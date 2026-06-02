@@ -1,67 +1,59 @@
-"""
-FastAPI 后端入口
-功能：
-    - 提供多智能体系统接口
-    - 接收用户输入，返回学习路径、资源、知识和评估结果
-"""
-
+# backend/app.py
 from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import Dict
-from agents.agent_orchestrator import AgentOrchestrator
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="EduAgent Backend", version="0.1")
+app = FastAPI(
+    title="EduAgent Backend",
+    description="基于大模型的个性化学习多智能体系统后端",
+    version="0.1.0"
+)
 
-# ==========================
-# 请求体模型
-# ==========================
-class UserRequest(BaseModel):
-    student_id: str
-    user_input: Dict  # 学生画像输入
-    topic: str        # 学习主题
-    action: str = "full_pipeline"  # 可选：full_pipeline / record_learning / evaluate
-    record: Dict = None  # 如果 action=record_learning, 需要 {"resource": str, "score": float}
+# 允许跨域访问（前端 React 5173端口可访问）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 生产环境可改成具体域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# 根路径测试
+@app.get("/")
+def root():
+    return {"msg": "EduAgent Backend Running"}
 
-# ==========================
-# 全局 Orchestrator 存储
-# ==========================
-orchestrators: Dict[str, AgentOrchestrator] = {}
+# MVP聊天接口：返回结构化学生画像
+@app.post("/chat")
+def chat(data: dict):
+    """
+    前端发送 JSON 格式：
+    { "message": "我是计算机二年级学生" }
+    返回结构化学生画像
+    """
+    message = data.get("message", "")
 
-def get_orchestrator(student_id: str):
-    if student_id not in orchestrators:
-        orchestrators[student_id] = AgentOrchestrator(student_id)
-    return orchestrators[student_id]
+    # 模拟生成6维学生画像
+    profile = {
+        "knowledge_level": "中等",           # 知识水平
+        "learning_goal": "考研",             # 学习目标
+        "weak_points": ["概率论", "数据结构"], # 学生薄弱点
+        "interest": ["人工智能", "前端开发"], # 兴趣方向
+        "study_style": "视觉型",             # 学习风格
+        "preferred_resources": ["文档", "视频"], # 偏好资源
+        "analysis": f"已分析输入：{message}"   # 简单分析输入
+    }
 
+    return {"reply": profile}
 
-# ==========================
-# 接口：运行完整流程
-# ==========================
-@app.post("/run")
-def run_pipeline(req: UserRequest):
-    agent = get_orchestrator(req.student_id)
-
-    if req.action == "full_pipeline":
-        result = agent.run_full_pipeline(req.user_input, req.topic)
-        return {"status": "success", "data": result}
-
-    elif req.action == "record_learning":
-        if not req.record:
-            return {"status": "error", "message": "record missing"}
-        agent.record_learning(req.record.get("resource"), req.record.get("score"))
-        return {"status": "success", "message": "record added"}
-
-    elif req.action == "evaluate":
-        result = agent.evaluate()
-        return {"status": "success", "evaluation": result}
-
-    else:
-        return {"status": "error", "message": f"unknown action {req.action}"}
-
-
-# ==========================
-# 健康检查
-# ==========================
-@app.get("/health")
-def health_check():
-    return {"status": "ok", "message": "Backend running"}
+# 可选：未来可扩展多智能体资源生成接口
+@app.post("/generate_resource")
+def generate_resource(data: dict):
+    """
+    输入：
+    {
+        "profile": {...学生画像...},
+        "course": "人工智能入门"
+    }
+    返回个性化学习资源（文档、视频、题库）
+    """
+    return {"reply": "资源生成功能待实现"}
