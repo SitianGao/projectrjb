@@ -262,8 +262,9 @@
   * 提供生成进度提示 
   * 支持流式展示结果 
 * 避免长时间无响应或白屏等待情况
-* 
-##2.3 性能需求（Performance Requirements）
+
+
+## 2.3 性能需求（Performance Requirements）
 
 ## 1️⃣ 响应时间要求
 
