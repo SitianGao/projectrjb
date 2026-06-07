@@ -1,9 +1,7 @@
 """学习资源表"""
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey
-from sqlalchemy.orm import declarative_base
+from . import Base
 import datetime
-
-Base = declarative_base()
 
 
 class Resource(Base):

@@ -1,9 +1,7 @@
 """学习路径表"""
 from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
-from sqlalchemy.orm import declarative_base
+from . import Base
 import datetime
-
-Base = declarative_base()
 
 
 class LearningPath(Base):

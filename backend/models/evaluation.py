@@ -1,9 +1,7 @@
 """学习记录 & 评估表"""
 from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey
-from sqlalchemy.orm import declarative_base
+from . import Base
 import datetime
-
-Base = declarative_base()
 
 
 class LearningRecord(Base):

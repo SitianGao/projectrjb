@@ -1,9 +1,7 @@
 """学生 & 画像表"""
 from sqlalchemy import Column, String, Float, DateTime, Text, ForeignKey
-from sqlalchemy.orm import declarative_base
+from . import Base
 import datetime
-
-Base = declarative_base()
 
 
 class Student(Base):
