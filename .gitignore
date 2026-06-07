@@ -4,6 +4,7 @@ __pycache__/
 venv/
 .env
 *.db
+logs/
 
 # Node
 node_modules/
