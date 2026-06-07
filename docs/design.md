@@ -22,6 +22,14 @@
 | 学习效果评估 | 多维评估 + 反馈闭环，自动调整学习策略 |
 | 多模态资源生成 | 课程文档、思维导图、练习题、代码案例、PPT、图表 |
 
+### 1.3 用例图（学生视角）
+
+下图展示了学生用户与本系统的核心交互场景，包括画像构建、路径规划、资源生成、智能辅导和学习评估五个主要用例。
+
+![学生视角用例图](images/use-case.png)
+
+*图 1-1：学生视角用例图。学生通过对话式画像构建初始化个人学习档案，随后系统生成个性化学习路径与配套资源。学生在学习过程中可随时进行智能问答，系统根据学习记录进行评估并动态调整学习计划。*
+
 ---
 
 ## 2. 系统架构
@@ -68,6 +76,12 @@
                                               SQLite/MySQL              知识库文档
 ```
 
+### 2.2a 系统架构图
+
+![系统架构图](images/architecture.png)
+
+*图 2-1：系统整体架构图。系统采用五层架构设计——前端层（React + Ant Design）、后端层（FastAPI）、AI 层（LangGraph Agent 编排 + 讯飞星火 LLM + ChromaDB RAG）、数据层（SQLite/MySQL）和部署层（Docker + Nginx）。各层之间通过 HTTP/SSE 协议通信，数据从上到下逐层传递。*
+
 ### 2.3 数据流
 
 ```
@@ -80,6 +94,10 @@
 7. 用户触发 TutorAgent（问答）或 EvaluateAgent（评估）
 8. 评估结果反馈 → 调整路径和资源 → 闭环
 ```
+
+![顶层和一层数据流图](images/dfd-level0&1.png)
+
+*图 2-2：顶层数据流图（Level 0）和一层数据流图（Level 1）。顶层 DFD 展示了系统与外部实体（学生用户）之间的数据交互——学生输入学习描述，系统返回画像、路径、资源和评估报告。一层 DFD 将系统分解为画像管理、路径规划、资源生成、智能辅导和学习评估五个核心处理模块，以及学生信息库、知识库和学习记录库三个数据存储。*
 
 ---
 
@@ -234,6 +252,10 @@ students 1 ──── * resources           (一个学生多个资源)
 students 1 ──── * learning_records    (一个学生多条学习记录)
 learning_paths 1 ──── * resources     (一个路径关联多个资源)
 ```
+
+![ER图](images/er-diagram.png)
+
+*图 5-1：数据库 ER 图。系统包含 5 张核心表：students（学生）与 student_profiles（画像）、learning_paths（学习路径）、resources（学习资源）、learning_records（学习记录）之间为一对多关系。student_profiles 中的 memory_strength 字段存储各知识点的记忆强度，支撑遗忘曲线驱动的间隔复习功能。*
 
 ### 5.2 表结构
 
@@ -394,6 +416,10 @@ TutorAgent  EvaluateAgent  ← 用户主动触发
                ▼
          评估 → 调整路径/资源 → 闭环
 ```
+
+![时序图](images/sequence.png)
+
+*图 7-1：多 Agent 协同工作时序图。展示了学生用户从发起对话到获得学习资源的完整交互过程：(1) 学生在 ProfilePage 输入学习描述 → ProfileAgent 通过 LLM 分析并返回学生画像；(2) 画像就绪后 PlannerAgent 和 ResourceAgent 并行执行——前者生成学习路径，后者生成配套学习资源；(3) 结果推送到前端，学生可在 TutorPage 发起智能问答，或在 EvaluatePage 查看学习评估报告。整个过程采用 SSE 流式传输，保证交互的实时性。*
 
 ### 7.2 Agent 职责与输入/输出
 
