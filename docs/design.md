@@ -493,9 +493,134 @@ TutorAgent 支持 4 种解释风格切换：
 
 ---
 
-## 10. 部署方案
+## 10. 开发计划与协作约定
 
-### 10.1 Docker Compose
+### 10.1 人员分工
+
+本计划与 `prepare.md`、`github-workflow.md`、`test_plan.md` 保持一致：团队共 3 人，开发周期约 24 天，其中 Day 18-22 为期末考试缓冲期，不安排代码开发。
+
+| 角色 | 分支 | 负责范围 | 核心交付物 |
+|------|------|----------|----------|
+| 队长 | `feature/backend-core` | 后端 API、数据库模型、AgentOrchestrator、LLMClient、异步任务、Docker 集成、项目进度 | FastAPI 全部端点、统一接口规范、数据库表、Docker Compose、最终集成包 |
+| 队员A | `feature/frontend-core` | 前端全部页面、组件、SSE 流式展示、Markdown/Mermaid/markmap 渲染、交互体验 | React 页面、API 调用封装、通用组件、前端联调截图、演示录屏素材 |
+| 队员B | `feature/ai-core` | Agent 核心逻辑、Prompt、RAG、知识库、内容安全、AI 输出质量测试 | 5 个 Agent、RAG 管线、知识库样例、内容过滤、AI 输出样例和测试用例 |
+
+### 10.2 每日任务与交付物
+
+| 天数 | 队长：后端 + 集成 | 队员A：前端 | 队员B：AI/RAG + 安全 | 当日交付 |
+|------|------------------|-------------|---------------------|----------|
+| Day 1 | 创建 `feature/backend-core`；搭建 FastAPI、CORS、配置读取、日志结构 | 创建 `feature/frontend-core`；搭建 Vite + React + Ant Design；完成路由骨架 | 创建 `feature/ai-core`；整理赛题知识点与课程样例；确定 Agent 输入输出草案 | 前后端可启动，三条分支创建完成，接口草案 v0.1 |
+| Day 2 | 建立 SQLite 连接、SQLAlchemy 基类；创建 students、student_profiles 初版 | 完成 HomePage、ProfilePage 静态结构；封装 `api/client.js` | 完成 ProfileAgent Prompt v0.1；准备 3 组画像对话样例 | 项目骨架、画像表、画像页面、画像 Prompt 样例 |
+| Day 3 | 实现 `/api/profile/chat`、`/api/profile/{student_id}`；接入 SSE 返回格式 | 完成 ChatBox、ProfileCard；用 Mock 数据展示画像 | 实现 ProfileAgent 画像抽取逻辑，输出 6 维 JSON | 画像构建链路可用：Mock/后端均可演示 |
+| Day 4 | 创建 learning_paths 表；实现 `/api/planner/generate` 和 `/api/planner/{student_id}` | 完成 LearningPathPage、PathTimeline；接入规划 Mock 数据 | 完成 PlannerAgent Prompt 和路径 JSON 结构 | 可生成并展示阶段式学习路径 |
+| Day 5 | 实现 AgentOrchestrator 初版，串联 ProfileAgent 与 PlannerAgent | 前端接入真实画像和路径接口；处理加载态和错误态 | 联调 ProfileAgent、PlannerAgent；修正字段不一致问题 | 画像 → 路径端到端联调通过 |
+| Day 6 | 创建 resources 表；实现 `/api/resource/generate` 初版 | 完成 ResourcePage、ResourceCard、MarkdownRenderer | 完成 ResourceAgent，支持 document、exercise、code 三类资源 | 可生成并展示基础学习资源 |
+| Day 7 | 实现 task_manager；完成 `/api/task/{task_id}/status` | 完成 ProgressBar、useTaskStatus；接入异步资源生成状态 | 补充 mindmap、ppt 大纲、reading 类型资源生成 Prompt | 异步资源生成闭环可演示 |
+| Day 8 | 封装 LLMClient，统一星火/DeepSeek 调用和重试 | 完成 MindMapViewer、MermaidChart；支持多模态资源渲染 | 搭建 embedding、vector_store、retriever 初版 | LLM 调用封装、RAG 骨架、多模态展示组件 |
+| Day 9 | 实现 `/api/tutor/chat` SSE；接入 RAG 检索结果参数 | 完成 TutorPage；支持流式问答展示 | 完成 TutorAgent，多解释风格：analogy、formula、visual、story | 智能辅导流式问答可用 |
+| Day 10 | 创建 learning_records 表；实现 `/api/evaluate/record` | 完成 EvaluatePage 静态结构、学习记录提交交互 | 完成 EvaluateAgent 初版，输出评分、薄弱点、建议 | 学习记录提交与评估页面可用 |
+| Day 11 | 实现 `/api/evaluate/start`、`/api/evaluate/report/{student_id}` | 接入评估报告真实接口；展示评分图表和建议 | 实现遗忘曲线计算与 review_plan 输出 | 学习评估闭环可演示 |
+| Day 12 | 完成资源、问答、评估接口错误处理；统一状态码和错误格式 | 补齐全站空状态、错误提示、重试按钮 | 完成 content_filter；补充防幻觉 Prompt 约束 | 创新点、安全过滤、错误处理初版完成 |
+| Day 13 | 端到端联调五大流程；修复接口字段和数据库问题 | 全流程接入真实 API；清理 Mock 依赖 | 整理知识库文档，调优检索相关性 | 主流程 E2E：画像、路径、资源、问答、评估 |
+| Day 14 | 性能优化：SSE 首字延迟、异步任务进度、LLM 超时重试 | 响应式适配；优化移动端和评委演示屏尺寸 | 执行 Agent 单元测试、安全测试、内容质量测试 | 性能与兼容性问题清单 |
+| Day 15 | 完成接口测试；Swagger 示例逐个跑通 | 完成 UI 细节、加载骨架、演示路径固定入口 | 完成测试样例：画像、路径、资源、问答、评估 | `test_plan.md` 中核心功能测试基本通过 |
+| Day 16 | 配置 Docker Compose、数据库初始化、环境变量模板 | 修复前端 Bug；补充演示截图 | 完成文档初稿：Agent、RAG、安全、知识库说明 | 可一键启动的 Demo 包初版 |
+| Day 17 | 完成最终集成、README 启动说明、开源协议检查 | 完成前端最终走查和录屏准备 | 完成 AI 输出样例、内容安全验收、开源标注 | Day 17 前完成全部代码，进入冻结期 |
+| Day 18 | 不开发；仅记录发现的问题，不改代码 | 不开发；整理个人负责部分说明 | 不开发；整理知识库和 Prompt 说明 | 期末缓冲，问题记录 |
+| Day 19 | 不开发；保留紧急 P0 修复窗口 | 不开发；保留紧急 P0 修复窗口 | 不开发；保留紧急 P0 修复窗口 | 期末缓冲 |
+| Day 20 | 不开发 | 不开发 | 不开发 | 期末缓冲 |
+| Day 21 | 不开发 | 不开发 | 不开发 | 期末缓冲 |
+| Day 22 | 不开发；晚上统一确认 Day 23 收尾清单 | 不开发；准备演示素材 | 不开发；准备文档补充素材 | 收尾清单 |
+| Day 23 | 最终打包；检查 Docker、Swagger、环境变量；编写演示脚本 | 录制演示视频；补充关键页面截图 | 完善系统设计、测试报告、AI 模块说明 | 提交包候选版 |
+| Day 24 | 最终验收：按评分点检查代码、文档、演示材料 | 修复演示视频和截图中的小问题 | 检查知识库、Prompt、测试结论、开源致谢 | 最终提交包：代码、文档、PPT、演示视频 |
+
+### 10.3 协作流程
+
+- 每天开始写代码前，三人都先切到 `main` 拉取最新代码，再切回自己的功能分支并合并 `main`。
+- 每天结束前提交日报，格式为：`已完成 / 今日交付物 / 遇到问题 / 需要谁配合 / 明日计划`。
+- 队长负责合并 PR 和维护主分支稳定；队员A、队员B完成阶段功能后向 `main` 提交 PR。
+- 提交信息使用 `feat:`、`fix:`、`refactor:`、`docs:` 前缀，例如 `feat: 完成TutorAgent流式问答功能`。
+- 前后端联调以 Swagger、SSE 示例和本章接口规范为准；字段变更必须先在群里确认，再同步更新设计文档。
+- AI 输出结构由队长和队员B先确认 JSON Schema，队员A只消费稳定字段；临时字段不得直接进入页面逻辑。
+- 测试安排遵循 `test_plan.md`：Day 6-9 做 Agent 单元测试，Day 9-12 做接口测试，Day 13-15 做集成和性能测试，Day 16-17 做验收测试。
+
+### 10.4 接口统一约定
+
+#### 10.4.1 请求与响应格式
+
+- 所有后端接口统一以 `/api/` 开头。
+- 普通接口返回 JSON，流式接口使用 SSE。
+- 所有请求体和响应体字段使用 `snake_case`，前端展示时再转换为中文文案。
+- 时间字段统一使用 ISO 8601 字符串，例如 `2026-06-07T10:30:00+08:00`。
+- ID 字段统一使用字符串，学生 ID 使用 UUID，任务 ID 使用 `task_` 前缀。
+- 前端请求封装统一放在 `frontend/src/api/`，后端路由统一放在 `backend/api/`，Agent 输出结构统一由 `backend/agents/` 维护。
+
+成功响应统一格式：
+
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "ok"
+}
+```
+
+错误响应统一格式：
+
+```json
+{
+  "success": false,
+  "error": true,
+  "code": "ERROR_CODE",
+  "message": "错误描述"
+}
+```
+
+#### 10.4.2 SSE 事件格式
+
+流式接口统一返回以下事件类型：
+
+| type | 用途 | 示例 |
+|------|------|------|
+| `start` | 任务开始 | `{"type":"start","message":"开始生成"}` |
+| `delta` | 文本增量 | `{"type":"delta","content":"本节内容..."}` |
+| `progress` | 进度更新 | `{"type":"progress","progress":0.5,"message":"正在检索知识库"}` |
+| `data` | 结构化结果 | `{"type":"data","data":{...}}` |
+| `error` | 流式错误 | `{"type":"error","code":"LLM_ERROR","message":"模型调用失败"}` |
+| `done` | 任务完成 | `{"type":"done"}` |
+
+SSE 示例：
+
+```text
+data: {"type":"start","message":"开始生成学习路径"}
+data: {"type":"delta","content":"第一阶段：数学基础补强"}
+data: {"type":"data","data":{"stages":[...]}}
+data: {"type":"done"}
+```
+
+#### 10.4.3 Agent 输出结构约定
+
+| Agent | 必须输出字段 | 说明 |
+|-------|-------------|------|
+| ProfileAgent | `student_id`, `profile`, `completeness`, `next_questions` | `profile` 包含知识基础、目标、历史、风格、薄弱点、兴趣 6 维 |
+| PlannerAgent | `goal`, `stages`, `current_stage`, `estimated_days` | `stages` 中每项包含 `title`、`objectives`、`topics`、`tasks` |
+| ResourceAgent | `resources` | 每个资源包含 `type`、`title`、`topic`、`difficulty`、`content` |
+| TutorAgent | `answer`, `explanation_style`, `references`, `diagrams` | `diagrams` 可为空数组，图表内容使用 Mermaid 文本 |
+| EvaluateAgent | `overall_score`, `dimensions`, `weak_topics`, `suggestions`, `review_plan` | `review_plan` 用于驱动复习推荐 |
+
+#### 10.4.4 联调验收标准
+
+- Swagger 能显示所有接口，且请求示例可直接运行。
+- 前端页面不依赖假数据即可完成主流程演示。
+- Agent 输出必须是可解析 JSON；若模型输出异常，后端需要返回统一错误格式。
+- 每个接口至少保留 1 个成功样例和 1 个失败样例。
+- Docker 启动后，评委只需访问前端地址即可完成画像、路径、资源、问答、评估五个核心流程。
+
+---
+
+## 11. 部署方案
+
+### 11.1 Docker Compose
 
 ```yaml
 services:
@@ -505,7 +630,7 @@ services:
   # MySQL 和 Redis 按需添加
 ```
 
-### 10.2 评委启动方式
+### 11.2 评委启动方式
 
 ```bash
 # 一键启动
@@ -516,7 +641,7 @@ docker-compose up -d
 后端 API 文档：http://localhost:8000/docs
 ```
 
-### 10.3 降级方案
+### 11.3 降级方案
 
 如果 Docker 有问题，提供手动启动脚本：
 - `start.sh`（Linux/Mac）
@@ -524,7 +649,7 @@ docker-compose up -d
 
 ---
 
-## 11. 开源合规
+## 12. 开源合规
 
 | 依赖 | 协议 |
 |------|------|
