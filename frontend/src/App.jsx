@@ -24,7 +24,7 @@ const { Header, Content, Sider } = Layout
 const { Text } = Typography
 
 const menuItems = [
-  { key: '/', icon: <HomeOutlined />, label: '仪表盘' },
+  { key: '/', icon: <HomeOutlined />, label: '个人中心' },
   { key: '/profile', icon: <UserOutlined />, label: '学生画像' },
   { key: '/learning-path', icon: <RiseOutlined />, label: '学习路径' },
   { key: '/resources', icon: <FileTextOutlined />, label: '学习资源' },

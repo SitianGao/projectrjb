@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Row, Col, Card, Statistic, Typography, Space, List, Tag } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Row, Col, Card, Statistic, Typography, Space, List, Tag, Avatar, Progress } from 'antd'
 import {
   UserOutlined,
   BookOutlined,
@@ -8,6 +8,9 @@ import {
   RiseOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
+  CaretUpOutlined,
+  CaretDownOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
 import { getProfile } from '../api/profile'
@@ -19,7 +22,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton'
 const { Title, Text } = Typography
 
 /**
- * 首页 / 仪表盘
+ * 首页 / 个人中心
  *
  * 展示学生概况：画像摘要、学习进度、最近路径、快捷入口
  */
@@ -64,8 +67,8 @@ export default function HomePage() {
             ],
           })
           setPaths([
-            { id: '1', title: '高中数学 — 函数专题', status: 'in_progress', updatedAt: new Date() },
-            { id: '2', title: '物理力学基础', status: 'completed', updatedAt: new Date(Date.now() - 86400000) },
+            { id: '1', title: '高中数学 — 函数专题', status: 'in_progress', progress: 62, updatedAt: new Date() },
+            { id: '2', title: '物理力学基础', status: 'completed', progress: 100, updatedAt: new Date(Date.now() - 86400000) },
           ])
           setEvaluation({
             overallScore: 78,
@@ -93,100 +96,448 @@ export default function HomePage() {
     { to: '/evaluate', icon: <TrophyOutlined />, label: '学习评估', desc: '进度追踪与评分' },
   ]
 
+  /** 趋势箭头 */
+  const trendArrow = evaluation?.recentTrend === 'up'
+    ? <CaretUpOutlined style={{ color: '#52c41a', fontSize: 14 }} />
+    : evaluation?.recentTrend === 'down'
+      ? <CaretDownOutlined style={{ color: '#ff4d4f', fontSize: 14 }} />
+      : null
+
   return (
     <div>
-      <Title level={3}>仪表盘</Title>
-      <Text type="secondary">欢迎回来，{profile?.name || '同学'}</Text>
+      {/* ========== 页面标题 ========== */}
+      <Title level={3} style={{ color: 'var(--text-h, #08060d)', marginBottom: 24 }}>
+        个人中心
+      </Title>
 
-      {/* 统计卡片 */}
-      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="综合评分"
-              value={evaluation?.overallScore || 0}
-              suffix="分"
-              prefix={<TrophyOutlined />}
-              valueStyle={{ color: '#1677ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="学习进度"
-              value={profile?.progress || 0}
-              suffix="%"
-              prefix={<RiseOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="完成任务"
-              value={evaluation?.completedTasks || 0}
-              prefix={<CheckCircleOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="学习时长"
-              value={evaluation?.totalHours || 0}
-              suffix="h"
-              prefix={<ClockCircleOutlined />}
-            />
-          </Card>
-        </Col>
-      </Row>
+      {/* ========== 欢迎横幅 — 深色科技渐变 ========== */}
+      <div
+        className="tech-banner"
+        style={{
+          position: 'relative',
+          borderRadius: 16,
+          padding: '28px 32px',
+          marginBottom: 24,
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+          overflow: 'hidden',
+          color: '#fff',
+          boxShadow: '0 4px 24px rgba(15, 52, 96, 0.3)',
+        }}
+      >
+        {/* 背景光晕 */}
+        <div
+          style={{
+            position: 'absolute',
+            top: -40,
+            right: -40,
+            width: 200,
+            height: 200,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(170,59,255,0.25) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: -60,
+            left: '30%',
+            width: 280,
+            height: 140,
+            borderRadius: '50%',
+            background: 'radial-gradient(ellipse, rgba(59,130,246,0.18) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }}
+        />
+        {/* 网格线装饰 */}
+        <div
+          className="tech-grid"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+            pointerEvents: 'none',
+          }}
+        />
 
-      {/* 快捷入口 */}
-      <Title level={4} style={{ marginTop: 32 }}>快捷入口</Title>
+        <Row align="middle" gutter={[24, 16]} style={{ position: 'relative', zIndex: 1 }}>
+          <Col>
+            <Avatar
+              size={72}
+              icon={<UserOutlined />}
+              className="tech-avatar-glow"
+              style={{
+                backgroundColor: 'transparent',
+                border: '2px solid rgba(170,59,255,0.6)',
+                boxShadow: '0 0 20px rgba(170,59,255,0.4), inset 0 0 20px rgba(170,59,255,0.1)',
+              }}
+            />
+          </Col>
+          <Col flex="auto">
+            <Title level={4} style={{ margin: 0, color: '#fff', fontWeight: 600, letterSpacing: 0.5 }}>
+              欢迎回来，{profile?.name || '同学'}
+            </Title>
+            <Space size="middle" style={{ marginTop: 6 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.7)' }}>
+                {profile?.level || '--'} 级 · 学习进度 {profile?.progress ?? 0}%
+              </Text>
+              {trendArrow && (
+                <Text style={{ color: 'rgba(255,255,255,0.7)' }}>
+                  {trendArrow} {evaluation?.recentTrend === 'up' ? '持续进步中' : '继续加油'}
+                </Text>
+              )}
+            </Space>
+            <br />
+            <Space style={{ marginTop: 8 }}>
+              {profile?.strengths?.map((s) => (
+                <Tag
+                  key={s}
+                  color="purple"
+                  style={{
+                    borderRadius: 4,
+                    background: 'rgba(170,59,255,0.2)',
+                    border: '1px solid rgba(170,59,255,0.4)',
+                    color: '#d4adfc',
+                  }}
+                >
+                  ✨ 优势: {s}
+                </Tag>
+              ))}
+              {profile?.weaknesses?.map((w) => (
+                <Tag
+                  key={w}
+                  style={{
+                    borderRadius: 4,
+                    background: 'rgba(255,165,0,0.15)',
+                    border: '1px solid rgba(255,165,0,0.35)',
+                    color: '#ffb347',
+                  }}
+                >
+                  🎯 待提升: {w}
+                </Tag>
+              ))}
+            </Space>
+          </Col>
+        </Row>
+      </div>
+
+      {/* ========== 统计卡片 — 玻璃拟态 ========== */}
       <Row gutter={[16, 16]}>
-        {quickLinks.map((link) => (
-          <Col xs={24} sm={12} md={8} lg={4} key={link.to}>
-            <Link to={link.to} style={{ textDecoration: 'none' }}>
-              <Card hoverable style={{ textAlign: 'center', height: '100%' }}>
-                <div style={{ fontSize: 32, color: '#1677ff', marginBottom: 8 }}>
-                  {link.icon}
-                </div>
-                <Text strong>{link.label}</Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: 12 }}>{link.desc}</Text>
-              </Card>
-            </Link>
+        {[
+          {
+            title: '综合评分',
+            value: evaluation?.overallScore ?? 0,
+            suffix: '分',
+            icon: <TrophyOutlined />,
+            color: '#aa3bff',
+            trend: trendArrow,
+          },
+          {
+            title: '学习进度',
+            value: profile?.progress ?? 0,
+            suffix: '%',
+            icon: <RiseOutlined />,
+            color: '#52c41a',
+          },
+          {
+            title: '完成任务',
+            value: evaluation?.completedTasks ?? 0,
+            suffix: null,
+            icon: <CheckCircleOutlined />,
+            color: '#1677ff',
+          },
+          {
+            title: '学习时长',
+            value: evaluation?.totalHours ?? 0,
+            suffix: 'h',
+            icon: <ClockCircleOutlined />,
+            color: '#fa8c16',
+          },
+        ].map((stat) => (
+          <Col xs={24} sm={12} lg={6} key={stat.title}>
+            <Card
+              hoverable
+              className="tech-stat-card"
+              style={{
+                borderRadius: 12,
+                border: '1px solid var(--border, #e5e4e7)',
+                background: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(8px)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* 左侧彩色装饰条 */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: '15%',
+                  height: '70%',
+                  width: 3,
+                  borderRadius: '0 3px 3px 0',
+                  background: stat.color,
+                  opacity: 0.6,
+                }}
+              />
+              <Statistic
+                title={
+                  <Text style={{ color: '#595959', fontSize: 13 }}>{stat.title}</Text>
+                }
+                value={stat.value}
+                suffix={
+                  <span style={{ fontSize: 14 }}>
+                    {stat.suffix} {stat.trend}
+                  </span>
+                }
+                prefix={React.cloneElement(stat.icon, { style: { color: stat.color } })}
+                valueStyle={{ color: '#1a1a2e', fontWeight: 600 }}
+              />
+            </Card>
           </Col>
         ))}
       </Row>
 
-      {/* 最近学习路径 */}
-      <Title level={4} style={{ marginTop: 32 }}>学习路径</Title>
-      {paths.length > 0 ? (
-        <List
-          dataSource={paths.slice(0, 5)}
-          renderItem={(item) => (
-            <List.Item
-              extra={
-                <Tag color={item.status === 'completed' ? 'success' : 'processing'}>
-                  {item.status === 'completed' ? '已完成' : '进行中'}
-                </Tag>
-              }
-            >
-              <List.Item.Meta
-                title={<Link to="/learning-path">{item.title}</Link>}
-                description={`更新于 ${formatRelativeTime(item.updatedAt)}`}
-              />
-            </List.Item>
+      <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+        {/* ========== 左列：快捷入口 + 知识点 ========== */}
+        <Col xs={24} lg={12}>
+          {/* 快捷入口 */}
+          <div style={{ marginBottom: 24 }}>
+            <Title level={5} style={{ color: 'var(--text-h, #08060d)', marginBottom: 16 }}>
+              <ThunderboltOutlined style={{ color: 'var(--accent, #aa3bff)', marginRight: 8 }} />
+              快捷入口
+            </Title>
+            <Row gutter={[12, 12]}>
+              {quickLinks.map((link) => (
+                <Col xs={12} sm={8} md={8} key={link.to}>
+                  <Link to={link.to} style={{ textDecoration: 'none' }}>
+                    <Card
+                      hoverable
+                      className="tech-quick-card"
+                      style={{
+                        borderRadius: 12,
+                        textAlign: 'center',
+                        height: '100%',
+                        border: '1px solid var(--border, #e5e4e7)',
+                        background: 'rgba(255,255,255,0.7)',
+                        backdropFilter: 'blur(6px)',
+                      }}
+                    >
+                      <div
+                        className="tech-icon-circle"
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 12,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 22,
+                          color: '#fff',
+                          background: 'linear-gradient(135deg, #aa3bff 0%, #6366f1 100%)',
+                          marginBottom: 10,
+                          boxShadow: '0 4px 12px rgba(170,59,255,0.25)',
+                          transition: 'transform 0.25s, box-shadow 0.25s',
+                        }}
+                      >
+                        {link.icon}
+                      </div>
+                      <br />
+                      <Text strong style={{ color: '#2c2c2c', fontSize: 13 }}>
+                        {link.label}
+                      </Text>
+                      <br />
+                      <Text style={{ fontSize: 11, color: '#8c8c8c' }}>
+                        {link.desc}
+                      </Text>
+                    </Card>
+                  </Link>
+                </Col>
+              ))}
+            </Row>
+          </div>
+
+          {/* 知识点掌握度 */}
+          {profile?.topics?.length > 0 && (
+            <div>
+              <Title level={5} style={{ color: 'var(--text-h, #08060d)', marginBottom: 16 }}>
+                <BookOutlined style={{ color: 'var(--accent, #aa3bff)', marginRight: 8 }} />
+                知识点掌握度
+              </Title>
+              <Card
+                style={{
+                  borderRadius: 12,
+                  border: '1px solid var(--border, #e5e4e7)',
+                  background: 'rgba(255,255,255,0.7)',
+                  backdropFilter: 'blur(6px)',
+                }}
+              >
+                {profile.topics.map((topic) => {
+                  const pct = Math.round(topic.accuracy * 100)
+                  return (
+                    <div key={topic.name} style={{ marginBottom: 16 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Text style={{ color: '#2c2c2c', fontSize: 13, fontWeight: 500 }}>
+                          {topic.name}
+                        </Text>
+                        <Text
+                          className="tech-percent"
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: pct >= 80 ? '#52c41a' : pct >= 60 ? '#fa8c16' : '#ff4d4f',
+                          }}
+                        >
+                          {pct}%
+                        </Text>
+                      </div>
+                      <Progress
+                        percent={pct}
+                        size="small"
+                        showInfo={false}
+                        strokeColor={
+                          pct >= 80
+                            ? { '0%': '#52c41a', '100%': '#73d13d' }
+                            : pct >= 60
+                              ? { '0%': '#fa8c16', '100%': '#ffc53d' }
+                              : { '0%': '#ff4d4f', '100%': '#ff7a45' }
+                        }
+                        trailColor="rgba(0,0,0,0.06)"
+                      />
+                    </div>
+                  )
+                })}
+              </Card>
+            </div>
           )}
-        />
-      ) : (
-        <Card>
-          <Text type="secondary">暂无学习路径，前往 <Link to="/profile">画像页</Link> 开始创建</Text>
-        </Card>
-      )}
+        </Col>
+
+        {/* ========== 右列：学习路径 ========== */}
+        <Col xs={24} lg={12}>
+          <Title level={5} style={{ color: 'var(--text-h, #08060d)', marginBottom: 16 }}>
+            <RiseOutlined style={{ color: 'var(--accent, #aa3bff)', marginRight: 8 }} />
+            学习路径
+          </Title>
+          {paths.length > 0 ? (
+            <Card
+              style={{
+                borderRadius: 12,
+                border: '1px solid var(--border, #e5e4e7)',
+                background: 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(6px)',
+              }}
+            >
+              <List
+                dataSource={paths.slice(0, 5)}
+                renderItem={(item) => (
+                  <List.Item
+                    style={{
+                      padding: '12px 0',
+                      borderLeft: item.status === 'completed'
+                        ? '3px solid #52c41a'
+                        : '3px solid var(--accent, #aa3bff)',
+                      paddingLeft: 14,
+                      marginBottom: 4,
+                      borderRadius: '0 6px 6px 0',
+                      transition: 'background 0.2s',
+                      background: 'transparent',
+                    }}
+                    className="tech-path-item"
+                    extra={
+                      <Space size="small">
+                        {item.progress !== undefined && (
+                          <Progress
+                            percent={item.progress}
+                            size="small"
+                            style={{ width: 60 }}
+                            showInfo={false}
+                            strokeColor={
+                              item.status === 'completed'
+                                ? '#52c41a'
+                                : { '0%': '#aa3bff', '100%': '#6366f1' }
+                            }
+                            trailColor="rgba(0,0,0,0.06)"
+                          />
+                        )}
+                        <Tag
+                          color={item.status === 'completed' ? 'success' : 'processing'}
+                          style={{ borderRadius: 4, fontSize: 11 }}
+                        >
+                          {item.status === 'completed' ? '已完成' : '进行中'}
+                        </Tag>
+                      </Space>
+                    }
+                  >
+                    <List.Item.Meta
+                      avatar={
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background:
+                              item.status === 'completed'
+                                ? 'rgba(82,196,26,0.1)'
+                                : 'rgba(170,59,255,0.1)',
+                          }}
+                        >
+                          <BookOutlined
+                            style={{
+                              color: item.status === 'completed' ? '#52c41a' : '#aa3bff',
+                              fontSize: 15,
+                            }}
+                          />
+                        </div>
+                      }
+                      title={
+                        <Link
+                          to="/learning-path"
+                          style={{ color: '#2c2c2c', fontWeight: 500, fontSize: 14 }}
+                        >
+                          {item.title}
+                        </Link>
+                      }
+                      description={
+                        <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          更新于 {formatRelativeTime(item.updatedAt)}
+                        </Text>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            </Card>
+          ) : (
+            <Card
+              style={{
+                borderRadius: 12,
+                border: '1px solid var(--border, #e5e4e7)',
+                textAlign: 'center',
+                padding: '24px 0',
+              }}
+            >
+              <BookOutlined
+                style={{ fontSize: 48, color: 'var(--border, #e5e4e7)', marginBottom: 12 }}
+              />
+              <br />
+              <Text type="secondary">
+                暂无学习路径，前往 <Link to="/profile">画像页</Link> 开始创建
+              </Text>
+            </Card>
+          )}
+        </Col>
+      </Row>
     </div>
   )
 }
