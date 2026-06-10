@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from utils.logger import setup_logging
+from database import init_db
 
 # ---- 日志系统最先初始化 ----
 setup_logging()
@@ -42,6 +43,14 @@ app.include_router(resource_router, prefix="/api/resource", tags=["资源"])
 app.include_router(tutor_router, prefix="/api/tutor", tags=["辅导"])
 app.include_router(evaluate_router, prefix="/api/evaluate", tags=["评估"])
 app.include_router(task_router, prefix="/api/task", tags=["任务"])
+
+
+# ---- 启动事件 ----
+@app.on_event("startup")
+async def startup():
+    """应用启动时自动初始化数据库表"""
+    init_db()
+    logger.info("数据库表初始化完成")
 
 
 @app.get("/")
