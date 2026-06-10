@@ -179,7 +179,7 @@ class TestBuildProfileLLM:
             agent_llm.build_profile("s001", "继续学AI", history=history)
         )
         # 验证 user prompt 中包含历史记录
-        user_prompt = agent_llm.llm.calls[-1]["user"]
+        user_prompt = agent_llm.llm_client.calls[-1]["user"]
         assert "学过Python基础" in user_prompt
         assert "线性代数" in user_prompt
 
@@ -188,7 +188,7 @@ class TestBuildProfileLLM:
         asyncio.run(
             agent_llm.build_profile("s001", "我进步了", current_profile=existing)
         )
-        user_prompt = agent_llm.llm.calls[-1]["user"]
+        user_prompt = agent_llm.llm_client.calls[-1]["user"]
         assert "已有画像" in user_prompt
         assert "初级" in user_prompt
 
