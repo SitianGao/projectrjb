@@ -1,0 +1,83 @@
+[
+  {
+    "id": 1,
+    "question": "下列哪一项属于监督学习任务？",
+    "options": ["聚类用户分群", "预测房价", "关联规则挖掘", "降维"],
+    "answer": "预测房价",
+    "explanation": "预测房价是有明确标签（房价）的回归问题，属于监督学习。",
+    "knowledge_point": "监督学习",
+    "difficulty": "简单"
+  },
+  {
+    "id": 2,
+    "question": "在机器学习中，过拟合通常如何缓解？",
+    "options": ["增加模型复杂度", "减小训练数据量", "使用正则化", "不使用验证集"],
+    "answer": "使用正则化",
+    "explanation": "正则化可以惩罚大权重，降低模型复杂度，缓解过拟合。",
+    "knowledge_point": "过拟合与正则化",
+    "difficulty": "中等"
+  },
+  {
+    "id": 3,
+    "question": "交叉验证的主要作用是什么？",
+    "options": ["增加训练集大小", "更稳健地评估模型泛化能力", "减少计算量", "替代测试集"],
+    "answer": "更稳健地评估模型泛化能力",
+    "explanation": "交叉验证通过多次划分训练/验证集来更可靠地估计模型性能。",
+    "knowledge_point": "交叉验证",
+    "difficulty": "中等"
+  },
+  {
+    "id": 4,
+    "question": "下列哪个不是常见的回归评估指标？",
+    "options": ["MSE", "MAE", "Accuracy", "RMSE"],
+    "answer": "Accuracy",
+    "explanation": "Accuracy 是分类指标，不适用于回归问题。",
+    "knowledge_point": "模型评估",
+    "difficulty": "简单"
+  },
+  {
+    "id": 5,
+    "question": "梯度下降中学习率过大可能导致什么问题？",
+    "options": ["收敛速度变慢", "震荡或发散", "模型更稳定", "一定能找到全局最优"],
+    "answer": "震荡或发散",
+    "explanation": "学习率过大会使参数更新过大，导致训练过程震荡甚至发散。",
+    "knowledge_point": "梯度下降",
+    "difficulty": "中等"
+  },
+  {
+    "id": 6,
+    "question": "特征工程不包括下面哪一项？",
+    "options": ["特征缩放", "特征选择", "模型正则化", "类别编码"],
+    "answer": "模型正则化",
+    "explanation": "模型正则化是模型训练环节，不是特征工程本身。",
+    "knowledge_point": "特征工程",
+    "difficulty": "中等"
+  },
+  {
+    "id": 7,
+    "question": "哪种方法可以处理类不平衡问题？",
+    "options": ["欠采样/过采样", "增加学习率", "减少训练集", "删除验证集"],
+    "answer": "欠采样/过采样",
+    "explanation": "欠采样或过采样可以缓解类别不平衡问题，也可采用加权损失等方法。",
+    "knowledge_point": "数据处理",
+    "difficulty": "中等"
+  },
+  {
+    "id": 8,
+    "question": "在模型选择中，哪种方法用于自动搜索超参数？",
+    "options": ["Grid Search", "手动调参", "随机删除特征", "PCA"],
+    "answer": "Grid Search",
+    "explanation": "Grid Search 和 Random Search 等方法用于系统搜索超参数空间。",
+    "knowledge_point": "超参数调优",
+    "difficulty": "中等"
+  },
+  {
+    "id": 9,
+    "question": "KNN 算法适合哪类任务？",
+    "options": ["仅回归任务", "仅聚类任务", "分类与回归任务均可", "仅降维任务"],
+    "answer": "分类与回归任务均可",
+    "explanation": "KNN 可用于分类也可用于回归（取邻居均值），但计算量随数据增大而增大。",
+    "knowledge_point": "常见算法",
+    "difficulty": "简单"
+  }
+]

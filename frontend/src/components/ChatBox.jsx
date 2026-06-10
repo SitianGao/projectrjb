@@ -95,8 +95,11 @@ export default function ChatBox({
                   size="small"
                   icon={msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
                   style={{
-                    backgroundColor: msg.role === 'user' ? '#1677ff' : '#52c41a',
+                    backgroundColor: msg.role === 'user' ? '#1677ff' : '#aa3bff',
                     flexShrink: 0,
+                    boxShadow: msg.role === 'assistant'
+                      ? '0 2px 8px rgba(170,59,255,0.3)'
+                      : '0 2px 8px rgba(22,119,255,0.25)',
                   }}
                 />
                 <div
@@ -104,9 +107,21 @@ export default function ChatBox({
                     maxWidth: '80%',
                     padding: '10px 16px',
                     borderRadius: 12,
+                    textAlign: 'left',
                     backgroundColor:
-                      msg.role === 'user' ? '#e6f4ff' : msg.error ? '#fff2f0' : '#f5f5f5',
-                    border: msg.error ? '1px solid #ffccc7' : 'none',
+                      msg.role === 'user'
+                        ? '#e6f4ff'
+                        : msg.error
+                          ? '#fff2f0'
+                          : 'rgba(170,59,255,0.06)',
+                    border: msg.error
+                      ? '1px solid #ffccc7'
+                      : msg.role === 'assistant'
+                        ? '1px solid rgba(170,59,255,0.18)'
+                        : '1px solid rgba(22,119,255,0.15)',
+                    boxShadow: msg.role === 'assistant'
+                      ? '0 1px 4px rgba(170,59,255,0.06)'
+                      : 'none',
                   }}
                 >
                   {msg.role === 'assistant' ? (

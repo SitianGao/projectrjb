@@ -81,3 +81,111 @@
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ===== 首页个人中心 — 科技感动效 ===== */
+
+/* 欢迎横幅网格动画 */
+.tech-banner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.04),
+    transparent
+  );
+  animation: tech-shimmer 4s ease-in-out infinite;
+}
+
+@keyframes tech-shimmer {
+  0%, 100% { left: -100%; }
+  50% { left: 100%; }
+}
+
+/* 头像发光脉冲 */
+.tech-avatar-glow {
+  animation: avatar-pulse 3s ease-in-out infinite;
+}
+
+@keyframes avatar-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(170, 59, 255, 0.4), inset 0 0 20px rgba(170, 59, 255, 0.1); }
+  50% { box-shadow: 0 0 32px rgba(170, 59, 255, 0.6), inset 0 0 32px rgba(170, 59, 255, 0.15); }
+}
+
+/* 统计卡片 */
+.tech-stat-card {
+  transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+}
+.tech-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(170, 59, 255, 0.15);
+  border-color: rgba(170, 59, 255, 0.25) !important;
+}
+
+/* 快捷入口卡片 — 图标圆角方块 */
+.tech-quick-card {
+  transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+}
+.tech-quick-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(170, 59, 255, 0.2);
+  border-color: rgba(170, 59, 255, 0.3) !important;
+}
+.tech-quick-card:hover .tech-icon-circle {
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(170, 59, 255, 0.4);
+}
+
+/* 学习路径条目 hover */
+.tech-path-item:hover {
+  background: rgba(170, 59, 255, 0.03) !important;
+  border-radius: 0 6px 6px 0;
+}
+
+/* 知识点百分比 */
+.tech-percent {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+}
+
+/* 画像页卡片 hover */
+.tech-profile-card {
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+.tech-profile-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(170, 59, 255, 0.12);
+  border-color: rgba(170, 59, 255, 0.2) !important;
+}
+
+.tech-profile-chat {
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+.tech-profile-chat:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(170, 59, 255, 0.12);
+  border-color: rgba(170, 59, 255, 0.2) !important;
+}
+
+/* ---- 向下兼容旧类名 ---- */
+.stat-card {
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+}
+
+.quick-link-card {
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+.quick-link-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+
+.quick-link-card:hover > div > .anticon {
+  transform: scale(1.1);
+}
