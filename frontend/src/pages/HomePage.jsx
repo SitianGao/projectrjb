@@ -106,7 +106,7 @@ export default function HomePage() {
   return (
     <div>
       {/* ========== 页面标题 ========== */}
-      <Title level={3} style={{ color: 'var(--text-h, #08060d)', marginBottom: 24 }}>
+      <Title level={3} style={{ color: '#1a1a2e', marginTop: -8, marginBottom: 12 }}>
         个人中心
       </Title>
 
@@ -118,10 +118,10 @@ export default function HomePage() {
           borderRadius: 16,
           padding: '28px 32px',
           marginBottom: 24,
-          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+          background: 'linear-gradient(135deg, #0f0c29 0%, #1a1040 40%, #0d1b3e 100%)',
           overflow: 'hidden',
           color: '#fff',
-          boxShadow: '0 4px 24px rgba(15, 52, 96, 0.3)',
+          boxShadow: '0 4px 32px rgba(99, 102, 241, 0.25), 0 1px 4px rgba(0, 0, 0, 0.15)',
         }}
       >
         {/* 背景光晕 */}
@@ -130,10 +130,10 @@ export default function HomePage() {
             position: 'absolute',
             top: -40,
             right: -40,
-            width: 200,
-            height: 200,
+            width: 220,
+            height: 220,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(170,59,255,0.25) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(99, 102, 241, 0.1) 40%, transparent 70%)',
             pointerEvents: 'none',
           }}
         />
@@ -141,11 +141,11 @@ export default function HomePage() {
           style={{
             position: 'absolute',
             bottom: -60,
-            left: '30%',
-            width: 280,
-            height: 140,
+            left: '25%',
+            width: 300,
+            height: 150,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse, rgba(59,130,246,0.18) 0%, transparent 70%)',
+            background: 'radial-gradient(ellipse, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0.08) 40%, transparent 70%)',
             pointerEvents: 'none',
           }}
         />
@@ -156,7 +156,7 @@ export default function HomePage() {
             position: 'absolute',
             inset: 0,
             backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+              'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
             backgroundSize: '40px 40px',
             pointerEvents: 'none',
           }}
@@ -170,21 +170,21 @@ export default function HomePage() {
               className="tech-avatar-glow"
               style={{
                 backgroundColor: 'transparent',
-                border: '2px solid rgba(170,59,255,0.6)',
-                boxShadow: '0 0 20px rgba(170,59,255,0.4), inset 0 0 20px rgba(170,59,255,0.1)',
+                border: '2px solid rgba(139, 92, 246, 0.6)',
+                boxShadow: '0 0 28px rgba(139, 92, 246, 0.4), inset 0 0 20px rgba(139, 92, 246, 0.12)',
               }}
             />
           </Col>
           <Col flex="auto">
-            <Title level={4} style={{ margin: 0, color: '#fff', fontWeight: 600, letterSpacing: 0.5 }}>
+            <Title level={4} style={{ margin: 0, color: '#f8f7ff', fontWeight: 600, letterSpacing: 0.5 }}>
               欢迎回来，{profile?.name || '同学'}
             </Title>
             <Space size="middle" style={{ marginTop: 6 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.7)' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.78)' }}>
                 {profile?.level || '--'} 级 · 学习进度 {profile?.progress ?? 0}%
               </Text>
               {trendArrow && (
-                <Text style={{ color: 'rgba(255,255,255,0.7)' }}>
+                <Text style={{ color: 'rgba(255,255,255,0.78)' }}>
                   {trendArrow} {evaluation?.recentTrend === 'up' ? '持续进步中' : '继续加油'}
                 </Text>
               )}
@@ -197,12 +197,13 @@ export default function HomePage() {
                   color="purple"
                   style={{
                     borderRadius: 4,
-                    background: 'rgba(170,59,255,0.2)',
-                    border: '1px solid rgba(170,59,255,0.4)',
-                    color: '#d4adfc',
+                    background: 'rgba(139, 92, 246, 0.25)',
+                    border: '1px solid rgba(139, 92, 246, 0.45)',
+                    color: '#c4b5fd',
+                    fontWeight: 500,
                   }}
                 >
-                  ✨ 优势: {s}
+                  优势: {s}
                 </Tag>
               ))}
               {profile?.weaknesses?.map((w) => (
@@ -210,12 +211,13 @@ export default function HomePage() {
                   key={w}
                   style={{
                     borderRadius: 4,
-                    background: 'rgba(255,165,0,0.15)',
-                    border: '1px solid rgba(255,165,0,0.35)',
-                    color: '#ffb347',
+                    background: 'rgba(251, 191, 36, 0.18)',
+                    border: '1px solid rgba(251, 191, 36, 0.4)',
+                    color: '#fcd34d',
+                    fontWeight: 500,
                   }}
                 >
-                  🎯 待提升: {w}
+                  待提升: {w}
                 </Tag>
               ))}
             </Space>
@@ -263,10 +265,11 @@ export default function HomePage() {
               style={{
                 borderRadius: 12,
                 border: '1px solid var(--border, #e5e4e7)',
-                background: 'rgba(255,255,255,0.8)',
-                backdropFilter: 'blur(8px)',
+                background: 'rgba(255,255,255,0.82)',
+                backdropFilter: 'blur(10px)',
                 position: 'relative',
                 overflow: 'hidden',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04)',
               }}
             >
               {/* 左侧彩色装饰条 */}
@@ -278,13 +281,13 @@ export default function HomePage() {
                   height: '70%',
                   width: 3,
                   borderRadius: '0 3px 3px 0',
-                  background: stat.color,
-                  opacity: 0.6,
+                  background: `linear-gradient(180deg, ${stat.color}, ${stat.color}cc)`,
+                  opacity: 0.8,
                 }}
               />
               <Statistic
                 title={
-                  <Text style={{ color: '#595959', fontSize: 13 }}>{stat.title}</Text>
+                  <Text style={{ color: '#595959', fontSize: 13, fontWeight: 500 }}>{stat.title}</Text>
                 }
                 value={stat.value}
                 suffix={
@@ -293,7 +296,7 @@ export default function HomePage() {
                   </span>
                 }
                 prefix={React.cloneElement(stat.icon, { style: { color: stat.color } })}
-                valueStyle={{ color: '#1a1a2e', fontWeight: 600 }}
+                valueStyle={{ color: '#1a1a2e', fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -305,8 +308,8 @@ export default function HomePage() {
         <Col xs={24} lg={12}>
           {/* 快捷入口 */}
           <div style={{ marginBottom: 24 }}>
-            <Title level={5} style={{ color: 'var(--text-h, #08060d)', marginBottom: 16 }}>
-              <ThunderboltOutlined style={{ color: 'var(--accent, #aa3bff)', marginRight: 8 }} />
+            <Title level={5} style={{ color: '#1a1a2e', marginBottom: 16 }}>
+              <ThunderboltOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />
               快捷入口
             </Title>
             <Row gutter={[12, 12]}>
@@ -321,8 +324,9 @@ export default function HomePage() {
                         textAlign: 'center',
                         height: '100%',
                         border: '1px solid var(--border, #e5e4e7)',
-                        background: 'rgba(255,255,255,0.7)',
-                        backdropFilter: 'blur(6px)',
+                        background: 'rgba(255,255,255,0.8)',
+                        backdropFilter: 'blur(8px)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                       }}
                     >
                       <div
@@ -336,16 +340,16 @@ export default function HomePage() {
                           justifyContent: 'center',
                           fontSize: 22,
                           color: '#fff',
-                          background: 'linear-gradient(135deg, #aa3bff 0%, #6366f1 100%)',
+                          background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
                           marginBottom: 10,
-                          boxShadow: '0 4px 12px rgba(170,59,255,0.25)',
+                          boxShadow: '0 4px 14px rgba(139, 92, 246, 0.3)',
                           transition: 'transform 0.25s, box-shadow 0.25s',
                         }}
                       >
                         {link.icon}
                       </div>
                       <br />
-                      <Text strong style={{ color: '#2c2c2c', fontSize: 13 }}>
+                      <Text strong style={{ color: '#1a1a2e', fontSize: 13 }}>
                         {link.label}
                       </Text>
                       <br />
@@ -362,16 +366,17 @@ export default function HomePage() {
           {/* 知识点掌握度 */}
           {profile?.topics?.length > 0 && (
             <div>
-              <Title level={5} style={{ color: 'var(--text-h, #08060d)', marginBottom: 16 }}>
-                <BookOutlined style={{ color: 'var(--accent, #aa3bff)', marginRight: 8 }} />
+              <Title level={5} style={{ color: '#1a1a2e', marginBottom: 16 }}>
+                <BookOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />
                 知识点掌握度
               </Title>
               <Card
                 style={{
                   borderRadius: 12,
                   border: '1px solid var(--border, #e5e4e7)',
-                  background: 'rgba(255,255,255,0.7)',
-                  backdropFilter: 'blur(6px)',
+                  background: 'rgba(255,255,255,0.8)',
+                  backdropFilter: 'blur(8px)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 }}
               >
                 {profile.topics.map((topic) => {
@@ -385,7 +390,7 @@ export default function HomePage() {
                           marginBottom: 6,
                         }}
                       >
-                        <Text style={{ color: '#2c2c2c', fontSize: 13, fontWeight: 500 }}>
+                        <Text style={{ color: '#1a1a2e', fontSize: 13, fontWeight: 500 }}>
                           {topic.name}
                         </Text>
                         <Text
@@ -422,8 +427,8 @@ export default function HomePage() {
 
         {/* ========== 右列：学习路径 ========== */}
         <Col xs={24} lg={12}>
-          <Title level={5} style={{ color: 'var(--text-h, #08060d)', marginBottom: 16 }}>
-            <RiseOutlined style={{ color: 'var(--accent, #aa3bff)', marginRight: 8 }} />
+          <Title level={5} style={{ color: '#1a1a2e', marginBottom: 16 }}>
+            <RiseOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />
             学习路径
           </Title>
           {paths.length > 0 ? (
@@ -431,8 +436,9 @@ export default function HomePage() {
               style={{
                 borderRadius: 12,
                 border: '1px solid var(--border, #e5e4e7)',
-                background: 'rgba(255,255,255,0.7)',
-                backdropFilter: 'blur(6px)',
+                background: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(8px)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
               }}
             >
               <List
@@ -443,7 +449,7 @@ export default function HomePage() {
                       padding: '12px 0',
                       borderLeft: item.status === 'completed'
                         ? '3px solid #52c41a'
-                        : '3px solid var(--accent, #aa3bff)',
+                        : '3px solid #8b5cf6',
                       paddingLeft: 14,
                       marginBottom: 4,
                       borderRadius: '0 6px 6px 0',
@@ -462,7 +468,7 @@ export default function HomePage() {
                             strokeColor={
                               item.status === 'completed'
                                 ? '#52c41a'
-                                : { '0%': '#aa3bff', '100%': '#6366f1' }
+                                : { '0%': '#8b5cf6', '100%': '#6366f1' }
                             }
                             trailColor="rgba(0,0,0,0.06)"
                           />
@@ -488,13 +494,13 @@ export default function HomePage() {
                             justifyContent: 'center',
                             background:
                               item.status === 'completed'
-                                ? 'rgba(82,196,26,0.1)'
-                                : 'rgba(170,59,255,0.1)',
+                                ? 'rgba(82,196,26,0.12)'
+                                : 'rgba(139, 92, 246, 0.12)',
                           }}
                         >
                           <BookOutlined
                             style={{
-                              color: item.status === 'completed' ? '#52c41a' : '#aa3bff',
+                              color: item.status === 'completed' ? '#52c41a' : '#8b5cf6',
                               fontSize: 15,
                             }}
                           />
@@ -503,7 +509,7 @@ export default function HomePage() {
                       title={
                         <Link
                           to="/learning-path"
-                          style={{ color: '#2c2c2c', fontWeight: 500, fontSize: 14 }}
+                          style={{ color: '#1a1a2e', fontWeight: 500, fontSize: 14 }}
                         >
                           {item.title}
                         </Link>
@@ -525,10 +531,12 @@ export default function HomePage() {
                 border: '1px solid var(--border, #e5e4e7)',
                 textAlign: 'center',
                 padding: '24px 0',
+                background: 'rgba(255,255,255,0.8)',
+                backdropFilter: 'blur(8px)',
               }}
             >
               <BookOutlined
-                style={{ fontSize: 48, color: 'var(--border, #e5e4e7)', marginBottom: 12 }}
+                style={{ fontSize: 48, color: 'rgba(139, 92, 246, 0.15)', marginBottom: 12 }}
               />
               <br />
               <Text type="secondary">
