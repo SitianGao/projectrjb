@@ -1,0 +1,92 @@
+import { useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Form, Input, Button, Typography, Divider } from 'antd'
+import { UserOutlined, LockOutlined } from '@ant-design/icons'
+import { useAuth } from '../contexts/AuthContext'
+import CharacterGroup from '../components/AnimatedCharacter'
+
+const { Title, Text } = Typography
+
+export default function LoginPage() {
+  const [loading, setLoading] = useState(false)
+  const [userNameFocused, setUserNameFocused] = useState(false)
+  const [pwFocused, setPwFocused] = useState(false)
+  const { login } = useAuth()
+  const navigate = useNavigate()
+
+  const onFinish = async (values) => {
+    setLoading(true)
+    const ok = await login(values.username, values.password)
+    setLoading(false)
+    if (ok) navigate('/', { replace: true })
+  }
+
+  return (
+    <div className="login-split">
+      {/* 左侧：4 个交互角色 */}
+      <div className="login-left">
+        <div className="login-bg-deco">
+          <div className="deco-circle c1" />
+          <div className="deco-circle c2" />
+          <div className="deco-circle c3" />
+          <div className="deco-circle c4" />
+        </div>
+
+        <CharacterGroup
+          userNameFocused={userNameFocused}
+          pwFocused={pwFocused}
+        />
+      </div>
+
+      {/* 右侧：登录表单 */}
+      <div className="login-right">
+        <div className="login-form-wrap">
+          <div className="auth-header">
+            <Title level={3}>📚 智能学习平台</Title>
+            <Text type="secondary">欢迎回来，请登录您的账号</Text>
+          </div>
+
+          <Form name="login" onFinish={onFinish} size="large" autoComplete="off">
+            <Form.Item
+              name="username"
+              rules={[{ required: true, message: '请输入用户名' }]}
+            >
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="用户名"
+                onFocus={() => setUserNameFocused(true)}
+                onBlur={() => setUserNameFocused(false)}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="password"
+              rules={[{ required: true, message: '请输入密码' }]}
+            >
+              <Input.Password
+                prefix={<LockOutlined />}
+                placeholder="密码"
+                onFocus={() => setPwFocused(true)}
+                onBlur={() => setPwFocused(false)}
+              />
+            </Form.Item>
+
+            <Form.Item>
+              <Button type="primary" htmlType="submit" block loading={loading}>
+                登 录
+              </Button>
+            </Form.Item>
+          </Form>
+
+          <Divider plain>
+            <Text type="secondary" style={{ fontSize: 13 }}>还没有账号？</Text>
+          </Divider>
+
+          <Link to="/register">
+            <Button block>注 册</Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}

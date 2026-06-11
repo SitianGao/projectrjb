@@ -10,18 +10,9 @@ import {
   RadarChartOutlined,
 } from '@ant-design/icons'
 import { formatPercent } from '../utils/format'
+import RadarChart, { DIMENSIONS } from './RadarChart'
 
 const { Text, Title } = Typography
-
-// ========== 六维定义 ==========
-const DIMENSIONS = [
-  { key: 'knowledge',   label: '知识掌握',   icon: '📚', color: '#aa3bff', description: '核心知识点的掌握程度' },
-  { key: 'ability',     label: '学习能力',   icon: '🧠', color: '#6366f1', description: '理解与运用新知识的能力' },
-  { key: 'thinking',    label: '思维水平',   icon: '💡', color: '#52c41a', description: '批判性思维与问题解决能力' },
-  { key: 'style',       label: '风格适配',   icon: '🎯', color: '#fa8c16', description: '学习风格与推荐策略的匹配度' },
-  { key: 'progress',    label: '学习进度',   icon: '📈', color: '#1677ff', description: '当前阶段目标的完成进度' },
-  { key: 'goalClarity', label: '目标明确',   icon: '🏆', color: '#eb2f96', description: '学习目标的清晰与规划程度' },
-]
 
 // ========== Mock 画像数据 ==========
 const MOCK_PROFILE = {
@@ -47,12 +38,6 @@ const MOCK_PROFILE = {
     { name: '三角函数', accuracy: 0.88 },
   ],
 }
-
-// ========== 雷达图常量 ==========
-const RADAR_CENTER = 160
-const RADAR_RADIUS = 100
-const RADAR_LEVELS = 4        // 同心辅助环数
-const RADAR_ANGLES = DIMENSIONS.map((_, i) => (Math.PI * 2 * i) / DIMENSIONS.length - Math.PI / 2)
 
 // ========== 样式常量 ==========
 const CARD_STYLE = {
@@ -85,7 +70,7 @@ const ICON_WRAP_STYLE = (size = 28, radius = 7) => ({
 /**
  * 计算六维得分（0-100），优先使用 profile.dimensions，否则根据已有字段推断
  */
-function deriveDimensions(profile) {
+export function deriveDimensions(profile) {
   if (!profile) return DIMENSIONS.reduce((acc, d) => ({ ...acc, [d.key]: 0 }), {})
 
   if (profile.dimensions) return profile.dimensions
@@ -109,197 +94,6 @@ function deriveDimensions(profile) {
     progress:    profile.progress || 0,
     goalClarity: (profile.name ? 40 : 0) + (profile.style ? 30 : 0) + (profile.level ? 30 : 0),
   }
-}
-
-/**
- * 计算雷达图顶点坐标
- */
-function getRadarPoint(angle, value, centerX = RADAR_CENTER, centerY = RADAR_CENTER, radius = RADAR_RADIUS) {
-  const r = (value / 100) * radius
-  return {
-    x: centerX + r * Math.cos(angle),
-    y: centerY + r * Math.sin(angle),
-  }
-}
-
-/**
- * 生成雷达多边形 points 字符串
- */
-function buildPolygon(dimensions, angles = RADAR_ANGLES) {
-  return angles
-    .map((angle, i) => {
-      const dim = DIMENSIONS[i]
-      const val = dimensions[dim.key] || 0
-      const { x, y } = getRadarPoint(angle, val)
-      return `${x},${y}`
-    })
-    .join(' ')
-}
-
-// ========== 六维雷达图 SVG 组件 ==========
-function RadarChart({ dimensions, animated = true }) {
-  const [animProgress, setAnimProgress] = useState(animated ? 0 : 1)
-  const rafRef = useRef(null)
-
-  useEffect(() => {
-    if (!animated) {
-      setAnimProgress(1)
-      return
-    }
-    const start = performance.now()
-    const duration = 800 // ms
-    const tick = (now) => {
-      const p = Math.min(1, (now - start) / duration)
-      // easeOutCubic
-      setAnimProgress(1 - Math.pow(1 - p, 3))
-      if (p < 1) rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [animated])
-
-  // 动画中的维度值
-  const animatedDims = useMemo(() => {
-    const result = {}
-    for (const d of DIMENSIONS) {
-      result[d.key] = (dimensions[d.key] || 0) * animProgress
-    }
-    return result
-  }, [dimensions, animProgress])
-
-  const dataPolygon = buildPolygon(animatedDims)
-
-  return (
-    <svg
-      viewBox={`0 0 ${RADAR_CENTER * 2} ${RADAR_CENTER * 2}`}
-      style={{ width: '100%', maxWidth: 320, display: 'block', margin: '0 auto' }}
-    >
-      {/* 渐变定义 */}
-      <defs>
-        <radialGradient id="radarGradient" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(170,59,255,0.35)" />
-          <stop offset="70%" stopColor="rgba(99,102,241,0.12)" />
-          <stop offset="100%" stopColor="rgba(99,102,241,0)" />
-        </radialGradient>
-        <filter id="radarGlow">
-          <feGaussianBlur stdDeviation="2" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      {/* 同心网格 */}
-      {Array.from({ length: RADAR_LEVELS }, (_, lvl) => {
-        const r = (RADAR_RADIUS / RADAR_LEVELS) * (lvl + 1)
-        const points = RADAR_ANGLES.map((a) => {
-          const x = RADAR_CENTER + r * Math.cos(a)
-          const y = RADAR_CENTER + r * Math.sin(a)
-          return `${x},${y}`
-        }).join(' ')
-        return (
-          <polygon
-            key={lvl}
-            points={points}
-            fill="none"
-            stroke="rgba(0,0,0,0.06)"
-            strokeWidth="1"
-          />
-        )
-      })}
-
-      {/* 轴线 */}
-      {RADAR_ANGLES.map((a, i) => {
-        const ex = RADAR_CENTER + RADAR_RADIUS * Math.cos(a)
-        const ey = RADAR_CENTER + RADAR_RADIUS * Math.sin(a)
-        return (
-          <line
-            key={i}
-            x1={RADAR_CENTER}
-            y1={RADAR_CENTER}
-            x2={ex}
-            y2={ey}
-            stroke="rgba(0,0,0,0.06)"
-            strokeWidth="1"
-          />
-        )
-      })}
-
-      {/* 数据填充多边形 */}
-      <polygon
-        points={dataPolygon}
-        fill="url(#radarGradient)"
-        stroke="rgba(170,59,255,0.5)"
-        strokeWidth="2"
-        strokeLinejoin="round"
-        filter="url(#radarGlow)"
-        style={{ transition: 'all 0.15s ease-out' }}
-      />
-
-      {/* 数据顶点 */}
-      {RADAR_ANGLES.map((a, i) => {
-        const dim = DIMENSIONS[i]
-        const val = animatedDims[dim.key] || 0
-        const { x, y } = getRadarPoint(a, val)
-        return (
-          <circle
-            key={i}
-            cx={x}
-            cy={y}
-            r="4"
-            fill="#fff"
-            stroke={dim.color}
-            strokeWidth="2.5"
-            filter="url(#radarGlow)"
-          />
-        )
-      })}
-
-      {/* 标签 */}
-      {RADAR_ANGLES.map((a, i) => {
-        const dim = DIMENSIONS[i]
-        // 标签放在顶点外侧
-        const labelR = RADAR_RADIUS + 28
-        const lx = RADAR_CENTER + labelR * Math.cos(a)
-        const ly = RADAR_CENTER + labelR * Math.sin(a)
-        const textAnchor =
-          lx < RADAR_CENTER - 20 ? 'end' : lx > RADAR_CENTER + 20 ? 'start' : 'middle'
-        return (
-          <text
-            key={i}
-            x={lx}
-            y={ly}
-            textAnchor={textAnchor}
-            dominantBaseline="central"
-            fontSize="12"
-            fontWeight={600}
-            fill="#1a1a2e"
-            style={{ fontFamily: 'var(--sans, system-ui)' }}
-          >
-            {dim.label}
-          </text>
-        )
-      })}
-
-      {/* 中心数值 */}
-      <text
-        x={RADAR_CENTER}
-        y={RADAR_CENTER}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize="14"
-        fontWeight={700}
-        fill="var(--accent, #aa3bff)"
-        style={{ fontFamily: 'var(--mono, ui-monospace)' }}
-      >
-        {Math.round(
-          Object.values(animatedDims).reduce((a, b) => a + b, 0) / DIMENSIONS.length
-        )}
-        <tspan fontSize="10" fontWeight={400}>分</tspan>
-      </text>
-    </svg>
-  )
 }
 
 // ========== 六维条形列表（辅助视图） ==========
