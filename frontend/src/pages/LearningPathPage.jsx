@@ -1,49 +1,65 @@
 import { useState, useEffect } from 'react'
-import { Typography, Button, Space, Empty, Card } from 'antd'
+import { Typography, Button, Space, Empty, Card, Tag, message } from 'antd'
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import PathTimeline from '../components/PathTimeline'
 import ProgressBar from '../components/ProgressBar'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { getStudentPaths, generateLearningPathStream } from '../api/planner'
-import { useTaskStatus } from '../hooks/useTaskStatus'
 
 const { Title, Text } = Typography
+
+/**
+ * 将后端 stages 转为 PathTimeline 期望的 nodes
+ */
+function stagesToNodes(stages, currentStage) {
+  return stages.map((stage) => {
+    const stageId = stage.stage_id
+    let status = 'pending'
+    if (stageId < currentStage) status = 'completed'
+    else if (stageId === currentStage) status = 'in_progress'
+
+    return {
+      id: `stage-${stageId}`,
+      title: stage.title,
+      description: stage.description || stage.objectives?.join('；'),
+      status,
+      duration: `${stage.estimated_days || '?'}天`,
+      difficulty: stage.difficulty,
+      topics: stage.topics,
+      tasks: stage.tasks,
+    }
+  })
+}
 
 /**
  * 学习路径页 — 时间线展示 + AI 生成
  */
 export default function LearningPathPage() {
-  const [paths, setPaths] = useState([])
+  const [currentPath, setCurrentPath] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [genProgress, setGenProgress] = useState(0)
+  const [genMessage, setGenMessage] = useState('')
+  const [streamContent, setStreamContent] = useState('')
   const [genSteps, setGenSteps] = useState([])
 
   const studentId = 'demo-student-01'
 
   useEffect(() => {
-    loadPaths()
+    loadPath()
   }, [])
 
-  async function loadPaths() {
+  async function loadPath() {
     setLoading(true)
     try {
       const data = await getStudentPaths(studentId)
-      setPaths(Array.isArray(data) ? data : data?.paths || [])
+      if (data && data.stages) {
+        setCurrentPath(data)
+      } else {
+        setCurrentPath(null)
+      }
     } catch {
-      // 模拟数据
-      setPaths([
-        {
-          id: '1',
-          nodes: [
-            { id: 'n1', title: '二次函数基础', description: '掌握 y=ax²+bx+c 的图像与性质', status: 'completed', duration: '2h' },
-            { id: 'n2', title: '函数与方程', description: '学会用函数图像解方程', status: 'completed', duration: '1.5h' },
-            { id: 'n3', title: '不等式与函数', description: '理解二次不等式与函数的关系', status: 'in_progress', duration: '2h' },
-            { id: 'n4', title: '函数综合应用', description: '综合运用函数知识解决实际问题', status: 'pending', duration: '3h' },
-            { id: 'n5', title: '章节测验', description: '完成单元测试，评估掌握程度', status: 'locked', duration: '1h' },
-          ],
-        },
-      ])
+      setCurrentPath(null)
     } finally {
       setLoading(false)
     }
@@ -52,10 +68,12 @@ export default function LearningPathPage() {
   async function handleGenerate() {
     setGenerating(true)
     setGenProgress(0)
+    setGenMessage('正在分析学生画像...')
+    setStreamContent('')
     setGenSteps([
-      { key: 'analyze', label: '分析学生画像', status: 'process' },
+      { key: 'profile', label: '分析学生画像', status: 'process' },
       { key: 'plan', label: '生成学习计划', status: 'wait' },
-      { key: 'resources', label: '匹配学习资源', status: 'wait' },
+      { key: 'save', label: '保存路径', status: 'wait' },
     ])
 
     try {
@@ -75,32 +93,66 @@ export default function LearningPathPage() {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6).trim()
-          if (data === '[DONE]') continue
 
           try {
             const parsed = JSON.parse(data)
-            if (parsed.progress !== undefined) setGenProgress(parsed.progress)
-            if (parsed.stage) {
-              setGenSteps((prev) =>
-                prev.map((s, i) =>
-                  i === prev.findIndex((x) => x.key === parsed.stage)
-                    ? { ...s, status: 'process' }
-                    : i < prev.findIndex((x) => x.key === parsed.stage)
-                      ? { ...s, status: 'finish' }
-                      : s,
-                ),
-              )
+
+            switch (parsed.type) {
+              case 'start':
+                setGenMessage(parsed.message || '开始生成')
+                setGenSteps((prev) =>
+                  prev.map((s) => (s.key === 'profile' ? { ...s, status: 'finish' } : s))
+                )
+                setGenSteps((prev) =>
+                  prev.map((s) =>
+                    s.key === 'plan' ? { ...s, status: 'process' } : s
+                  )
+                )
+                setGenProgress(10)
+                break
+
+              case 'delta':
+                setStreamContent((prev) => prev + (parsed.content || ''))
+                setGenProgress((p) => Math.min(p + 2, 70))
+                break
+
+              case 'data':
+                if (parsed.data) {
+                  setCurrentPath(parsed.data)
+                  setGenProgress(85)
+                  setGenMessage('路径已生成，正在保存...')
+                  setGenSteps((prev) =>
+                    prev.map((s) => (s.key === 'plan' ? { ...s, status: 'finish' } : s))
+                  )
+                  setGenSteps((prev) =>
+                    prev.map((s) =>
+                      s.key === 'save' ? { ...s, status: 'process' } : s
+                    )
+                  )
+                }
+                break
+
+              case 'error':
+                message.error(parsed.message || '生成失败')
+                break
+
+              case 'done':
+                setGenProgress(100)
+                setGenMessage('完成！')
+                setGenSteps((prev) => prev.map((s) => ({ ...s, status: 'finish' })))
+                break
             }
-          } catch { /* skip */ }
+          } catch {
+            // skip unparseable lines
+          }
         }
       }
 
-      // 完成后刷新列表
-      setGenProgress(100)
-      setGenSteps((prev) => prev.map((s) => ({ ...s, status: 'finish' })))
-      await loadPaths()
+      await loadPath()
+      message.success('学习路径已生成！')
     } catch (err) {
       console.error('Generate path error:', err)
+      message.error('生成失败，请重试')
     } finally {
       setGenerating(false)
     }
@@ -108,14 +160,26 @@ export default function LearningPathPage() {
 
   if (loading) return <LoadingSkeleton type="detail" />
 
-  const currentPath = paths[0]
+  const nodes = currentPath?.stages
+    ? stagesToNodes(currentPath.stages, currentPath.current_stage || 1)
+    : []
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title level={3} style={{ margin: 0 }}>学习路径</Title>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>学习路径</Title>
+          {currentPath?.goal && (
+            <Text type="secondary">目标：{currentPath.goal}</Text>
+          )}
+          {currentPath?.total_estimated_days && (
+            <Tag color="blue" style={{ marginLeft: 8 }}>
+              预计 {currentPath.total_estimated_days} 天
+            </Tag>
+          )}
+        </div>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadPaths}>刷新</Button>
+          <Button icon={<ReloadOutlined />} onClick={loadPath}>刷新</Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -134,17 +198,31 @@ export default function LearningPathPage() {
             status="running"
             percent={genProgress}
             steps={genSteps}
-            message="AI 正在为你定制学习路径..."
+            message={genMessage || 'AI 正在为你定制学习路径...'}
           />
+          {streamContent && (
+            <Card
+              size="small"
+              style={{ marginTop: 12, maxHeight: 200, overflow: 'auto', background: '#fafafa' }}
+            >
+              <Text style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>
+                {streamContent}
+              </Text>
+            </Card>
+          )}
         </Card>
       )}
 
       {/* 时间线 */}
       <div style={{ marginTop: 24 }}>
-        {currentPath ? (
+        {nodes.length > 0 ? (
           <PathTimeline
-            nodes={currentPath.nodes}
-            onNodeClick={(node) => console.log('Node clicked:', node)}
+            nodes={nodes}
+            onNodeClick={(node) => {
+              message.info(
+                `阶段: ${node.title}\n难度: ${node.difficulty || '未知'}\n时长: ${node.duration}`
+              )
+            }}
           />
         ) : (
           <Empty description="还没有学习路径，点击上方按钮生成你的第一条路径" />

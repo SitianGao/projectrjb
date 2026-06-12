@@ -13,10 +13,16 @@
 """
 from agents.llm_client import LLMClient
 from agents.profile_agent import ProfileAgent
+from agents.planner_agent import PlannerAgent
 from services.profile_service import ProfileService
+from services.planner_service import PlannerService
 from database import get_db
 
 # ── 全局单例 ──────────────────────────────────
 llm_client = LLMClient()
+
 profile_agent = ProfileAgent(llm_client)
 profile_service = ProfileService(profile_agent, get_db)
+
+planner_agent = PlannerAgent(llm_client)
+planner_service = PlannerService(planner_agent, get_db, profile_service)
