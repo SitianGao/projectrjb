@@ -8,7 +8,6 @@ import {
   RiseOutlined,
   FileTextOutlined,
   BookOutlined,
-  TrophyOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
@@ -25,7 +24,6 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
 const ResourcePage = lazy(() => import('./pages/ResourcePage'))
 const TutorPage = lazy(() => import('./pages/TutorPage'))
-const EvaluatePage = lazy(() => import('./pages/EvaluatePage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 
@@ -38,7 +36,6 @@ const menuItems = [
   { key: '/learning-path', icon: <RiseOutlined />, label: '学习路径' },
   { key: '/resources', icon: <FileTextOutlined />, label: '学习资源' },
   { key: '/tutor', icon: <BookOutlined />, label: '智能辅导' },
-  { key: '/evaluate', icon: <TrophyOutlined />, label: '学习评估' },
 ]
 
 // 需要登录才能访问的布局
@@ -179,7 +176,6 @@ function AuthLayout() {
               <Route path="/learning-path" element={<LearningPathPage />} />
               <Route path="/resources" element={<ResourcePage />} />
               <Route path="/tutor" element={<TutorPage />} />
-              <Route path="/evaluate" element={<EvaluatePage />} />
             </Routes>
           </Suspense>
         </Content>

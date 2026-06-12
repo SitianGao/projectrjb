@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Button, Space, Card, Row, Col, Statistic, Tabs, Tag } from 'antd'
+import { Typography, Button, Space, Card, Row, Col, Statistic, Tag, message } from 'antd'
 const { Title, Text, Paragraph } = Typography
 import {
   PlusOutlined,
@@ -12,28 +12,38 @@ import {
 } from '@ant-design/icons'
 import PathTimeline from '../components/PathTimeline'
 import LoadingSkeleton from '../components/LoadingSkeleton'
-import { getStudentPaths, generateLearningPathStream } from '../api/planner'
-import { mockPaths, mockStats } from '../mock/learningPathData'
+import { getLearningPath, generateLearningPath } from '../api/planner'
+import { mockPath, mockStats } from '../mock/learningPathData'
+
+/**
+ * SSE 事件类型：start | delta | data | error | done
+ */
+function parseSSEEvent(eventText) {
+  try {
+    return JSON.parse(eventText)
+  } catch {
+    return null
+  }
+}
 
 export default function LearningPathPage() {
-  const [paths, setPaths] = useState([])
+  const [pathData, setPathData] = useState(null)   // { student_id, title, stages, ... }
   const [loading, setLoading] = useState(true)
-  const [activePathId, setActivePathId] = useState(null)
+  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
-    loadPaths()
+    loadPath()
   }, [])
 
-  async function loadPaths() {
+  async function loadPath() {
     setLoading(true)
     try {
-      const data = await getStudentPaths('demo-student-01')
-      setPaths(Array.isArray(data) ? data : data?.paths || [])
+      const data = await getLearningPath('demo-student-01')
+      setPathData(data)
     } catch {
-      // 使用 Mock 数据
+      // 后端不可用时使用 Mock 数据
       setTimeout(() => {
-        setPaths(mockPaths)
-        setActivePathId(mockPaths[0]?.id)
+        setPathData(mockPath)
         setLoading(false)
       }, 600)
       return
@@ -41,30 +51,86 @@ export default function LearningPathPage() {
     setLoading(false)
   }
 
+  /**
+   * 生成新学习路径（SSE 流式）
+   * SSE 事件：start → delta* → data → done
+   */
   async function handleGenerate() {
-    // 占位：后续接入真实生成流程
-    console.log('Generate new path')
+    setGenerating(true)
+    try {
+      const response = await generateLearningPath({
+        student_id: 'demo-student-01',
+        goal: '掌握高中数学核心知识',
+      })
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''  // 保留未完成的行
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const eventData = line.slice(6)
+            const event = parseSSEEvent(eventData)
+            if (!event) continue
+
+            switch (event.type) {
+              case 'start':
+                console.log('[Planner] 开始生成:', event.message)
+                break
+
+              case 'delta':
+                // LLM 思考过程的增量文本，可按需展示
+                break
+
+              case 'data':
+                // 结构化阶段数据到达
+                setPathData({
+                  student_id: 'demo-student-01',
+                  title: event.title || '新学习路径',
+                  stages: event.stages || [],
+                })
+                message.success('学习路径生成成功！')
+                break
+
+              case 'error':
+                message.error(event.message || '生成失败')
+                break
+
+              case 'done':
+                console.log('[Planner] 生成完成')
+                break
+
+              default:
+                break
+            }
+          }
+        }
+      }
+    } catch (err) {
+      message.error('生成失败: ' + err.message)
+      // 降级使用 Mock
+      setPathData(mockPath)
+    } finally {
+      setGenerating(false)
+    }
   }
 
   if (loading) return <LoadingSkeleton type="detail" />
 
-  const activePath = paths.find(p => p.id === activePathId) || paths[0]
-  const completedTotal = paths.reduce((sum, p) => sum + p.completedNodes, 0)
-  const nodesTotal = paths.reduce((sum, p) => sum + p.totalNodes, 0)
-
-  // Tab 项：每个路径一个 Tab
-  const pathTabs = paths.map(p => ({
-    key: p.id,
-    label: (
-      <Space size={4}>
-        <span>{p.subject === '数学' ? '📐' : '📖'}</span>
-        <span>{p.title}</span>
-        <Tag style={{ fontSize: 10, lineHeight: '16px', marginLeft: 4 }}>
-          {p.completedNodes}/{p.totalNodes}
-        </Tag>
-      </Space>
-    ),
-  }))
+  const stages = pathData?.stages || []
+  const totalTasks = stages.reduce((sum, s) => sum + (s.tasks?.length || 0), 0)
+  const completedTasks = stages.reduce(
+    (sum, s) => sum + (s.tasks?.filter(t => t.status === 'completed')?.length || 0),
+    0,
+  )
 
   return (
     <div className="learning-path-page">
@@ -75,9 +141,14 @@ export default function LearningPathPage() {
           <Text type="secondary">AI 根据你的画像为你定制个性化学习路线</Text>
         </div>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadPaths}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleGenerate}>
-            生成新路径
+          <Button icon={<ReloadOutlined />} onClick={loadPath}>刷新</Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleGenerate}
+            loading={generating}
+          >
+            {generating ? '生成中...' : '生成新路径'}
           </Button>
         </Space>
       </div>
@@ -87,19 +158,19 @@ export default function LearningPathPage() {
         <Col xs={12} sm={6}>
           <Card className="stat-mini-card" size="small">
             <Statistic
-              title="学习路径"
-              value={paths.length}
+              title="学习阶段"
+              value={stages.length}
               prefix={<BookOutlined style={{ color: '#1677ff' }} />}
-              suffix="条"
+              suffix="个"
             />
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card className="stat-mini-card" size="small">
             <Statistic
-              title="已完成节点"
-              value={completedTotal}
-              suffix={<Text type="secondary">/ {nodesTotal}</Text>}
+              title="已完成任务"
+              value={completedTasks}
+              suffix={<Text type="secondary">/ {totalTasks}</Text>}
               prefix={<TrophyOutlined style={{ color: '#52c41a' }} />}
             />
           </Card>
@@ -125,39 +196,31 @@ export default function LearningPathPage() {
         </Col>
       </Row>
 
-      {/* 路径选择 + 时间线 */}
-      <Card className="path-main-card" bodyStyle={{ padding: 0 }}>
-        {paths.length > 1 && (
-          <div style={{ padding: '12px 20px 0' }}>
-            <Tabs
-              activeKey={activePathId}
-              onChange={setActivePathId}
-              items={pathTabs}
-              size="small"
-            />
-          </div>
+      {/* 时间线 */}
+      <Card className="path-main-card" bodyStyle={{ padding: 20 }}>
+        {pathData ? (
+          <PathTimeline
+            title={pathData.title}
+            stages={stages}
+            overallProgress={pathData.overallProgress}
+            onStageClick={(stage) => console.log('Stage:', stage.title)}
+          />
+        ) : (
+          <Card>
+            <div style={{ textAlign: 'center', padding: 48 }}>
+              <BookOutlined style={{ fontSize: 40, color: '#d9d9d9' }} />
+              <Paragraph type="secondary" style={{ marginTop: 16 }}>还没有学习路径</Paragraph>
+              <Button
+                type="primary"
+                icon={<ThunderboltOutlined />}
+                onClick={handleGenerate}
+                loading={generating}
+              >
+                AI 生成学习路径
+              </Button>
+            </div>
+          </Card>
         )}
-
-        <div style={{ padding: paths.length > 1 ? '0 20px 20px' : 20 }}>
-          {activePath ? (
-            <PathTimeline
-              title={activePath.title}
-              nodes={activePath.nodes}
-              overallProgress={activePath.overallProgress}
-              onNodeClick={(node) => console.log('Node:', node.title)}
-            />
-          ) : (
-            <Card>
-              <div style={{ textAlign: 'center', padding: 48 }}>
-                <BookOutlined style={{ fontSize: 40, color: '#d9d9d9' }} />
-                <Paragraph type="secondary" style={{ marginTop: 16 }}>还没有学习路径</Paragraph>
-                <Button type="primary" icon={<ThunderboltOutlined />} onClick={handleGenerate}>
-                  AI 生成学习路径
-                </Button>
-              </div>
-            </Card>
-          )}
-        </div>
       </Card>
     </div>
   )

@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons'
 import ChatBox from '../components/ChatBox'
 import { useChat } from '../hooks/useChat'
-import { chatWithProfileStream } from '../api/profile'
+import { startProfileChat } from '../api/profile'
 
 const { Title, Text } = Typography
 
@@ -23,7 +23,7 @@ export default function ProfilePage() {
   const navigate = useNavigate()
 
   const streamFetcher = useCallback(
-    (message, signal) => chatWithProfileStream('demo-student-01', message),
+    (message, signal) => startProfileChat({ student_id: 'demo-student-01', message }),
     [],
   )
 
