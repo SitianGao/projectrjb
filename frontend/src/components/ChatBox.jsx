@@ -134,7 +134,7 @@ export default function ChatBox({
   const isEmpty = messages.length === 0
 
   return (
-    <div className="chatbox" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fafbfc' }}>
+    <div className="chatbox" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-card)' }}>
       {/* 消息列表 */}
       <div ref={listRef} className="chatbox-list" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', minHeight: 0 }}>
         {isEmpty && showEmpty ? (

@@ -189,7 +189,7 @@ export default function HomePage() {
       : null
 
   return (
-    <div>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 48px' }}>
       {/* ========== 欢迎横幅 ========== */}
       <div
         className="tech-banner"

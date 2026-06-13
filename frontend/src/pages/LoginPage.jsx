@@ -71,6 +71,17 @@ export default function LoginPage() {
               />
             </Form.Item>
 
+            <Form.Item style={{ marginBottom: 12 }}>
+              <div style={{ textAlign: 'right' }}>
+                <Link
+                  to="/forgot-password"
+                  style={{ fontSize: 13, color: '#8b5cf6' }}
+                >
+                  忘记密码？
+                </Link>
+              </div>
+            </Form.Item>
+
             <Form.Item>
               <Button type="primary" htmlType="submit" block loading={loading}>
                 登 录
