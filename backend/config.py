@@ -20,9 +20,9 @@ LLM_PRIMARY = os.getenv("LLM_PRIMARY", "spark")          # spark / deepseek
 SPARK_API_PASSWORD = os.getenv("SPARK_API_PASSWORD", "")  # API 密码（Bearer token）
 SPARK_API_URL = os.getenv(
     "SPARK_API_URL",
-    "https://spark-api-open.xf-yun.com/agent/v1/chat/completions",
+    "https://spark-api-open.xf-yun.com/v1/chat/completions",
 )
-SPARK_MODEL = os.getenv("SPARK_MODEL", "spark-2.0-flash")  # spark-2.0-flash / spark-2.0 / ...
+SPARK_MODEL = os.getenv("SPARK_MODEL", "4.0Ultra")
 
 # ── 备选 LLM ────────────────────────────────────────
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")

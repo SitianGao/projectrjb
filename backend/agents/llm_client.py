@@ -61,9 +61,9 @@ class LLMClient:
 
         api_url = os.getenv(
             "SPARK_API_URL",
-            "https://spark-api-open.xf-yun.com/agent/v1/chat/completions",
+            "https://spark-api-open.xf-yun.com/v1/chat/completions",
         )
-        model_name = model or os.getenv("SPARK_MODEL", "spark-2.0-flash")
+        model_name = model or os.getenv("SPARK_MODEL", "4.0Ultra")
 
         async with httpx.AsyncClient(timeout=30) as client:
             async with client.stream(
