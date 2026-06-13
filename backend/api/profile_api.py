@@ -35,6 +35,12 @@ class ProfileUpdateRequest(BaseModel):
     pace_preference: Optional[str] = None
 
 
+class ProfileMessageRequest(BaseModel):
+    message: str
+    history: Optional[List[str]] = None
+    current_profile: Optional[Dict] = None
+
+
 # ── 端点实现 ─────────────────────────────────
 
 @router.post("/chat")
@@ -66,6 +72,56 @@ async def profile_chat(request: ProfileChatRequest):
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+@router.post("/{student_id}/chat/stream")
+async def profile_chat_stream_by_student(
+    student_id: str,
+    request: ProfileMessageRequest,
+):
+    """SSE profile chat endpoint used by the React ProfilePage."""
+
+    async def event_generator():
+        db = SessionLocal()
+        try:
+            profile_service.get_or_create_student(db, student_id)
+
+            async for event in profile_service.chat_stream(
+                db=db,
+                student_id=student_id,
+                message=request.message,
+                history=request.history,
+                current_profile=request.current_profile,
+            ):
+                yield event
+        finally:
+            db.close()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/{student_id}/chat")
+async def profile_chat_by_student(
+    student_id: str,
+    request: ProfileMessageRequest,
+):
+    """Compatibility endpoint for clients that pass student_id in the URL."""
+    return await profile_chat(
+        ProfileChatRequest(
+            student_id=student_id,
+            message=request.message,
+            history=request.history,
+            current_profile=request.current_profile,
+        )
     )
 
 
