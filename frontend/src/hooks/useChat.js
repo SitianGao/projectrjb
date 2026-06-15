@@ -10,6 +10,8 @@ import { useState, useCallback, useRef } from 'react'
  * @param {Function} options.streamFetcher - (message: string, signal?: AbortSignal) => Promise<Response>
  *   发起流式请求，返回 fetch Response。body 应为 SSE 流或纯文本流。
  * @param {Array} options.initialMessages - 初始消息列表
+ * @param {Function} options.onProfileUpdate - (profile: object) => void
+ *   当 SSE 返回 profile_update 事件时回调，传入更新后的画像数据
  * @returns {{
  *   messages: Array<{id, role, content}>,
  *   isLoading: boolean,
@@ -18,7 +20,7 @@ import { useState, useCallback, useRef } from 'react'
  *   abort: () => void,
  * }}
  */
-export function useChat({ streamFetcher, initialMessages = [] } = {}) {
+export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate } = {}) {
   const [messages, setMessages] = useState(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
   const abortRef = useRef(null)
@@ -72,6 +74,24 @@ export function useChat({ streamFetcher, initialMessages = [] } = {}) {
 
             try {
               const parsed = JSON.parse(data)
+
+              // 处理 profile_update 事件
+              if (parsed.type === 'profile_update' && onProfileUpdate) {
+                // 兼容多种返回格式：
+                // { profile: { student_id, profile: {...}, ... } }
+                // { profile: {...} }
+                // { data: {...} }
+                const profileData =
+                  parsed.data ||
+                  (parsed.profile?.profile) ||
+                  parsed.profile ||
+                  (parsed.dimensions ? parsed : null)
+                if (profileData) {
+                  onProfileUpdate(profileData)
+                }
+                continue
+              }
+
               const delta =
                 parsed.choices?.[0]?.delta?.content ||
                 parsed.content ||
@@ -112,7 +132,7 @@ export function useChat({ streamFetcher, initialMessages = [] } = {}) {
         abortRef.current = null
       }
     },
-    [streamFetcher, nextId],
+    [streamFetcher, nextId, onProfileUpdate],
   )
 
   const clearMessages = useCallback(() => {

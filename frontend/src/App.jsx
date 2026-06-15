@@ -1,77 +1,43 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom'
-import { Layout, Menu, Typography, Dropdown, Avatar } from 'antd'
+import { Typography, Dropdown, Avatar } from 'antd'
 import {
   HomeOutlined,
+  ArrowLeftOutlined,
   UserOutlined,
-  MessageOutlined,
-  RiseOutlined,
-  FileTextOutlined,
-  BookOutlined,
-  TrophyOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
   LogoutOutlined,
   KeyOutlined,
   EditOutlined,
+  SunOutlined,
+  MoonOutlined,
+  ReadOutlined,
 } from '@ant-design/icons'
 import LoadingSkeleton from './components/LoadingSkeleton'
+import NotificationCenter from './components/NotificationCenter'
 import { useAuth } from './contexts/AuthContext'
+import { ThemeProvider, useTheme, THEMES } from './contexts/ThemeContext'
 import './App.css'
 
 // 页面组件懒加载
+const LandingPage = lazy(() => import('./pages/LandingPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
-const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
-const ResourcePage = lazy(() => import('./pages/ResourcePage'))
 const TutorPage = lazy(() => import('./pages/TutorPage'))
-const EvaluatePage = lazy(() => import('./pages/EvaluatePage'))
+const DocsPage = lazy(() => import('./pages/DocsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResourcePage = lazy(() => import('./pages/ResourcePage'))
+const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
 
-const { Content, Sider } = Layout
 const { Text } = Typography
-
-const menuItems = [
-  { key: '/', icon: <MessageOutlined />, label: '对话' },
-  { key: '/home', icon: <HomeOutlined />, label: '个人中心' },
-  { key: '/learning-path', icon: <RiseOutlined />, label: '学习路径' },
-  { key: '/resources', icon: <FileTextOutlined />, label: '学习资源' },
-  { key: '/tutor', icon: <BookOutlined />, label: '智能辅导' },
-  { key: '/evaluate', icon: <TrophyOutlined />, label: '学习评估' },
-]
 
 // 需要登录才能访问的布局
 function AuthLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const [collapsed, setCollapsed] = useState(false)
-  const [pinned, setPinned] = useState(false)
-
-  // 计算当前选中的菜单项
-  const selectedKey = (() => {
-    if (location.pathname === '/') return '/'
-    return menuItems
-      .filter((item) => item.key !== '/')
-      .find((item) => location.pathname.startsWith(item.key))?.key || ''
-  })()
-
-  const handleMouseEnter = () => {
-    if (!pinned) setCollapsed(false)
-  }
-  const handleMouseLeave = () => {
-    if (!pinned) setCollapsed(true)
-  }
-  const handleToggle = () => {
-    if (pinned) {
-      setPinned(false)
-      setCollapsed(true)
-    } else {
-      setPinned(true)
-      setCollapsed(false)
-    }
-  }
+  const { mode, setMode, resolved } = useTheme()
 
   // 用户下拉菜单项
   const userMenuItems = [
@@ -91,17 +57,11 @@ function AuthLayout() {
       key: 'edit-profile',
       icon: <EditOutlined />,
       label: '修改信息',
-      onClick: () => {
-        // TODO: 打开修改信息弹窗
-      },
     },
     {
       key: 'change-password',
       icon: <KeyOutlined />,
       label: '修改密码',
-      onClick: () => {
-        // TODO: 打开修改密码弹窗
-      },
     },
     { type: 'divider' },
     {
@@ -117,20 +77,68 @@ function AuthLayout() {
   ]
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f5f5f5' }}>
-      {/* 上菜单栏 */}
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-page)' }}>
+      {/* 顶部导航栏 */}
       <div className="top-bar">
-        <Text strong style={{ color: '#fff', fontSize: 18 }}>
-          📚 智能学习平台
-        </Text>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* 个人中心 */}
-          <div
-            className={`top-home-btn ${location.pathname === '/home' ? 'active' : ''}`}
-            onClick={() => navigate('/home')}
-            title="个人中心"
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <Text strong style={{ color: 'var(--text-primary)', fontSize: 18, cursor: 'pointer' }} onClick={() => navigate('/')}>
+            🤖 智能学习平台
+          </Text>
+          <span
+            onClick={() => navigate('/landing')}
+            style={{
+              fontSize: 14,
+              color: location.pathname === '/landing' ? '#8b5cf6' : 'var(--text-secondary)',
+              fontWeight: location.pathname === '/landing' ? 600 : 400,
+              cursor: 'pointer',
+              transition: 'color 0.2s',
+              userSelect: 'none',
+            }}
+            onMouseEnter={(e) => { if (location.pathname !== '/landing') e.target.style.color = '#8b5cf6' }}
+            onMouseLeave={(e) => { if (location.pathname !== '/landing') e.target.style.color = 'var(--text-secondary)' }}
           >
-            <HomeOutlined />
+            主页
+          </span>
+          <span
+            onClick={() => navigate('/docs')}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 14,
+              color: location.pathname === '/docs' ? '#8b5cf6' : 'var(--text-secondary)',
+              fontWeight: location.pathname === '/docs' ? 600 : 400,
+              cursor: 'pointer',
+              transition: 'color 0.2s',
+              userSelect: 'none',
+            }}
+            onMouseEnter={(e) => { if (location.pathname !== '/docs') e.target.style.color = '#8b5cf6' }}
+            onMouseLeave={(e) => { if (location.pathname !== '/docs') e.target.style.color = 'var(--text-secondary)' }}
+          >
+            <ReadOutlined /> 文档
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* 通知 */}
+          <NotificationCenter />
+
+          {/* 主题切换 */}
+          <Dropdown menu={{
+            items: Object.values(THEMES).map((t) => ({
+              key: t.key,
+              icon: t.icon === 'sun' ? <SunOutlined /> : t.icon === 'moon' ? <MoonOutlined /> : <SunOutlined style={{ opacity: 0.5 }} />,
+              label: t.label,
+              onClick: () => setMode(t.key),
+            })),
+            selectedKeys: [mode],
+          }} placement="bottomRight" trigger={['click']}>
+            <div className="top-home-btn" title="主题切换">
+              {resolved === 'dark' ? <MoonOutlined /> : <SunOutlined />}
+            </div>
+          </Dropdown>
+
+          {/* 个人中心 / 画像 */}
+          <div className="top-home-btn" onClick={() => navigate(location.pathname === '/home' ? '/' : '/home')}
+            title={location.pathname === '/home' ? '平台主页' : '个人中心'}>
+            {location.pathname === '/home' ? <ArrowLeftOutlined /> : <HomeOutlined />}
           </div>
 
           {/* 用户头像下拉 */}
@@ -143,46 +151,19 @@ function AuthLayout() {
         </div>
       </div>
 
-      {/* 下方：左侧菜单 + 右侧内容 */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <Sider
-          breakpoint="lg"
-          collapsedWidth="64"
-          width={150}
-          collapsed={collapsed}
-          onCollapse={(value) => setCollapsed(value)}
-          trigger={null}
-          style={{ overflowY: 'auto', overflowX: 'hidden' }}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          <div className={`sider-toggle ${pinned ? 'pinned' : ''}`} onClick={handleToggle} title={pinned ? '取消固定' : '固定侧边栏'}>
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            {pinned && !collapsed && <span className="pin-dot" />}
-          </div>
-          <Menu
-            theme="dark"
-            mode="inline"
-            selectedKeys={selectedKey ? [selectedKey] : []}
-            items={menuItems}
-            onClick={({ key }) => navigate(key)}
-            className="compact-menu"
-          />
-        </Sider>
-
-        <Content className="site-content">
-          <Suspense fallback={<LoadingSkeleton type="detail" />}>
-            <Routes>
-              <Route path="/" element={<ProfilePage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/home" element={<HomePage />} />
-              <Route path="/learning-path" element={<LearningPathPage />} />
-              <Route path="/resources" element={<ResourcePage />} />
-              <Route path="/tutor" element={<TutorPage />} />
-              <Route path="/evaluate" element={<EvaluatePage />} />
-            </Routes>
-          </Suspense>
-        </Content>
+      {/* 内容区（全宽） */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <Suspense fallback={<LoadingSkeleton type="detail" />}>
+          <Routes>
+            <Route path="/" element={<ProfilePage />} />
+            <Route path="/home" element={<HomePage />} />
+            <Route path="/landing" element={<LandingPage />} />
+            <Route path="/tutor" element={<TutorPage />} />
+            <Route path="/docs" element={<DocsPage />} />
+            <Route path="/resources" element={<ResourcePage />} />
+            <Route path="/learning-path/:pathId" element={<LearningPathPage />} />
+          </Routes>
+        </Suspense>
       </div>
     </div>
   )
@@ -197,9 +178,15 @@ function RequireAuth({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* 登录/注册 — 独立页面，不需要布局 */}
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+        {/* 登录/注册/忘记密码 — 独立页面，不需要布局 */}
+        <Route path="/forgot-password" element={
+          <Suspense fallback={<LoadingSkeleton type="detail" />}>
+            <ForgotPasswordPage />
+          </Suspense>
+        } />
         <Route path="/login" element={
           <Suspense fallback={<LoadingSkeleton type="detail" />}>
             <LoginPage />
@@ -219,5 +206,6 @@ export default function App() {
         } />
       </Routes>
     </BrowserRouter>
+    </ThemeProvider>
   )
 }
