@@ -92,9 +92,13 @@ export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate }
                 continue
               }
 
+              // 跳过无内容的事件（如 type:start, type:done）
+              if (parsed.type === 'start' || parsed.type === 'done') continue
+
+              // 优先匹配后端自定义格式，保留 OpenAI 兼容
               const delta =
-                parsed.choices?.[0]?.delta?.content ||
                 parsed.content ||
+                parsed.choices?.[0]?.delta?.content ||
                 parsed.delta ||
                 (typeof parsed === 'string' ? parsed : '')
 
