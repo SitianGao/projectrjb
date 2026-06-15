@@ -11,6 +11,7 @@ import {
   FireOutlined,
 } from '@ant-design/icons'
 import PathTimeline from '../components/PathTimeline'
+import ProgressBar from '../components/ProgressBar'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { getLearningPath, generateLearningPath } from '../api/planner'
 import { mockPath, mockStats } from '../mock/learningPathData'
@@ -26,6 +27,34 @@ function parseSSEEvent(eventText) {
   }
 }
 
+const { Title, Text } = Typography
+
+/**
+ * 将后端 stages 转为 PathTimeline 期望的 nodes
+ */
+function stagesToNodes(stages, currentStage) {
+  return stages.map((stage) => {
+    const stageId = stage.stage_id
+    let status = 'pending'
+    if (stageId < currentStage) status = 'completed'
+    else if (stageId === currentStage) status = 'in_progress'
+
+    return {
+      id: `stage-${stageId}`,
+      title: stage.title,
+      description: stage.description || stage.objectives?.join('；'),
+      status,
+      duration: `${stage.estimated_days || '?'}天`,
+      difficulty: stage.difficulty,
+      topics: stage.topics,
+      tasks: stage.tasks,
+    }
+  })
+}
+
+/**
+ * 学习路径页 — 时间线展示 + AI 生成
+ */
 export default function LearningPathPage() {
   const [pathData, setPathData] = useState(null)   // { student_id, title, stages, ... }
   const [loading, setLoading] = useState(true)
@@ -48,7 +77,6 @@ export default function LearningPathPage() {
       }, 600)
       return
     }
-    setLoading(false)
   }
 
   /**
@@ -133,12 +161,18 @@ export default function LearningPathPage() {
   )
 
   return (
-    <div className="learning-path-page">
-      {/* 页面标题栏 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <Title level={3} style={{ margin: 0 }}>📐 学习路径</Title>
-          <Text type="secondary">AI 根据你的画像为你定制个性化学习路线</Text>
+          <Title level={3} style={{ margin: 0 }}>学习路径</Title>
+          {currentPath?.goal && (
+            <Text type="secondary">目标：{currentPath.goal}</Text>
+          )}
+          {currentPath?.total_estimated_days && (
+            <Tag color="blue" style={{ marginLeft: 8 }}>
+              预计 {currentPath.total_estimated_days} 天
+            </Tag>
+          )}
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={loadPath}>刷新</Button>

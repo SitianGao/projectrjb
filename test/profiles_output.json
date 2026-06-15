@@ -1,0 +1,125 @@
+[
+  {
+    "case": "小张 — 零基础入门型（文科转专业，数学弱，偏好视频）",
+    "student_id": "case_001",
+    "rounds": 5,
+    "final_profile": {
+      "student_id": "case_001",
+      "profile": {
+        "knowledge_level": "初级（大二），Python入门，数学薄弱",
+        "learning_goal": "通过人工智能导论考试，达到基本理解水平",
+        "cognitive_style": "视觉型（偏好视频/图解），不偏好阅读文本和独立编程",
+        "weakness": [
+          "计算机基础",
+          "编程能力",
+          "数学基础（高数、线代、概率论）"
+        ],
+        "interest": [
+          "计算机视觉（人脸识别）",
+          "语音识别（智能音箱）"
+        ],
+        "pace_preference": "慢速深入型",
+        "learning_history": [
+          "老师你好，我是大二学生，这学期选了人工智能导论课。我之前是文科背景，计算机基础比较差，有点担心跟不上。",
+          "我只上过一门大学计算机基础课，会一点Python基本语法，但也就hello world和if-else的水平。",
+          "数学我坦白说不太行，高考数学刚及格，线性代数和概率论都还没学过。高数学过但基本忘光了。",
+          "我比较喜欢看B站视频学习，很容易看懂。看书的话容易犯困走神，不太适合我。动手写代码的话基础太差经常卡住。"
+        ]
+      },
+      "completeness": 0.8,
+      "confidence": 0.9,
+      "sources": [
+        "dialogue"
+      ],
+      "next_questions": []
+    },
+    "validation": {
+      "completeness_ok": true,
+      "confidence_ok": true
+    }
+  },
+  {
+    "case": "小李 — 编程转AI型（计算机科班，数学推导弱，偏好代码）",
+    "student_id": "case_002",
+    "rounds": 5,
+    "final_profile": {
+      "student_id": "case_002",
+      "profile": {
+        "knowledge_level": "中高级（大三计算机），编程强，ML概念有科普级了解，具体算法原理未掌握",
+        "learning_goal": "6个月内系统掌握ML/DL核心算法，Kaggle参赛，重点NLP + 知识图谱方向",
+        "cognitive_style": "动手型（偏好代码实现，从代码反推理论）",
+        "weakness": [
+          "数学推导（微积分/线代应用）",
+          "ML算法数学原理"
+        ],
+        "interest": [
+          "NLP",
+          "大语言模型",
+          "对话系统",
+          "Kaggle竞赛",
+          "图神经网络",
+          "知识图谱"
+        ],
+        "pace_preference": "中速均衡型",
+        "learning_history": [
+          "你好，我是计算机专业大三的，Java和Python都很熟，数据结构、算法这些基础课都学过了。这学期想系统学习机器学习和深度学习。",
+          "我对NLP特别感兴趣，最近ChatGPT这些大模型太强了。我之前做过一个简单的Java聊天机器人，但完全基于规则的，现在想了解真正的AI是怎么做的。",
+          "数学的话...实话实说我的微积分和线性代数都是应试过的，考试成绩还行但在实际推导的时候经常懵。概率论学得还不错。",
+          "我觉得看代码实现对我来说最快！经常是看一遍源码就懂了，然后反过去看公式才有感觉。纯看数学推导的话我会比较吃力。时间上我希望半年内能打Kaggle比赛。"
+        ]
+      },
+      "completeness": 0.85,
+      "confidence": 0.9,
+      "sources": [
+        "dialogue"
+      ],
+      "next_questions": []
+    },
+    "validation": {
+      "completeness_ok": true,
+      "confidence_ok": true
+    }
+  },
+  {
+    "case": "小王 — 跨专业应用型（生物信息学研一，统计好，需针对性路径）",
+    "student_id": "case_003",
+    "rounds": 5,
+    "final_profile": {
+      "student_id": "case_003",
+      "profile": {
+        "knowledge_level": "中高级（研一生物信息学），统计扎实，Python中等，CNN有基础，GNN薄弱",
+        "learning_goal": "3个月内（每周15h）：系统性补ML/DL基础 → GNN → 蛋白质结构预测应用，聚焦研究相关技术",
+        "cognitive_style": "动手+理论混合型（论文+代码学习，需结构化路径）",
+        "weakness": [
+          "Python编程深度",
+          "GNN",
+          "ML/DL系统性基础"
+        ],
+        "interest": [
+          "蛋白质结构预测",
+          "图神经网络",
+          "AlphaFold",
+          "Transformer",
+          "蛋白质语言模型（ESM）"
+        ],
+        "pace_preference": "快速聚焦型（限时+限定范围）",
+        "learning_history": [
+          "你好，我是生物信息学专业研一的学生。我的研究方向是蛋白质结构预测，需要用到深度学习的方法。",
+          "我统计学基础比较好，本科做过很多统计分析和实验设计。R语言很熟练，Python也会写但不算是高手水平，大概能写个脚本处理数据这样。",
+          "我读AlphaFold的论文时，CNN的部分能大概理解，但图神经网络（GNN）的部分就比较吃力了。因为蛋白质可以表示为3D图结构，GNN对这个很关键。我希望能针对性补一下这块知识。",
+          "我平时主要是看论文+看官方代码实现来学习。但我发现一个问题：直接看代码经常卡在某个地方不理解，又不知道去哪里补基础知识。所以我希望有一个针对性强的学习路径，帮我先补必要的ML/DL基础，再深入GNN。时间上我比较紧，希望在3个月内能上手。"
+        ]
+      },
+      "completeness": 0.85,
+      "confidence": 0.91,
+      "sources": [
+        "dialogue"
+      ],
+      "next_questions": []
+    },
+    "validation": {
+      "completeness_ok": true,
+      "confidence_ok": true
+    }
+  }
+]

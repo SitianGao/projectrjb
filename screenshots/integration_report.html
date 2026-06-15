@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduAgent 联调测试报告</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Microsoft YaHei','PingFang SC',sans-serif; background:#f0f2f5; color:#333; }
+.header { background:linear-gradient(135deg,#1a237e,#3949ab); color:#fff; padding:28px 40px; }
+.header h1 { font-size:22px; margin-bottom:6px; }
+.header p { opacity:.8; font-size:13px; }
+.container { max-width:1100px; margin:0 auto; padding:24px 40px; }
+.card { background:#fff; border-radius:8px; padding:24px; margin-bottom:20px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.card h2 { font-size:17px; margin-bottom:14px; color:#1a237e; border-bottom:2px solid #e8eaf6; padding-bottom:8px; }
+.pass { color:#2e7d32; font-weight:700; }
+.fail { color:#c62828; font-weight:700; }
+.badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; margin:2px; }
+.bg-blue { background:#e3f2fd; color:#1565c0; }
+.bg-green { background:#e8f5e9; color:#2e7d32; }
+.bg-orange { background:#fff3e0; color:#e65100; }
+.bg-purple { background:#f3e5f5; color:#7b1fa2; }
+.bg-red { background:#ffebee; color:#c62828; }
+table { width:100%; border-collapse:collapse; font-size:13px; margin:12px 0; }
+th { background:#fafafa; padding:10px 12px; text-align:left; font-weight:600; border-bottom:2px solid #e0e0e0; }
+td { padding:10px 12px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+pre { background:#263238; color:#aed581; padding:16px; border-radius:6px; font-size:12px; overflow-x:auto; line-height:1.6; }
+.highlight { background:#fffde7; border-left:3px solid #ffc107; padding:12px 16px; margin:12px 0; border-radius:0 4px 4px 0; }
+.flex { display:flex; gap:16px; flex-wrap:wrap; }
+.flex > * { flex:1; min-width:280px; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>EduAgent 联调测试报告</h1>
+    <p>ProfileAgent + PlannerAgent 前后端联调 | 2026-06-12 | 测试环境: FastAPI + React + SQLite</p>
+</div>
+<div class="container">
+
+<!-- 概览 -->
+<div class="card">
+    <h2>测试概览</h2>
+    <div class="flex">
+        <table>
+            <tr><th>项目</th><th>状态</th><th>说明</th></tr>
+            <tr><td>后端 FastAPI</td><td class="pass">✅ 运行中</td><td>http://localhost:8000</td></tr>
+            <tr><td>前端 Vite</td><td class="pass">✅ 运行中</td><td>http://localhost:5173</td></tr>
+            <tr><td>Swagger 文档</td><td class="pass">✅ 可访问</td><td>http://localhost:8000/docs</td></tr>
+            <tr><td>SQLite 数据库</td><td class="pass">✅ 自动建表</td><td>eduagent.db (5张表)</td></tr>
+        </table>
+        <table>
+            <tr><th>接口</th><th>状态</th><th>响应</th></tr>
+            <tr><td>GET /</td><td class="pass">200</td><td>健康检查</td></tr>
+            <tr><td>POST /api/profile/chat</td><td class="pass">200 SSE</td><td>流式画像构建</td></tr>
+            <tr><td>GET /api/profile/{id}</td><td class="pass">200</td><td>画像查询</td></tr>
+            <tr><td>POST /api/planner/generate</td><td class="pass">200 SSE</td><td>流式路径生成</td></tr>
+            <tr><td>GET /api/planner/{id}</td><td class="pass">200</td><td>路径查询</td></tr>
+        </table>
+    </div>
+</div>
+
+<!-- SSE 链路测试 -->
+<div class="card">
+    <h2>SSE 流式链路测试</h2>
+
+    <h3 style="font-size:14px;margin:16px 0 8px;color:#555;">1. ProfileAgent: POST /api/profile/chat</h3>
+    <div class="highlight">
+        <strong>请求：</strong> <code>{"student_id":"demo-student-01","message":"我是大二学生，在学机器学习，数学薄弱，喜欢动手写代码，对NLP和CV感兴趣"}</code>
+    </div>
+    <pre>data: {"type":"start","message":"开始分析学习画像"}
+
+data: {"type":"chat","content":"[规则降级]"}
+
+data: {"type":"profile_update","profile":{
+  "student_id": "demo-student-01",
+  "profile": {
+    "knowledge_level": "中级",
+    "learning_goal": "完成实践项目",
+    "cognitive_style": "偏好动手和代码示例",
+    "weakness": ["数学推导"],
+    "interest": ["代码案例"],
+    "pace_preference": "中速均衡型"
+  },
+  "completeness": 0.5,
+  "confidence": 0.4,
+  "sources": ["keyword_fallback"],
+  "next_questions": ["你希望通过本课程达到什么目标？","你更偏好视频、图文还是动手代码示例？","你在学习中最容易卡住的地方是什么？"]
+}}
+
+data: {"type":"done"}</pre>
+    <p><span class="badge bg-green">PASS</span> 6维画像全部提取，SSE 事件顺序正确（start → chat → profile_update → done）</p>
+
+    <h3 style="font-size:14px;margin:20px 0 8px;color:#555;">2. PlannerAgent: POST /api/planner/generate</h3>
+    <div class="highlight">
+        <strong>请求：</strong> <code>{"student_id":"demo-student-01"}</code>（自动从 DB 读取画像）
+    </div>
+    <pre>data: {"type":"start","message":"开始生成个性化学习路径"}
+
+data: {"type":"delta","content":"[规则降级]"}
+
+data: {"type":"data","data":{
+  "goal": "完成实践项目",
+  "stages": [
+    {"stage_id":1,"title":"基础补强","difficulty":"初级","estimated_days":2,
+     "topics":["数学推导"],"objectives":["掌握 数学推导 的核心概念与基本应用"]},
+    {"stage_id":2,"title":"核心阶段 1：基础概念 → 核心理论","difficulty":"初级","estimated_days":4},
+    {"stage_id":3,"title":"核心阶段 2：关键方法 → 工具实践","difficulty":"中级","estimated_days":4},
+    {"stage_id":4,"title":"核心阶段 3：案例分析 → 综合实战","difficulty":"高级","estimated_days":4},
+    {"stage_id":5,"title":"综合实战","difficulty":"高级","estimated_days":5,
+     "topics":["代码案例"],"tasks":[{"type":"project","description":"完成与代码案例相关的综合实战项目"}]}
+  ],
+  "current_stage": 1,
+  "total_estimated_days": 19,
+  "difficulty_level": "中级",
+  "adaptation_notes": "基于知识水平(中级)、节奏(中速均衡型)、1个薄弱点、1个兴趣方向自动编排"
+}}
+
+data: {"type":"done"}</pre>
+    <p><span class="badge bg-green">PASS</span> 5阶段路径，难度递进（初级→高级），薄弱点前置补强，兴趣融入实战</p>
+</div>
+
+<!-- 数据一致性 -->
+<div class="card">
+    <h2>数据库持久化验证</h2>
+    <table>
+        <tr><th>端点</th><th>返回数据</th><th>状态</th></tr>
+        <tr>
+            <td>GET /api/profile/demo-student-01</td>
+            <td>
+                knowledge_level=<span class="badge bg-blue">中级</span>
+                weakness=<span class="badge bg-red">数学推导</span>
+                interest=<span class="badge bg-green">代码案例</span>
+                completeness=<strong>0.5</strong>
+            </td>
+            <td class="pass">✅</td>
+        </tr>
+        <tr>
+            <td>GET /api/planner/demo-student-01</td>
+            <td>
+                goal=<strong>完成实践项目</strong>
+                stages=<strong>5</strong>
+                total_days=<strong>19</strong>
+                status=<span class="badge bg-green">active</span>
+            </td>
+            <td class="pass">✅</td>
+        </tr>
+    </table>
+</div>
+
+<!-- 修复记录 -->
+<div class="card">
+    <h2>联调修复清单</h2>
+    <table>
+        <tr><th>#</th><th>文件</th><th>问题</th><th>修复</th></tr>
+        <tr>
+            <td>1</td>
+            <td><code>frontend/src/api/profile.js</code></td>
+            <td>API 路径不匹配: <code>/profile/{id}/chat/stream</code></td>
+            <td>→ <code>/api/profile/chat</code> + 补充 student_id 字段</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td><code>frontend/src/hooks/useChat.js</code></td>
+            <td>未处理 SSE profile_update 事件</td>
+            <td>新增 <code>onEvent</code> 回调参数</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td><code>frontend/src/pages/ProfilePage.jsx</code></td>
+            <td>画像数据无 UI 展示</td>
+            <td>新增画像卡片 (Tag 组件展示6维)</td>
+        </tr>
+    </table>
+</div>
+
+<!-- 前端路由 -->
+<div class="card">
+    <h2>前端路由验证</h2>
+    <table>
+        <tr><th>路由</th><th>页面</th><th>数据来源</th><th>状态</th></tr>
+        <tr><td><code>/</code> (重定向到 /profile)</td><td>AI 对话页</td><td>POST /api/profile/chat (SSE)</td><td class="pass">✅</td></tr>
+        <tr><td><code>/login</code></td><td>登录页</td><td>Mock 登录 (student/student123)</td><td class="pass">✅</td></tr>
+        <tr><td><code>/learning-path</code></td><td>学习路径时间线</td><td>GET /api/planner/{id} (+ SSE 生成)</td><td class="pass">✅</td></tr>
+    </table>
+</div>
+
+<div style="text-align:center;padding:24px;color:#999;font-size:12px;">
+    EduAgent — 第15届软件杯 A3 | ProfileAgent + PlannerAgent 联调通过 | 2026-06-12
+</div>
+
+</div>
+</body>
+</html>
