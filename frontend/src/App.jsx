@@ -27,6 +27,8 @@ const DocsPage = lazy(() => import('./pages/DocsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResourcePage = lazy(() => import('./pages/ResourcePage'))
+const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
 
 const { Text } = Typography
 
@@ -158,6 +160,8 @@ function AuthLayout() {
             <Route path="/landing" element={<LandingPage />} />
             <Route path="/tutor" element={<TutorPage />} />
             <Route path="/docs" element={<DocsPage />} />
+            <Route path="/resources" element={<ResourcePage />} />
+            <Route path="/learning-path/:pathId" element={<LearningPathPage />} />
           </Routes>
         </Suspense>
       </div>

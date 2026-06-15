@@ -30,6 +30,7 @@ import { startProfileChat } from '../api/profile'
 import { getResources } from '../api/resource'
 import { getLearningPath, generateLearningPath } from '../api/planner'
 import { getTutorSessions, createTutorSession } from '../api/tutor'
+import ResourcePage from '../pages/ResourcePage'
 import { mockPath, mockStats } from '../mock/learningPathData'
 import { formatRelativeTime } from '../utils/format'
 
@@ -297,6 +298,12 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('resource')
   const [tutorHover, setTutorHover] = useState(false)
   const [tutorLocked, setTutorLocked] = useState(false)
+  const [profile, setProfile] = useState(null)
+
+  const handleProfileUpdate = useCallback((updatedProfile) => {
+    setProfile(updatedProfile)
+    message.success('学习画像已更新 📊')
+  }, [])
 
   const streamFetcher = useCallback(
     (msg, signal) => startProfileChat({ student_id: 'demo-student-01', message: msg }),
@@ -304,6 +311,7 @@ export default function ProfilePage() {
   )
   const { messages, isLoading, sendMessage, abort } = useChat({
     streamFetcher,
+    onProfileUpdate: handleProfileUpdate,
     initialMessages: [{
       id: 'welcome',
       role: 'assistant',
@@ -380,7 +388,7 @@ export default function ProfilePage() {
                 { key: 'path', label: '📐 学习路径', children: null },
               ]} />
             <div style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
-              {activeTab === 'resource' ? <ResourcePanel /> : <LearningPathPanel />}
+              {activeTab === 'resource' ? <ResourcePage /> : <LearningPathPanel />}
             </div>
           </div>
         </div>

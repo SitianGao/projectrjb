@@ -1,12 +1,15 @@
-import { Card, Tag, Typography, Button, Space } from 'antd'
+import { Card, Tag, Typography, Button, Space, Tooltip } from 'antd'
 import {
   FileTextOutlined,
   QuestionCircleOutlined,
   BranchesOutlined,
-  DownloadOutlined,
+  CodeOutlined,
+  EditOutlined,
   EyeOutlined,
   ClockCircleOutlined,
+  ExpandOutlined,
 } from '@ant-design/icons'
+import MarkdownRenderer from './MarkdownRenderer'
 import { formatDate, formatRelativeTime, truncateText } from '../utils/format'
 
 const { Text, Paragraph, Title } = Typography
@@ -15,31 +18,21 @@ const typeConfig = {
   document: { icon: <FileTextOutlined />, color: 'blue', label: '文档' },
   quiz: { icon: <QuestionCircleOutlined />, color: 'orange', label: '练习题' },
   mindmap: { icon: <BranchesOutlined />, color: 'purple', label: '思维导图' },
+  exercise: { icon: <EditOutlined />, color: 'green', label: '练习题' },
+  code: { icon: <CodeOutlined />, color: 'red', label: '代码' },
 }
 
 /**
  * 学习资源卡片
- *
- * @param {Object} props
- * @param {Object} props.resource - 资源数据
- * @param {string} props.resource.id
- * @param {'document'|'quiz'|'mindmap'} props.resource.type
- * @param {string} props.resource.title
- * @param {string} props.resource.description
- * @param {Array<string>} props.resource.tags
- * @param {string} props.resource.createdAt
- * @param {Function} props.onClick - 点击查看
- * @param {Function} props.onDownload - 下载
- * @param {boolean} props.loading
  */
-export default function ResourceCard({ resource, onClick, onDownload, loading = false }) {
+export default function ResourceCard({ resource, onClick, onDownload, loading = false, showContent = false }) {
   if (loading) {
-    return <Card loading />
+    return <Card loading style={{ borderRadius: 12, border: '1px solid #f0f0f0' }} />
   }
 
   if (!resource) {
     return (
-      <Card>
+      <Card style={{ borderRadius: 12 }}>
         <Text type="secondary">资源不可用</Text>
       </Card>
     )
@@ -50,62 +43,73 @@ export default function ResourceCard({ resource, onClick, onDownload, loading = 
   return (
     <Card
       hoverable
-      style={{ height: '100%' }}
+      className="resource-card"
+      style={{
+        height: '100%',
+        borderRadius: 12,
+        border: '1px solid #f0f0f0',
+        transition: 'box-shadow 0.25s, transform 0.25s',
+      }}
+      styles={{ body: { padding: '20px 22px', display: 'flex', flexDirection: 'column', height: '100%' } }}
       onClick={() => onClick?.(resource)}
-      actions={[
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          onClick={(e) => {
-            e.stopPropagation()
-            onClick?.(resource)
-          }}
-        >
-          查看
-        </Button>,
-        <Button
-          type="link"
-          icon={<DownloadOutlined />}
-          onClick={(e) => {
-            e.stopPropagation()
-            onDownload?.(resource)
-          }}
-        >
-          下载
-        </Button>,
-      ]}
     >
-      <Space direction="vertical" size="small" style={{ width: '100%' }}>
-        {/* 类型标签 + 标题 */}
-        <Space>
-          <Tag icon={config.icon} color={config.color}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 12 }}>
+        {/* 头部：类型标签 + 展开图标 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Tag icon={config.icon} color={config.color} style={{ borderRadius: 6, padding: '2px 10px', fontSize: 13 }}>
             {config.label}
           </Tag>
-        </Space>
-        <Title level={5} style={{ margin: 0 }}>
+          {showContent && (
+            <Tooltip title="点击查看详情">
+              <ExpandOutlined
+                style={{ color: '#94a3b8', cursor: 'pointer', fontSize: 15 }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClick?.(resource)
+                }}
+              />
+            </Tooltip>
+          )}
+        </div>
+
+        {/* 标题 */}
+        <Title level={5} style={{ margin: 0, lineHeight: 1.4, fontSize: 16 }}>
           {resource.title || '未命名资源'}
         </Title>
 
-        {/* 描述 */}
-        <Paragraph type="secondary" style={{ marginBottom: 8 }}>
-          {truncateText(resource.description, 120)}
-        </Paragraph>
-
-        {/* 标签 */}
-        {resource.tags?.length > 0 && (
-          <div>
-            {resource.tags.map((tag) => (
-              <Tag key={tag}>{tag}</Tag>
-            ))}
+        {/* 描述 或 Markdown 内容 */}
+        {showContent && resource.content ? (
+          <div
+            style={{
+              flex: 1,
+              maxHeight: 300,
+              overflow: 'auto',
+              padding: '8px 0',
+              borderTop: '1px solid #f1f5f9',
+              borderBottom: '1px solid #f1f5f9',
+            }}
+          >
+            <MarkdownRenderer content={resource.content} compact />
           </div>
+        ) : (
+          <Paragraph type="secondary" style={{ marginBottom: 8, flex: 1 }}>
+            {truncateText(resource.description, 120)}
+          </Paragraph>
         )}
 
-        {/* 时间 */}
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          <ClockCircleOutlined style={{ marginRight: 4 }} />
-          {formatRelativeTime(resource.createdAt)}
-        </Text>
-      </Space>
+        {/* 底部信息 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {resource.tags?.map((tag) => (
+              <Tag key={tag} style={{ borderRadius: 4, fontSize: 12 }}>{tag}</Tag>
+            ))}
+          </div>
+          <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+            <ClockCircleOutlined style={{ marginRight: 4 }} />
+            {formatRelativeTime(resource.createdAt)}
+          </Text>
+        </div>
+      </div>
     </Card>
   )
 }
