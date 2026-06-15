@@ -18,7 +18,6 @@ import {
   PushpinFilled,
 } from '@ant-design/icons'
 import ChatBox from '../components/ChatBox'
-import ProfileCard from '../components/ProfileCard'
 import ResourceCard from '../components/ResourceCard'
 import MindMapViewer from '../components/MindMapViewer'
 import MermaidChart from '../components/MermaidChart'
@@ -353,43 +352,26 @@ export default function ProfilePage() {
             <Text type="secondary" style={{ fontSize: 14 }}>个性化 AI 学习助手</Text>
           </div>
 
-          {/* ChatBox 卡片 + 画像卡片 */}
-          <div style={{ display: 'flex', gap: 16, maxWidth: 1100, margin: '0 auto', width: '100%' }}>
-            <div style={{
-              flex: 1, minWidth: 0,
-              height: 350,
-              borderRadius: 16,
-              overflow: 'hidden',
-              background: 'var(--bg-card)',
-              border: '1px solid #e8e8ed',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04), 0 12px 32px rgba(139,92,246,0.06)',
-            }}>
-              <ChatBox
-                messages={messages}
-                isLoading={isLoading}
-                onSend={sendMessage}
-                onAbort={abort}
-                placeholder="说说你的学习情况，我会为你定制学习方案..."
-                emptyText="和 AI 助手聊聊你的学习情况"
-                suggestions={SUGGESTIONS}
-                onSuggestionClick={handleSuggestion}
-              />
-            </div>
-            <div style={{
-              width: 320, flexShrink: 0, height: 350, overflow: 'auto',
-              borderRadius: 16,
-              background: 'var(--bg-card)',
-              border: '1px solid #e8e8ed',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04), 0 12px 32px rgba(139,92,246,0.06)',
-            }}>
-              {profile ? (
-                <ProfileCard profile={profile} compact />
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                  <Empty description="发送消息，AI 将构建你的学习画像" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                </div>
-              )}
-            </div>
+          {/* ChatBox 卡片 */}
+          <div style={{
+            height: 350,
+            maxWidth: 800, margin: '0 auto', width: '100%',
+            borderRadius: 16,
+            overflow: 'hidden',
+            background: 'var(--bg-card)',
+            border: '1px solid #e8e8ed',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04), 0 12px 32px rgba(139,92,246,0.06)',
+          }}>
+            <ChatBox
+              messages={messages}
+              isLoading={isLoading}
+              onSend={sendMessage}
+              onAbort={abort}
+              placeholder="说说你的学习情况，我会为你定制学习方案..."
+              emptyText="和 AI 助手聊聊你的学习情况"
+              suggestions={SUGGESTIONS}
+              onSuggestionClick={handleSuggestion}
+            />
           </div>
 
         </div>
