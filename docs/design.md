@@ -497,42 +497,51 @@ TutorAgent 支持 4 种解释风格切换：
 
 ### 10.1 人员分工
 
-本计划与 `prepare.md`、`github-workflow.md`、`test_plan.md` 保持一致：团队共 3 人，开发周期约 24 天，其中 Day 18-22 为期末考试缓冲期，不安排代码开发。
+本计划与 `prepare.md`、`github-workflow.md`、`test_plan.md` 保持一致：团队共 3 人。Day 1-5 保持原计划，用于完成项目骨架、画像构建、学习路径规划和画像到路径的端到端联调；从当前 Day 6 开始，将原 Day 6-24 的剩余工作压缩到 Day 6-16 完成。任务量不减少，但每天必须明确交付物和跨成员对接项。
 
 | 角色 | 分支 | 负责范围 | 核心交付物 |
 |------|------|----------|----------|
 | 队长 | `feature/backend-core` | 后端 API、数据库模型、AgentOrchestrator、LLMClient、异步任务、Docker 集成、项目进度 | FastAPI 全部端点、统一接口规范、数据库表、Docker Compose、最终集成包 |
-| 队员A | `feature/frontend-core` | 前端全部页面、组件、SSE 流式展示、Markdown/Mermaid/markmap 渲染、交互体验 | React 页面、API 调用封装、通用组件、前端联调截图、演示录屏素材 |
+| 队员A | `feature/frontend-core` | 前端全部页面、组件、SSE 流式展示、Markdown/Mermaid/markmap 渲染、交互体验 | React 页面、API 调用封装、通用组件、前端联调截图、页面回归结果 |
 | 队员B | `feature/ai-core` | Agent 核心逻辑、Prompt、RAG、知识库、内容安全、AI 输出质量测试 | 5 个 Agent、RAG 管线、知识库样例、内容过滤、AI 输出样例和测试用例 |
 
 ### 10.2 每日任务与交付物
 
-| 天数 | 队长：后端 + 集成 | 队员A：前端 | 队员B：AI/RAG + 安全 | 当日交付 |
-|------|------------------|-------------|---------------------|----------|
-| Day 1 | 创建 `feature/backend-core`；搭建 FastAPI、CORS、配置读取、日志结构 | 创建 `feature/frontend-core`；搭建 Vite + React + Ant Design；完成路由骨架 | 创建 `feature/ai-core`；整理赛题知识点与课程样例；确定 Agent 输入输出草案 | 前后端可启动，三条分支创建完成，接口草案 v0.1 |
-| Day 2 | 建立 SQLite 连接、SQLAlchemy 基类；创建 students、student_profiles 初版 | 完成 HomePage、ProfilePage 静态结构；封装 `api/client.js` | 完成 ProfileAgent Prompt v0.1；准备 3 组画像对话样例 | 项目骨架、画像表、画像页面、画像 Prompt 样例 |
-| Day 3 | 实现 `/api/profile/chat`、`/api/profile/{student_id}`；接入 SSE 返回格式 | 完成 ChatBox、ProfileCard；用 Mock 数据展示画像 | 实现 ProfileAgent 画像抽取逻辑，输出 6 维 JSON | 画像构建链路可用：Mock/后端均可演示 |
-| Day 4 | 创建 learning_paths 表；实现 `/api/planner/generate` 和 `/api/planner/{student_id}` | 完成 LearningPathPage、PathTimeline；接入规划 Mock 数据 | 完成 PlannerAgent Prompt 和路径 JSON 结构 | 可生成并展示阶段式学习路径 |
-| Day 5 | 实现 AgentOrchestrator 初版，串联 ProfileAgent 与 PlannerAgent | 前端接入真实画像和路径接口；处理加载态和错误态 | 联调 ProfileAgent、PlannerAgent；修正字段不一致问题 | 画像 → 路径端到端联调通过 |
-| Day 6 | 创建 resources 表；实现 `/api/resource/generate` 初版 | 完成 ResourcePage、ResourceCard、MarkdownRenderer | 完成 ResourceAgent，支持 document、exercise、code 三类资源 | 可生成并展示基础学习资源 |
-| Day 7 | 实现 task_manager；完成 `/api/task/{task_id}/status` | 完成 ProgressBar、useTaskStatus；接入异步资源生成状态 | 补充 mindmap、ppt 大纲、reading 类型资源生成 Prompt | 异步资源生成闭环可演示 |
-| Day 8 | 封装 LLMClient，统一星火/DeepSeek 调用和重试 | 完成 MindMapViewer、MermaidChart；支持多模态资源渲染 | 搭建 embedding、vector_store、retriever 初版 | LLM 调用封装、RAG 骨架、多模态展示组件 |
-| Day 9 | 实现 `/api/tutor/chat` SSE；接入 RAG 检索结果参数 | 完成 TutorPage；支持流式问答展示 | 完成 TutorAgent，多解释风格：analogy、formula、visual、story | 智能辅导流式问答可用 |
-| Day 10 | 创建 learning_records 表；实现 `/api/evaluate/record` | 完成 EvaluatePage 静态结构、学习记录提交交互 | 完成 EvaluateAgent 初版，输出评分、薄弱点、建议 | 学习记录提交与评估页面可用 |
-| Day 11 | 实现 `/api/evaluate/start`、`/api/evaluate/report/{student_id}` | 接入评估报告真实接口；展示评分图表和建议 | 实现遗忘曲线计算与 review_plan 输出 | 学习评估闭环可演示 |
-| Day 12 | 完成资源、问答、评估接口错误处理；统一状态码和错误格式 | 补齐全站空状态、错误提示、重试按钮 | 完成 content_filter；补充防幻觉 Prompt 约束 | 创新点、安全过滤、错误处理初版完成 |
-| Day 13 | 端到端联调五大流程；修复接口字段和数据库问题 | 全流程接入真实 API；清理 Mock 依赖 | 整理知识库文档，调优检索相关性 | 主流程 E2E：画像、路径、资源、问答、评估 |
-| Day 14 | 性能优化：SSE 首字延迟、异步任务进度、LLM 超时重试 | 响应式适配；优化移动端和评委演示屏尺寸 | 执行 Agent 单元测试、安全测试、内容质量测试 | 性能与兼容性问题清单 |
-| Day 15 | 完成接口测试；Swagger 示例逐个跑通 | 完成 UI 细节、加载骨架、演示路径固定入口 | 完成测试样例：画像、路径、资源、问答、评估 | `test_plan.md` 中核心功能测试基本通过 |
-| Day 16 | 配置 Docker Compose、数据库初始化、环境变量模板 | 修复前端 Bug；补充演示截图 | 完成文档初稿：Agent、RAG、安全、知识库说明 | 可一键启动的 Demo 包初版 |
-| Day 17 | 完成最终集成、README 启动说明、开源协议检查 | 完成前端最终走查和录屏准备 | 完成 AI 输出样例、内容安全验收、开源标注 | Day 17 前完成全部代码，进入冻结期 |
-| Day 18 | 不开发；仅记录发现的问题，不改代码 | 不开发；整理个人负责部分说明 | 不开发；整理知识库和 Prompt 说明 | 期末缓冲，问题记录 |
-| Day 19 | 不开发；保留紧急 P0 修复窗口 | 不开发；保留紧急 P0 修复窗口 | 不开发；保留紧急 P0 修复窗口 | 期末缓冲 |
-| Day 20 | 不开发 | 不开发 | 不开发 | 期末缓冲 |
-| Day 21 | 不开发 | 不开发 | 不开发 | 期末缓冲 |
-| Day 22 | 不开发；晚上统一确认 Day 23 收尾清单 | 不开发；准备演示素材 | 不开发；准备文档补充素材 | 收尾清单 |
-| Day 23 | 最终打包；检查 Docker、Swagger、环境变量；编写演示脚本 | 录制演示视频；补充关键页面截图 | 完善系统设计、测试报告、AI 模块说明 | 提交包候选版 |
-| Day 24 | 最终验收：按评分点检查代码、文档、演示材料 | 修复演示视频和截图中的小问题 | 检查知识库、Prompt、测试结论、开源致谢 | 最终提交包：代码、文档、PPT、演示视频 |
+Day 1-5 不再重新排期，只做完成情况确认；Day 6-Day 16 是比赛冲刺排期。每天结束时必须能拿出“可运行功能 + 页面截图 + 接口/测试证据 + 对接记录”，不能只提交半成品代码。
+
+#### 10.2.1 Day 1-5 完成情况确认
+
+| 天数 | 原定目标 | 当前完成判断 | 还需补齐的证据 |
+|------|----------|--------------|----------------|
+| Day 1 | 前后端项目骨架、三条功能分支、接口草案 v0.1 | 已具备 FastAPI、React、Agent、RAG、测试目录结构 | 保留前后端启动截图、Swagger 首页截图 |
+| Day 2 | 数据库基础、画像页面静态结构、ProfileAgent Prompt 样例 | 已具备数据库脚本、ProfilePage、ProfileAgent、画像测试 | 补充画像样例 JSON 到测试报告或截图目录 |
+| Day 3 | 画像 SSE 接口、ChatBox、ProfileCard、6 维画像输出 | 已具备 `/api/profile/*`、ChatBox、ProfileCard、ProfileAgent | 保留一次画像对话截图和接口返回样例 |
+| Day 4 | 学习路径接口、LearningPathPage、PathTimeline、PlannerAgent | 已具备 `/api/planner/*`、LearningPathPage、PathTimeline、PlannerAgent | 保留路径页面截图和路径 JSON 样例 |
+| Day 5 | Orchestrator 串联画像到路径，前端接真实接口 | 已具备 AgentOrchestrator 和画像 -> 路径主流程代码 | Day 6 复测 `pytest test -q`，并保留通过结果 |
+
+#### 10.2.2 Day 6-Day 16 每日冲刺任务
+
+| 天数 | 当天必须达到的效果 | 队长：后端 + 集成 | 队员A：前端页面效果 | 队员B：AI/RAG + 安全 | 当天交付物 | 必须对接完成 |
+|------|------------------|------------------|-------------------|---------------------|------------|--------------|
+| Day 6 | 学生能在“学习资源”页面输入主题并看到 3 类基础资源卡片 | 创建 `resources` 表和 Resource 模型；实现 `POST /api/resource/generate` 同步初版；响应包含 `resources[]`、`type`、`title`、`topic`、`difficulty`、`content`；补齐失败返回 `RESOURCE_GENERATE_FAILED` | `ResourcePage` 有主题输入框、难度选择、资源类型选择、生成按钮；生成后展示 document、exercise、code 三张 `ResourceCard`；Markdown 内容能正常渲染，空状态提示“暂无资源，先输入主题生成” | `ResourceAgent` 输出 document、exercise、code 三类资源；每类资源不少于标题、适用知识点、正文、练习或代码；准备“机器学习入门”样例输出 | 资源接口 Swagger 截图；资源页面生成前/生成后截图；3 组 Agent 输出 JSON；`pytest test -q` 通过截图或日志 | 队长 + 队员B 确认 ResourceAgent JSON Schema；队长 + 队员A 确认 ResourceCard 展示字段；队员A + 队员B 确认 Markdown/代码块格式 |
+| Day 7 | 学生点击生成后能看到任务进度，长任务不再卡死页面 | 实现 `task_manager`；实现 `GET /api/task/{task_id}/status`；`/api/resource/generate` 返回 `task_id`；任务状态包含 `pending/running/done/failed`、`progress`、`message`、`result`；封装 LLMClient 超时、重试、降级文案 | `ResourcePage` 接入 `useTaskStatus`；点击生成后按钮禁用，显示 `ProgressBar` 和阶段文案；任务完成后自动替换为资源卡片；失败时显示重试按钮 | 增加 reading、mindmap、ppt_outline 资源 Prompt；完成 embedding、vector_store、retriever 最小可用骨架；知识库能加载 `data/knowledge` 中的 Markdown | 异步任务接口截图；资源生成进度从 0 到 100 的页面截图；RAG 加载日志；任务失败重试截图 | 队长 + 队员A 确认任务状态枚举和轮询间隔；队长 + 队员B 确认 LLMClient 调用入参；队员A + 队员B 确认 mindmap/ppt_outline 前端展示格式 |
+| Day 8 | 学生能在“智能辅导”页面流式提问，并看到引用知识点和多解释答案 | 实现 `POST /api/tutor/chat` SSE；接入 retriever 检索结果；SSE 事件包含 `start/delta/data/error/done`；补齐 tutor 接口错误码和 Swagger 示例 | `TutorPage` 左侧为对话区，右侧为参考知识点/图表区；回答逐字流式出现；支持切换解释风格：类比、公式、图解、故事；Mermaid 图能正常显示，失败时有降级文本 | `TutorAgent` 支持 analogy、formula、visual、story 四种解释；输出 `answer`、`explanation_style`、`references`、`diagrams`；RAG 检索至少返回标题、片段、来源文件 | Tutor SSE 事件日志和连续截图；4 种解释风格样例；RAG references JSON；Mermaid 渲染截图 | 队员B + 队长 确认 references 字段和 diagrams 字段；队长 + 队员A 确认 SSE 事件处理；队员A + 队员B 确认 Mermaid 文本可渲染 |
+| Day 9 | 学生完成学习后能提交记录，系统生成评分、薄弱点和复习计划 | 创建 `learning_records` 表；实现 `POST /api/evaluate/record`、`POST /api/evaluate/start`、`GET /api/evaluate/report/{student_id}`；报告保存到数据库；接口返回 `overall_score`、`dimensions`、`weak_topics`、`suggestions`、`review_plan` | `EvaluatePage` 有学习记录表单、测评入口、评分雷达图/维度条、薄弱知识点列表、复习计划时间线；没有报告时显示引导；生成报告时有加载态 | `EvaluateAgent` 输出评分、薄弱点、建议；实现遗忘曲线初版：根据掌握度和时间生成 `review_plan`；准备 3 个学生评估样例 | 评估接口 Swagger 截图；EvaluatePage 空状态/生成中/报告态截图；review_plan 样例 JSON；遗忘曲线说明小节 | 队长 + 队员B 确认 EvaluateAgent 输出和 review_plan 算法字段；队长 + 队员A 确认雷达图/时间线数据结构；队员A + 队员B 确认薄弱点中文展示 |
+| Day 10 | 系统具备比赛可展示的安全、错误处理和创新点初版 | 统一所有接口成功/失败格式；补齐 Swagger 示例；完成画像、路径、资源、任务、问答、评估接口第一轮测试；接口失败必须返回明确 `code` 和 `message` | 全站补齐空状态、加载骨架、错误提示、重试按钮；清理核心流程 Mock 依赖；导航中五个主流程入口清晰可见 | 完成 `content_filter`；补充防幻觉 Prompt 约束；安全拦截敏感输入，RAG 无依据时明确提示“资料库中未找到可靠依据”；完成 Agent 单测和安全测试 | API 测试清单；错误态页面截图；安全拦截图；创新点初版说明：遗忘曲线 + 多解释路径 | 全员统一错误码表；队长 + 队员A 确认前端错误文案；队长 + 队员B 确认安全拦截返回格式和防幻觉边界 |
+| Day 11 | 五大主流程可以从首页连续运行，不需要手动改数据 | 打通一条固定测试学生数据；修复画像 -> 路径 -> 资源 -> 问答 -> 评估的字段和数据库问题；保留 E2E 手工测试步骤 | 首页展示“开始画像/查看路径/生成资源/智能辅导/学习评估”五个入口；页面之间跳转顺畅；每个页面都能用真实 API 完成核心动作 | 调优知识库召回；补充 AI 输出样例；把不稳定 Prompt 收敛成固定模板；记录常见失败和降级策略 | 一份完整 E2E 手工测试步骤；五流程截图；P0/P1 问题清单；核心流程不依赖 Mock 的确认记录 | 全员一起跑一次完整主流程；队长记录问题和负责人；队员A 标注页面问题；队员B 标注输出质量问题 |
+| Day 12 | 系统响应速度和稳定性达到连续使用水平 | 优化 SSE 首字延迟、异步任务进度、LLM 超时重试；执行并发资源生成测试；关闭 P0/P1 后端问题 | 适配 1366x768 屏幕和手机宽度；按钮、卡片、图表不重叠；加载骨架和进度提示自然；关键页面截图稳定 | 做内容质量测试、安全测试、RAG 相关性测试；修正低质量输出 Prompt；补齐知识库缺口 | 性能测试记录；兼容性截图；RAG 命中样例；已关闭问题清单 | 队长 + 队员A 对接慢页面和接口耗时；队长 + 队员B 对接慢调用和低质量输出；全员确认 P0 清零 |
+| Day 13 | 系统可以在一台新机器上完整启动，前后端、数据库、知识库都能连通 | 配置 Docker Compose 或一键启动脚本；完成数据库初始化和种子数据导入；统一环境变量读取；启动后 `/docs`、`/api/health`、五大业务接口均可访问 | 修复构建错误；确认 `npm run build` 通过；前端通过环境变量读取后端地址；所有页面刷新后不白屏，路由能正常恢复 | 确认知识库加载流程可重复执行；向量库不存在时自动初始化；RAG 检索失败时有降级结果；安全过滤模块随后端启动加载 | 一键启动成功记录；后端健康检查结果；前端构建结果；数据库表和种子数据检查结果；RAG 初始化日志 | 队长 + 队员A 确认前端构建产物和后端地址配置；队长 + 队员B 确认知识库初始化时机和失败降级；全员在同一启动方式下跑通系统 |
+| Day 14 | 五大功能进入技术冻结：接口字段、页面交互、Agent 输出结构不再随意变更 | 锁定 API Schema；修复 P0/P1 后端缺陷；补齐自动化测试中缺失的接口用例；保证重复运行测试不会污染数据库 | 锁定页面交互和组件字段；修复 P0/P1 前端缺陷；清理残留 Mock；确保画像、路径、资源、问答、评估页面只消费真实接口或明确降级数据 | 锁定 Profile/Planner/Resource/Tutor/Evaluate 五个 Agent 输出结构；修复低质量输出和解析失败问题；补齐 RAG、安全、Prompt 的单元测试 | API Schema 冻结表；P0/P1 缺陷关闭记录；前端无 Mock 检查结果；Agent 输出结构样例；自动化测试通过记录 | 队长同步冻结字段；队员A 按冻结字段做最后适配；队员B 按冻结字段修正 Agent 输出；字段变更必须三人同时确认 |
+| Day 15 | 全流程技术回归通过：从注册/登录到画像、路径、资源、问答、评估可以连续跑完 | 执行接口回归、集成回归和并发测试；修复剩余 P1/P2 后端问题；检查日志中无未处理异常；确认异步任务失败可恢复 | 执行桌面端和移动端页面回归；确认表单校验、加载态、错误态、重试态都可用；修复布局错位、按钮不可点、图表不渲染等问题 | 执行 Agent 质量回归；确认 RAG 引用可追溯；确认安全拦截不会误伤正常学习问题；优化慢 Prompt 和不稳定输出 | 回归测试结果；接口成功/失败样例；前端关键流程截图；RAG 命中率抽查结果；剩余缺陷列表 | 全员按同一测试账号跑完整流程；队长记录后端问题；队员A 记录页面问题；队员B 记录 AI 输出问题并当天关闭高优先级项 |
+| Day 16 | 技术版本达到可提交状态：代码可运行、测试可通过、主要流程无阻断问题 | 生成最终技术版本；确认 `.env.example` 完整且无真实密钥；确认数据库迁移/初始化可重复；执行最终 `pytest test -q` 和接口冒烟测试 | 执行最终 `npm run build`；确认生产构建页面可访问；检查移动端和 1366x768 屏幕下无明显遮挡、溢出、白屏 | 执行最终 Agent/RAG/安全冒烟测试；确认知识库文件齐全；确认无联网依赖时系统有可解释降级；确认创新点功能在页面可被触发 | 最终代码版本；后端测试通过结果；前端构建通过结果；五大流程冒烟结果；已知问题清单只剩非阻断项 | 全员共同跑最终技术验收；队长负责后端和启动链路；队员A 负责页面可用性；队员B 负责 AI 输出、RAG、安全和创新点可用性 |
+
+#### 10.2.3 每天结束前必须提交的技术证据
+
+- 代码：当天功能分支提交，commit 信息说明具体功能，例如 `feat: 完成资源异步生成进度展示`。
+- 页面证据：至少 2 张运行截图，包含“功能操作前”和“功能完成后”；涉及流式输出或进度条时补 1 张过程截图。
+- 接口证据：Swagger、Postman、curl 或测试日志至少保留一种；当天新增接口必须有成功样例和失败样例。
+- 对接记录：日报里写清楚“今天和谁对接了什么字段/页面/Prompt，结论是什么，是否还有阻塞”。
+- 问题清单：P0/P1/P2 分级，必须写负责人和计划关闭日期。
 
 ### 10.3 协作流程
 
@@ -542,7 +551,7 @@ TutorAgent 支持 4 种解释风格切换：
 - 提交信息使用 `feat:`、`fix:`、`refactor:`、`docs:` 前缀，例如 `feat: 完成TutorAgent流式问答功能`。
 - 前后端联调以 Swagger、SSE 示例和本章接口规范为准；字段变更必须先在群里确认，再同步更新设计文档。
 - AI 输出结构由队长和队员B先确认 JSON Schema，队员A只消费稳定字段；临时字段不得直接进入页面逻辑。
-- 测试安排遵循 `test_plan.md`：Day 6-9 做 Agent 单元测试，Day 9-12 做接口测试，Day 13-15 做集成和性能测试，Day 16-17 做验收测试。
+- 测试安排遵循 `test_plan.md`：Day 6-8 做 Agent 单元测试，Day 9-10 做接口测试，Day 11-12 做集成和性能测试，Day 13-16 做部署启动、技术冻结、全流程回归和最终技术验收。
 
 ### 10.4 接口统一约定
 

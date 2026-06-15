@@ -186,12 +186,11 @@ class ProfileAgent(BaseAgent):
         try:
             async for chunk in self.call_llm(user_prompt):
                 full_response.append(chunk)
-                # 流式输出 LLM 原始文本（前端可按需展示）
-                yield f'data: {{"type":"chat","content":{json.dumps(chunk, ensure_ascii=False)}}}\n\n'
         except Exception as e:
-            yield f'data: {{"type":"error","message":"LLM 调用失败: {str(e)}"}}\n\n'
             # 降级
             result = self._keyword_fallback(student_id, message, history or [])
+            reply = self._build_chat_reply(result)
+            yield f'data: {{"type":"chat","content":{json.dumps(reply, ensure_ascii=False)}}}\n\n'
             profile_json = json.dumps(result, ensure_ascii=False)
             yield f'data: {{"type":"profile_update","profile":{profile_json}}}\n\n'
             yield f'data: {{"type":"done"}}\n\n'
@@ -210,11 +209,15 @@ class ProfileAgent(BaseAgent):
             }
             if "learning_history" not in result["profile"]:
                 result["profile"]["learning_history"] = history or []
+            reply = parsed.get("reply") or parsed.get("chat_reply") or self._build_chat_reply(result)
+            yield f'data: {{"type":"chat","content":{json.dumps(reply, ensure_ascii=False)}}}\n\n'
             profile_json = json.dumps(result, ensure_ascii=False)
             yield f'data: {{"type":"profile_update","profile":{profile_json}}}\n\n'
         else:
             # 解析失败，用 fallback
             result = self._keyword_fallback(student_id, message, history or [])
+            reply = self._build_chat_reply(result)
+            yield f'data: {{"type":"chat","content":{json.dumps(reply, ensure_ascii=False)}}}\n\n'
             profile_json = json.dumps(result, ensure_ascii=False)
             yield f'data: {{"type":"profile_update","profile":{profile_json}}}\n\n'
 
@@ -285,6 +288,46 @@ class ProfileAgent(BaseAgent):
                 return json.loads(cleaned)
             except json.JSONDecodeError:
                 return None
+
+    def _build_chat_reply(self, result: Dict) -> str:
+        """Build user-facing text from structured profile output."""
+        profile = result.get("profile", {}) if isinstance(result, dict) else {}
+        next_questions = result.get("next_questions", []) if isinstance(result, dict) else []
+        completeness = result.get("completeness", 0) if isinstance(result, dict) else 0
+
+        lines = ["我已经根据你的描述更新了学习画像。"]
+
+        knowledge_level = profile.get("knowledge_level")
+        learning_goal = profile.get("learning_goal")
+        cognitive_style = profile.get("cognitive_style")
+        weaknesses = profile.get("weakness") or []
+        interests = profile.get("interest") or []
+        pace_preference = profile.get("pace_preference")
+
+        summary = []
+        if knowledge_level:
+            summary.append(f"当前基础：{knowledge_level}")
+        if learning_goal:
+            summary.append(f"学习目标：{learning_goal}")
+        if cognitive_style:
+            summary.append(f"学习偏好：{cognitive_style}")
+        if weaknesses:
+            summary.append(f"需要重点补强：{', '.join(weaknesses)}")
+        if interests:
+            summary.append(f"兴趣方向：{', '.join(interests)}")
+        if pace_preference:
+            summary.append(f"学习节奏：{pace_preference}")
+
+        if summary:
+            lines.append("")
+            lines.extend(f"- {item}" for item in summary)
+
+        if completeness and completeness < 0.7 and next_questions:
+            lines.append("")
+            lines.append("为了继续完善画像，我还想确认：")
+            lines.extend(f"{idx}. {question}" for idx, question in enumerate(next_questions[:3], 1))
+
+        return "\n".join(lines)
 
     def _keyword_fallback(
         self,

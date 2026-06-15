@@ -26,6 +26,7 @@ class StudentProfile(Base):
     learning_goal = Column(Text)
     learning_history = Column(Text)    # JSON
     cognitive_style = Column(Text)
+    pace_preference = Column(Text)     # 学习节奏偏好
     weakness = Column(Text)            # JSON
     interest = Column(Text)            # JSON
     chat_history = Column(Text)        # JSON

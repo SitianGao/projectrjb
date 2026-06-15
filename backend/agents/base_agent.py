@@ -13,6 +13,7 @@ class BaseAgent(ABC):
     """所有 Agent 的基类"""
 
     def __init__(self, llm_client):
+        self.llm_client = llm_client
         self.llm = llm_client
 
     @abstractmethod

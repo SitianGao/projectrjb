@@ -1,7 +1,7 @@
 # EduAgent 项目启动准备指南
 
 > **赛题**：第15届软件杯 A3 — 基于大模型的个性化学习资源生成与学习多智能体系统
-> **时间**：约 24 天 | **团队**：3 人 | **状态**：准备期
+> **时间**：Day 1-16 压缩周期 | **团队**：3 人 | **状态**：Day 6 起加速推进
 
 ---
 
@@ -97,7 +97,7 @@ pydantic==2.*
 projectrjb/
 ├── README.md
 ├── .gitignore
-├── docker-compose.yml               # Day 18+
+├── docker-compose.yml               # Day 13+
 │
 ├── docs/                            # 📚 文档
 │   ├── contestproblem.md
@@ -181,26 +181,30 @@ projectrjb/
 │   └── sql/                         # 建表语句
 │       └── schema.sql
 │
-├── deploy/                          # 🚀 部署（Day 18+）
+├── deploy/                          # 🚀 部署（Day 13+）
 └── test/                            # 🧪 测试
 ```
 
 ---
 
-## 5. 24 天时间线（压缩版）
+## 5. 16 天时间线（Day 6 起压缩版）
 
-> ⚠️ **期末考试在第 18-22 天，完全不开发。所有代码 Day 17 前完成。**
+> 从当前 Day 6 开始，将原 Day 6-24 的剩余工作压缩到 Day 6-16 完成。Day 1-5 保持原任务不变，已覆盖项目骨架、画像构建、学习路径规划和画像到路径联调。
 
-| 阶段 | 天数 | 队长（后端+Agent） | 队员A（前端） | 队员B（RAG+知识库） |
-|------|------|-------------------|-------------|-------------------|
-| 环境搭建 | Day 1-2 | FastAPI 骨架 + LLM 验证 | React 骨架 + Ant Design | 知识数据收集 + SQLite 建表 |
-| 核心开发 | Day 3-6 | 5 个 Agent + Orchestrator + API | 6 个页面 + 组件 + Mock | RAG 管线 + 安全过滤 |
-| 前后端对接 | Day 7-9 | Agent→API 包装 + 流式输出 | Mock→真实 API + SSE 对接 | 知识库完善 + 检索调优 |
-| 功能补全 | Day 10-12 | 创新点实现 + 异步任务 | 体验打磨 + 动效 + 错误处理 | 题库补充 + 安全测试 |
-| 联调测试 | Day 13-15 | 端到端联调 + 性能优化 | 响应式适配 | 测试用例 + 安全验证 |
-| Bug修复 | Day 16-17 | 修 bug + Docker 配置 | Bug 修复 + UI 调整 | 文档初稿 + 开源标注 |
-| 🔴期末 | Day 18-22 | **不开发，安心考试** | **不开发，安心考试** | **不开发，安心考试** |
-| 收尾 | Day 23-24 | 最终打包 + 演示脚本 | 演示视频录制 | 文档完善 + 提交检查 |
+| 阶段 | 天数 | 队长（后端+Agent） | 队员A（前端） | 队员B（RAG+知识库） | 对接重点 |
+|------|------|-------------------|-------------|-------------------|----------|
+| 已完成基础 | Day 1-5 | FastAPI、数据库基础、画像/路径 API、Orchestrator 初版 | 首页、画像页、路径页、ChatBox、ProfileCard、PathTimeline | ProfileAgent、PlannerAgent、画像/路径 Prompt | 画像字段、路径 JSON、SSE 格式已完成首轮对接 |
+| 资源生成 | Day 6 | resource API、resources 表、Day1-5 遗留测试复测 | ResourcePage、ResourceCard、MarkdownRenderer | ResourceAgent 三类资源输出样例 | 资源字段、错误格式、资源卡片展示 |
+| 异步与 RAG 骨架 | Day 7 | task_manager、任务状态接口、LLMClient 重试超时 | ProgressBar、useTaskStatus、异步状态展示 | mindmap/ppt/reading Prompt、embedding/vector_store/retriever 初版 | 任务状态枚举、LLMClient 调用、RAG 入参 |
+| 智能辅导 | Day 8 | tutor SSE API、RAG 检索接入 | TutorPage、MindMapViewer、MermaidChart | TutorAgent、多解释路径、知识库检索 | Tutor SSE 事件、Mermaid/mindmap 内容格式 |
+| 学习评估与创新点 | Day 9 | evaluate API、learning_records 表、报告接口 | EvaluatePage、评分图表、复习提醒展示 | EvaluateAgent、遗忘曲线、review_plan | 评估报告字段、review_plan 展示 |
+| 错误处理与安全 | Day 10 | 统一状态码、错误格式、Swagger 示例、接口测试第一轮 | 空状态、错误提示、重试按钮、清理 Mock | content_filter、防幻觉 Prompt、Agent 单测/安全测试 | 错误码、安全拦截结果、测试样例 |
+| 五流程联调 | Day 11 | 画像/路径/资源/问答/评估 E2E 联调 | 全流程真实 API、响应式适配、演示入口 | 知识库调优、AI 输出样例 | 完整演示走查、P0/P1 问题分配 |
+| 性能与兼容 | Day 12 | SSE、异步任务、LLM 超时重试、并发测试 | 移动端和演示屏优化、加载骨架 | 内容质量、安全、RAG 相关性测试 | 性能瓶颈、慢调用、低质量输出 |
+| Demo 包初版 | Day 13 | Docker Compose、数据库初始化、环境变量、Swagger 检查 | 前端 Bug 修复、关键页面截图 | Agent/RAG/安全/知识库文档初稿 | 启动地址、截图、AI 模块文档 |
+| 功能冻结 | Day 14 | README、开源协议、最终集成、冻结新增功能 | 最终走查、演示路径、录屏素材 | AI 输出样例、内容安全验收、开源标注 | 只修 P0/P1，不新增功能 |
+| 候选提交包 | Day 15 | 最终打包、演示脚本、提交包候选版 | 演示视频、截图、操作说明 | 系统设计、测试报告、创新点材料 | 演示脚本、视频镜头、创新点讲解 |
+| 最终提交 | Day 16 | 评分点验收、最终提交包 | 视频/截图小修、前端阻断 Bug 复核 | 知识库、Prompt、测试结论、开源致谢复核 | 全员最终验收，队长提交 |
 
 ---
 
