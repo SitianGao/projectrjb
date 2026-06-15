@@ -1,4 +1,9 @@
-"""学习资源 API"""
+"""
+学习资源 API
+- POST /api/resource/generate   生成资源（异步任务）
+- GET  /api/resource/{id}      获取资源详情
+- GET  /api/resource/list      资源列表
+"""
 from fastapi import APIRouter
 
 router = APIRouter()
@@ -6,13 +11,7 @@ router = APIRouter()
 
 @router.post("/generate")
 async def generate_resource():
-    """生成学习资源"""
-    pass
-
-
-@router.post("/generate/stream")
-async def generate_resource_stream():
-    """流式生成学习资源 (SSE)"""
+    """生成学习资源，返回 task_id"""
     pass
 
 
@@ -23,18 +22,6 @@ async def get_resource(resource_id: str):
 
 
 @router.get("/list")
-async def list_resources(student_id: str = ""):
-    """获取资源列表"""
-    pass
-
-
-@router.get("/types")
-async def get_resource_types():
-    """获取支持的资源类型"""
-    pass
-
-
-@router.post("/{resource_id}/bookmark")
-async def bookmark_resource(resource_id: str):
-    """收藏资源"""
+async def list_resources(student_id: str):
+    """获取学生资源列表"""
     pass
