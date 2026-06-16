@@ -41,6 +41,6 @@ class BaseAgent(ABC):
             except Exception as e:
                 logger.error(f"[{self.__class__.__name__}] Attempt {attempt + 1} failed: {e}")
                 if attempt == 2:
-                    yield f"[生成失败: {str(e)}]"
+                    yield f"[提示: 内容生成失败（已重试3次），请稍后重新尝试。错误详情: {str(e)}]"
                 else:
                     await asyncio.sleep(2 ** attempt)

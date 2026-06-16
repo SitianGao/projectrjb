@@ -51,7 +51,7 @@ async def generate_resource(
             )
             task_service.update(
                 task["task_id"],
-                status="completed",
+                status="done",
                 progress=100,
                 message="资源生成完成",
                 result=result,
