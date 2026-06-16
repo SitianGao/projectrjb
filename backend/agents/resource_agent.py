@@ -238,12 +238,12 @@ class ResourceAgent(BaseAgent):
             else:
                 result = self._template_fallback(topic, types, difficulty)
                 data_json = json.dumps(result, ensure_ascii=False)
-                yield f'data: {{"type":"error","code":"PARSE_ERROR","message":"LLM 返回内容无法解析，已使用模板降级"}}\n\n'
+                yield f'data: {{"type":"error","code":"RESOURCE_GENERATE_FAILED","sub_code":"PARSE_ERROR","message":"LLM 返回内容无法解析，已使用模板降级"}}\n\n'
                 yield f'data: {{"type":"data","data":{data_json}}}\n\n'
         except Exception as e:
             result = self._template_fallback(topic, types, difficulty)
             data_json = json.dumps(result, ensure_ascii=False)
-            yield f'data: {{"type":"error","code":"LLM_ERROR","message":"模型调用失败，已使用模板降级: {str(e)}"}}\n\n'
+            yield f'data: {{"type":"error","code":"RESOURCE_GENERATE_FAILED","sub_code":"LLM_ERROR","message":"模型调用失败，已使用模板降级: {str(e)}"}}\n\n'
             yield f'data: {{"type":"data","data":{data_json}}}\n\n'
 
         yield f'data: {{"type":"done"}}\n\n'

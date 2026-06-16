@@ -62,7 +62,7 @@ async def generate_resource(
                 status="failed",
                 progress=100,
                 message="资源生成失败",
-                error=str(exc),
+                error={"code": "RESOURCE_GENERATE_FAILED", "message": str(exc)},
             )
         finally:
             db.close()
@@ -87,6 +87,9 @@ async def generate_resource_stream(request: ResourceGenerateRequest):
                 count=request.count,
             ):
                 yield event
+        except Exception as exc:
+            yield f'data: {{"type":"error","code":"RESOURCE_GENERATE_FAILED","message":"资源生成失败: {str(exc)}"}}\n\n'
+            yield f'data: {{"type":"done"}}\n\n'
         finally:
             db.close()
 
