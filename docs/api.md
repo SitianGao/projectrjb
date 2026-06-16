@@ -50,6 +50,19 @@ DATABASE_URL=sqlite:///./eduagent.db
 - Base URL: `/api`
 - JSON 请求头: `Content-Type: application/json`
 - SSE 响应头: `Content-Type: text/event-stream`
+- 普通 JSON 成功响应统一包装：
+
+```json
+{"success": true, "data": {}, "message": "ok"}
+```
+
+- 普通 JSON 失败响应统一包装：
+
+```json
+{"success": false, "error": true, "code": "ERROR_CODE", "message": "错误描述"}
+```
+
+- 第一阶段为避免旧前端立刻挂掉，后端会临时把 `data` 对象里的业务字段同步放在顶层；正式新调用请统一读取 `response.data.data`。
 - SSE 事件格式统一为：
 
 ```text
@@ -64,11 +77,11 @@ data: {"type":"error","code":"...","message":"..."}
 data: {"type":"done"}
 ```
 
-- FastAPI 参数校验失败返回 `422`，格式为 FastAPI 标准 `detail` 数组。
+- FastAPI 参数校验失败返回 `422`，格式同统一失败响应。
 - 未找到资源返回 `404`：
 
 ```json
-{"detail":"资源不存在或任务不存在"}
+{"success":false,"error":true,"code":"NOT_FOUND","message":"资源不存在或任务不存在"}
 ```
 
 ## 2. Profile API
@@ -101,7 +114,20 @@ data: {"type":"done"}
 
 获取学生画像。
 
-成功返回：画像对象。
+成功返回：
+
+```json
+{
+  "success": true,
+  "data": {
+    "student_id": "demo-student-01",
+    "profile": {},
+    "completeness": 0.8,
+    "next_questions": []
+  },
+  "message": "ok"
+}
+```
 
 ### PUT `/api/profile/{student_id}`
 
@@ -120,7 +146,7 @@ data: {"type":"done"}
 }
 ```
 
-成功返回：更新后的画像对象。
+成功返回：统一响应包装后的更新画像对象。
 
 ## 3. Planner API
 
@@ -181,14 +207,23 @@ document | exercise | code | mindmap | reading
 
 ```json
 {
-  "task_id": "uuid",
+  "success": true,
+  "data": {
+    "task_id": "task_abc12345",
+    "status": "pending",
+    "progress": 0,
+    "message": "资源生成任务已创建",
+    "result": null,
+    "error": null,
+    "created_at": "2026-06-15T14:00:00Z",
+    "updated_at": "2026-06-15T14:00:00Z"
+  },
+  "message": "资源生成任务已创建",
+  "task_id": "task_abc12345",
   "status": "pending",
   "progress": 0,
-  "message": "资源生成任务已创建",
   "result": null,
-  "error": null,
-  "created_at": "2026-06-15T14:00:00Z",
-  "updated_at": "2026-06-15T14:00:00Z"
+  "error": null
 }
 ```
 
@@ -225,24 +260,27 @@ type 可选，document/exercise/code/mindmap/reading
 
 ```json
 {
-  "items": [
-    {
-      "id": "uuid",
-      "student_id": "demo-student-01",
-      "type": "document",
-      "title": "机器学习入门指南",
-      "topic": "机器学习入门",
-      "difficulty": "初级",
-      "description": "内容摘要",
-      "tags": ["机器学习入门", "初级", "document"],
-      "content": "Markdown 正文",
-      "created_at": "2026-06-15T14:00:00",
-      "createdAt": "2026-06-15T14:00:00"
-    }
-  ],
-  "total": 1,
-  "page": 1,
-  "page_size": 20
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "student_id": "demo-student-01",
+        "type": "document",
+        "title": "机器学习入门指南",
+        "topic": "机器学习入门",
+        "difficulty": "初级",
+        "description": "内容摘要",
+        "tags": ["机器学习入门", "初级", "document"],
+        "content": "Markdown 正文",
+        "created_at": "2026-06-15T14:00:00"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "page_size": 20
+  },
+  "message": "ok"
 }
 ```
 
@@ -315,33 +353,25 @@ data: {"type":"done","session_id":"..."}
 
 ```json
 {
-  "student_id": "demo-student-01",
-  "overall_score": 78,
-  "overallScore": 78,
-  "recent_trend": "up",
-  "recentTrend": "up",
-  "completed_tasks": 24,
-  "completedTasks": 24,
-  "total_time": 129600,
-  "totalTime": 129600,
-  "topic_scores": [
-    {"topic":"二次函数","score":85,"level":"优秀"}
-  ],
-  "topicScores": [
-    {"topic":"二次函数","score":85,"level":"优秀"}
-  ],
-  "history": [
-    {"date":"2026-06-15","score":78,"tasks":3}
-  ],
-  "progress_stats": {
-    "total_topics": 12,
-    "mastered_topics": 5,
-    "learning_topics": 4,
-    "not_started_topics": 3,
-    "totalTopics": 12,
-    "masteredTopics": 5,
-    "learningTopics": 4,
-    "notStartedTopics": 3
+  "success": true,
+  "data": {
+    "student_id": "demo-student-01",
+    "overall_score": 78,
+    "recent_trend": "up",
+    "completed_tasks": 24,
+    "total_time": 129600,
+    "topic_scores": [
+      {"topic":"二次函数","score":85,"level":"优秀"}
+    ],
+    "history": [
+      {"date":"2026-06-15","score":78,"tasks":3}
+    ],
+    "progress_stats": {
+      "total_topics": 12,
+      "mastered_topics": 5,
+      "learning_topics": 4,
+      "not_started_topics": 3
+    }
   }
 }
 ```
@@ -377,14 +407,18 @@ data: {"type":"done","session_id":"..."}
 
 ```json
 {
-  "task_id": "uuid",
-  "status": "pending|running|completed|failed",
-  "progress": 80,
-  "message": "正在生成学习资源",
-  "result": {},
-  "error": null,
-  "created_at": "2026-06-15T14:00:00Z",
-  "updated_at": "2026-06-15T14:00:01Z"
+  "success": true,
+  "data": {
+    "task_id": "task_abc12345",
+    "status": "pending|running|done|failed",
+    "progress": 80,
+    "message": "正在生成学习资源",
+    "result": {},
+    "error": null,
+    "created_at": "2026-06-15T14:00:00Z",
+    "updated_at": "2026-06-15T14:00:01Z"
+  },
+  "message": "ok"
 }
 ```
 
@@ -394,9 +428,10 @@ data: {"type":"done","session_id":"..."}
 
 | 文件 | 当前问题 | 必改为 |
 | --- | --- | --- |
+| `frontend/src/api/client.js` | 直接把后端响应交给页面 | 统一解包 `response.data.data`，错误读 `code/message` |
 | `frontend/src/api/resource.js` | 使用 `/resources`、`/resources/generate/stream` | `/resource/list`、`/resource/generate`、`/resource/generate/stream` |
-| `frontend/src/api/tutor.js` | 使用 `/tutor/ask/stream` | `/tutor/chat` |
-| `frontend/src/api/evaluate.js` | 使用 `/evaluate/{id}`、`/evaluate/{id}/progress`、`/evaluate/generate` | `/evaluate/report/{id}`、`/evaluate/progress/{id}`、`/evaluate/start` |
+| `frontend/src/api/tutor.js` | 使用 `/tutor/ask/stream` | 正式改 `/tutor/chat`；短期后端保留 `/tutor/ask/stream` 兼容 |
+| `frontend/src/api/evaluate.js` | 使用 `/evaluate/{id}`、`/evaluate/{id}/progress`、`/evaluate/generate` | 正式改 `/evaluate/report/{id}`、`/evaluate/progress/{id}`、`/evaluate/start`；短期后端保留旧路由兼容 |
 | 页面 Mock | 接口失败后静默降级 Mock，掩盖真实错误 | 加 `VITE_USE_MOCK=true/false`，联调时必须 `false` |
 | 资源类型 | 使用 `quiz` | 使用 `exercise` |
 

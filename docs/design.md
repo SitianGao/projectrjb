@@ -272,7 +272,7 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | INTEGER PK | 自增 |
+| id | VARCHAR(36) PK | UUID |
 | student_id | VARCHAR(36) FK | 关联学生 |
 | version | INTEGER | 画像版本号（动态更新+1） |
 | knowledge_level | TEXT | 知识基础 |
@@ -289,7 +289,7 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | INTEGER PK | 自增 |
+| id | VARCHAR(36) PK | UUID |
 | student_id | VARCHAR(36) FK | 关联学生 |
 | version | INTEGER | 路径版本号 |
 | goal | TEXT | 学习总目标 |
@@ -301,9 +301,9 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | INTEGER PK | 自增 |
+| id | VARCHAR(36) PK | UUID |
 | student_id | VARCHAR(36) FK | 关联学生 |
-| path_id | INTEGER FK | 关联学习路径 |
+| path_id | VARCHAR(36) FK | 关联学习路径 |
 | type | VARCHAR(30) | document / mindmap / exercise / code / reading / ppt |
 | title | VARCHAR(200) | 资源标题 |
 | content | TEXT | Markdown/JSON 内容 |
@@ -315,9 +315,9 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | INTEGER PK | 自增 |
+| id | VARCHAR(36) PK | UUID |
 | student_id | VARCHAR(36) FK | 关联学生 |
-| resource_id | INTEGER FK | 关联资源 |
+| resource_id | VARCHAR(36) FK | 关联资源 |
 | action | VARCHAR(30) | view / complete / answer / ask |
 | topic | VARCHAR(100) | 相关知识点 |
 | score | REAL | 答题得分 0-1 |
@@ -351,8 +351,10 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 - 所有接口前缀 `/api/`
 - 流式接口统一 SSE，`Content-Type: text/event-stream`
 - 异步任务返回 `task_id`，前端轮询 `/api/task/{id}/status`
-- 错误响应统一格式：`{"error": true, "code": "ERROR_CODE", "message": "描述"}`
-- 学生 ID 使用 UUID
+- 普通成功响应统一格式：`{"success": true, "data": {}, "message": "ok"}`
+- 错误响应统一格式：`{"success": false, "error": true, "code": "ERROR_CODE", "message": "描述"}`
+- 学生 ID 使用 UUID，任务 ID 使用 `task_` 前缀
+- 第一阶段普通 JSON 接口保留顶层业务字段作为旧前端兼容；正式合同以 `data` 内字段为准。
 
 ### 6.3 核心接口示例
 
@@ -378,13 +380,13 @@ data: {"type":"done"}
 
 ```
 POST /api/resource/generate
-→ {"task_id":"task_abc","status":"pending"}
+→ {"success":true,"data":{"task_id":"task_abc","status":"pending"},"message":"资源生成任务已创建"}
 
 GET /api/task/task_abc/status
-→ {"status":"generating","progress":0.6,"message":"正在生成练习题..."}
+→ {"success":true,"data":{"status":"running","progress":60,"message":"正在生成练习题..."},"message":"ok"}
 
 GET /api/task/task_abc/status
-→ {"status":"done","result":{"resources":[...]}}
+→ {"success":true,"data":{"status":"done","result":{"resources":[...]}},"message":"ok"}
 ```
 
 ---

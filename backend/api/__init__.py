@@ -27,6 +27,7 @@ API 路由层 —— 处理 HTTP 请求/响应。
   - 异步任务: 返回 task_id，前端轮询 /api/task/{id}/status
   - 成功响应: {"success": true, "data": {}, "message": "ok"}
   - 错误响应: {"success": false, "error": true, "code": "ERROR_CODE", "message": "描述"}
+  - Phase 1 兼容: 普通 JSON 会临时保留顶层业务字段，正式调用以 data 内字段为准
   - 字段命名: snake_case
   - 时间格式: ISO 8601（2026-06-07T10:30:00+08:00）
   - 学生 ID: UUID 字符串

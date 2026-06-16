@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from api.response import ok
 from database import SessionLocal
 from deps import tutor_service
 
@@ -76,22 +77,22 @@ async def tutor_ask_stream(request: TutorChatRequest):
 @router.get("/history/{session_id}")
 async def get_tutor_history(session_id: str):
     """获取对话历史"""
-    return {"session_id": session_id, "messages": []}
+    return ok({"session_id": session_id, "messages": []})
 
 
 @router.get("/sessions")
 async def list_tutor_sessions(student_id: str):
     """获取辅导会话列表。"""
-    return tutor_service.list_sessions(student_id)
+    return ok(tutor_service.list_sessions(student_id))
 
 
 @router.post("/sessions")
 async def create_tutor_session(request: TutorSessionRequest):
     """创建辅导会话。"""
-    return tutor_service.create_session(request.student_id, request.title)
+    return ok(tutor_service.create_session(request.student_id, request.title), "会话已创建")
 
 
 @router.post("/check")
 async def submit_answer():
     """提交答案供检查（前端兼容）"""
-    return {"status": "ok", "correct": None, "feedback": "答案检查功能待 EvaluateAgent 接入。"}
+    return ok({"status": "ok", "correct": None, "feedback": "答案检查功能待 EvaluateAgent 接入。"})

@@ -5,11 +5,12 @@
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from api.response import ApiError, ok
 from database import SessionLocal, get_db
 from deps import planner_service, profile_service
 
@@ -60,5 +61,5 @@ async def get_path(student_id: str, db: Session = Depends(get_db)):
     """获取学生当前学习路径"""
     path = planner_service.get_current_path(db, student_id)
     if not path:
-        raise HTTPException(status_code=404, detail="学习路径未找到，请先生成路径")
-    return path
+        raise ApiError("PATH_NOT_FOUND", "学习路径未找到，请先生成路径", 404)
+    return ok(path)

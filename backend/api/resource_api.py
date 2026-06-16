@@ -8,11 +8,12 @@
 """
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from api.response import ApiError, ok
 from database import SessionLocal, get_db
 from deps import resource_service, task_service
 
@@ -68,7 +69,7 @@ async def generate_resource(
             db.close()
 
     background_tasks.add_task(run_task)
-    return task
+    return ok(task, "资源生成任务已创建")
 
 
 @router.post("/generate/stream")
@@ -114,20 +115,22 @@ async def list_resources(
     db: Session = Depends(get_db),
 ):
     """获取学生资源列表"""
-    return resource_service.list_resources(
-        db=db,
-        student_id=student_id,
-        page=page,
-        page_size=page_size,
-        keyword=keyword,
-        resource_type=type,
+    return ok(
+        resource_service.list_resources(
+            db=db,
+            student_id=student_id,
+            page=page,
+            page_size=page_size,
+            keyword=keyword,
+            resource_type=type,
+        )
     )
 
 
 @router.get("/types")
 async def get_resource_types():
     """获取支持的资源类型"""
-    return {
+    return ok({
         "items": [
             {"value": "document", "label": "文档"},
             {"value": "exercise", "label": "练习题"},
@@ -135,7 +138,7 @@ async def get_resource_types():
             {"value": "mindmap", "label": "思维导图"},
             {"value": "reading", "label": "拓展阅读"},
         ]
-    }
+    })
 
 
 @router.post("/{resource_id}/bookmark")
@@ -143,8 +146,8 @@ async def bookmark_resource(resource_id: str, db: Session = Depends(get_db)):
     """收藏资源（前端兼容）"""
     resource = resource_service.get_resource(db, resource_id)
     if not resource:
-        raise HTTPException(status_code=404, detail="学习资源不存在")
-    return {"resource_id": resource_id, "bookmarked": True}
+        raise ApiError("RESOURCE_NOT_FOUND", "学习资源不存在", 404)
+    return ok({"resource_id": resource_id, "bookmarked": True})
 
 
 @router.get("/{resource_id}")
@@ -152,5 +155,5 @@ async def get_resource(resource_id: str, db: Session = Depends(get_db)):
     """获取资源详情"""
     resource = resource_service.get_resource(db, resource_id)
     if not resource:
-        raise HTTPException(status_code=404, detail="学习资源不存在")
-    return resource
+        raise ApiError("RESOURCE_NOT_FOUND", "学习资源不存在", 404)
+    return ok(resource)

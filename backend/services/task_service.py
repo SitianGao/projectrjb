@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 class TaskService:
@@ -14,7 +14,7 @@ class TaskService:
         self._tasks: Dict[str, Dict] = {}
 
     def create(self, message: str = "任务已创建") -> Dict:
-        task_id = str(uuid.uuid4())
+        task_id = f"task_{uuid.uuid4().hex[:8]}"
         task = {
             "task_id": task_id,
             "status": "pending",
@@ -35,7 +35,7 @@ class TaskService:
         progress: Optional[int] = None,
         message: Optional[str] = None,
         result=None,
-        error: Optional[str] = None,
+        error: Any = None,
     ) -> Dict:
         task = self._tasks[task_id]
         if status is not None:

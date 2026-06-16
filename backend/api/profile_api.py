@@ -6,11 +6,12 @@
 """
 from typing import Optional, List, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from api.response import ApiError, ok
 from database import SessionLocal, get_db
 from deps import profile_service
 
@@ -130,8 +131,8 @@ async def get_profile(student_id: str, db: Session = Depends(get_db)):
     """获取学生画像"""
     profile = profile_service.get_profile(db, student_id)
     if not profile:
-        raise HTTPException(status_code=404, detail="学生画像未找到")
-    return profile
+        raise ApiError("PROFILE_NOT_FOUND", "学生画像未找到", 404)
+    return ok(profile)
 
 
 @router.put("/{student_id}")
@@ -147,10 +148,10 @@ async def update_profile(
     # 只更新提供的字段
     update_data = request.model_dump(exclude_none=True)
     if not update_data:
-        raise HTTPException(status_code=400, detail="没有提供需要更新的字段")
+        raise ApiError("PROFILE_UPDATE_EMPTY", "没有提供需要更新的字段", 400)
 
     # 保存画像
     profile_service.save_profile(db, student_id, update_data, increment_version=True)
 
     # 返回更新后的画像
-    return profile_service.get_profile(db, student_id)
+    return ok(profile_service.get_profile(db, student_id))

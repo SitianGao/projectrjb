@@ -4,10 +4,19 @@ EduAgent FastAPI 入口
 import logging
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from utils.logger import setup_logging
 from database import init_db
+from api.response import (
+    ApiError,
+    api_error_handler,
+    http_exception_handler,
+    ok,
+    validation_exception_handler,
+)
 
 # ---- 日志系统最先初始化 ----
 setup_logging()
@@ -27,6 +36,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_exception_handler(ApiError, api_error_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 
 # ---- 注册各模块路由 ----
@@ -59,7 +72,7 @@ async def startup():
 async def root():
     """健康检查"""
     logger.info("健康检查请求")
-    return {"status": "ok", "service": "EduAgent Backend"}
+    return ok({"status": "ok", "service": "EduAgent Backend"})
 
 
 logger.info("EduAgent Backend 路由注册完成")

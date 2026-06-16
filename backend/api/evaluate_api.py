@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from api.response import ok
 from database import SessionLocal, get_db
 from deps import evaluate_service
 
@@ -40,7 +41,7 @@ async def start_evaluation(
     db: Session = Depends(get_db),
 ):
     """开始学习评估"""
-    return evaluate_service.start_evaluation(db, request.student_id)
+    return ok(evaluate_service.start_evaluation(db, request.student_id))
 
 
 @router.post("/generate")
@@ -49,7 +50,7 @@ async def generate_evaluation(
     db: Session = Depends(get_db),
 ):
     """生成评估报告（前端兼容）"""
-    return evaluate_service.start_evaluation(db, request.student_id)
+    return ok(evaluate_service.start_evaluation(db, request.student_id))
 
 
 @router.post("/generate/stream")
@@ -85,31 +86,31 @@ async def generate_evaluation_stream(request: EvaluationStartRequest):
 @router.get("/report/{student_id}")
 async def get_report(student_id: str, db: Session = Depends(get_db)):
     """获取评估报告"""
-    return evaluate_service.build_report(db, student_id)
+    return ok(evaluate_service.build_report(db, student_id))
 
 
 @router.get("/progress/{student_id}")
 async def get_progress(student_id: str, db: Session = Depends(get_db)):
     """获取学习进度统计。"""
-    return evaluate_service.get_progress_stats(db, student_id)
+    return ok(evaluate_service.get_progress_stats(db, student_id))
 
 
 @router.get("/{student_id}")
 async def get_evaluation(student_id: str, db: Session = Depends(get_db)):
     """获取学生评估（前端兼容）"""
-    return evaluate_service.build_report(db, student_id)
+    return ok(evaluate_service.build_report(db, student_id))
 
 
 @router.get("/{student_id}/history")
 async def get_evaluation_history(student_id: str, db: Session = Depends(get_db)):
     """获取评估历史"""
-    return evaluate_service.build_report(db, student_id).get("history", [])
+    return ok(evaluate_service.build_report(db, student_id).get("history", []))
 
 
 @router.get("/{student_id}/progress")
 async def get_progress_stats(student_id: str, db: Session = Depends(get_db)):
     """获取学习进度统计（前端兼容）"""
-    return evaluate_service.get_progress_stats(db, student_id)
+    return ok(evaluate_service.get_progress_stats(db, student_id))
 
 
 @router.post("/record")
@@ -118,14 +119,17 @@ async def record_learning(
     db: Session = Depends(get_db),
 ):
     """提交学习记录"""
-    return evaluate_service.record_learning(
-        db=db,
-        student_id=request.student_id,
-        action=request.action,
-        resource_id=request.resource_id,
-        topic=request.topic,
-        score=request.score,
-        time_spent=request.time_spent,
+    return ok(
+        evaluate_service.record_learning(
+            db=db,
+            student_id=request.student_id,
+            action=request.action,
+            resource_id=request.resource_id,
+            topic=request.topic,
+            score=request.score,
+            time_spent=request.time_spent,
+        ),
+        "学习记录已提交",
     )
 
 
@@ -135,12 +139,15 @@ async def submit_self_eval(
     db: Session = Depends(get_db),
 ):
     """提交自评（前端兼容）"""
-    return evaluate_service.record_learning(
-        db=db,
-        student_id=request.student_id,
-        action=request.action or "self_eval",
-        resource_id=request.resource_id,
-        topic=request.topic,
-        score=request.score,
-        time_spent=request.time_spent,
+    return ok(
+        evaluate_service.record_learning(
+            db=db,
+            student_id=request.student_id,
+            action=request.action or "self_eval",
+            resource_id=request.resource_id,
+            topic=request.topic,
+            score=request.score,
+            time_spent=request.time_spent,
+        ),
+        "自评已提交",
     )
