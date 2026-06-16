@@ -20,12 +20,32 @@ client.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-// 响应拦截器：统一错误处理
+// 响应拦截器：统一解包 + 错误处理
 client.interceptors.response.use(
   (response) => {
-    return response.data
+    const body = response.data
+
+    // 新 API 合同：{ success: true, data: ..., message: "ok" }
+    if (body && typeof body === 'object' && 'success' in body) {
+      if (body.success === true) {
+        return body.data  // 业务层直接拿到 data
+      }
+      // success === false：业务错误
+      const err = new Error(body.message || '请求失败')
+      err._businessError = true
+      err.code = body.code
+      return Promise.reject(err)
+    }
+
+    // 旧格式 / 非标准响应：原样返回
+    return body
   },
   (error) => {
+    // 业务异常直接透传，由调用方自行处理
+    if (error._businessError) {
+      return Promise.reject(error)
+    }
+
     if (error.response) {
       const { status, data } = error.response
       const msg = data?.detail || data?.message || `请求失败 (${status})`
@@ -41,7 +61,6 @@ client.interceptors.response.use(
           message.error('请求的资源不存在')
           break
         case 422:
-          // 参数校验错误，取出第一条
           if (data?.detail && Array.isArray(data.detail)) {
             message.error(data.detail[0]?.msg || msg)
           } else {
@@ -57,7 +76,7 @@ client.interceptors.response.use(
     } else if (error.request) {
       message.error('网络连接失败，请检查网络')
     } else {
-      message.error('请求配置错误')
+      message.error(error.message || '请求失败')
     }
 
     return Promise.reject(error)

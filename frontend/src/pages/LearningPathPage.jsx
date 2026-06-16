@@ -14,6 +14,9 @@ import ProgressBar from '../components/ProgressBar'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { getLearningPath, generateLearningPath } from '../api/planner'
 import { mockPath, mockStats } from '../mock/learningPathData'
+import { shouldUseMock } from '../utils/useMock'
+
+const USE_MOCK = shouldUseMock()
 
 /**
  * SSE 事件类型：start | delta | data | error | done
@@ -69,12 +72,14 @@ export default function LearningPathPage() {
       const data = await getLearningPath('demo-student-01')
       setPathData(data)
     } catch {
-      // 后端不可用时使用 Mock 数据
-      setTimeout(() => {
-        setPathData(mockPath)
-        setLoading(false)
-      }, 600)
-      return
+      // 后端不可用时使用 Mock 数据（仅在 VITE_USE_MOCK=true 时）
+      if (USE_MOCK) {
+        setTimeout(() => {
+          setPathData(mockPath)
+          setLoading(false)
+        }, 600)
+        return
+      }
     }
   }
 
@@ -143,8 +148,7 @@ export default function LearningPathPage() {
       }
     } catch (err) {
       message.error('生成失败: ' + err.message)
-      // 降级使用 Mock
-      setPathData(mockPath)
+      if (USE_MOCK) setPathData(mockPath)
     } finally {
       setGenerating(false)
     }
@@ -164,12 +168,12 @@ export default function LearningPathPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>学习路径</Title>
-          {currentPath?.goal && (
-            <Text type="secondary">目标：{currentPath.goal}</Text>
+          {pathData?.goal && (
+            <Text type="secondary">目标：{pathData.goal}</Text>
           )}
-          {currentPath?.total_estimated_days && (
+          {pathData?.total_estimated_days && (
             <Tag color="blue" style={{ marginLeft: 8 }}>
-              预计 {currentPath.total_estimated_days} 天
+              预计 {pathData.total_estimated_days} 天
             </Tag>
           )}
         </div>

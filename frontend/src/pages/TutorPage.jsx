@@ -19,6 +19,9 @@ import { getResources } from '../api/resource'
 import { getLearningPath, generateLearningPath } from '../api/planner'
 import { mockPath } from '../mock/learningPathData'
 import { formatRelativeTime } from '../utils/format'
+import { shouldUseMock } from '../utils/useMock'
+
+const USE_MOCK = shouldUseMock()
 
 const { Title, Text } = Typography
 
@@ -92,10 +95,12 @@ export default function TutorPage() {
       const data = await getTutorSessions(studentId)
       setSessions(Array.isArray(data) ? data : data?.sessions || [])
     } catch {
-      setSessions([
-        { id: 's1', title: '二次函数答疑', updatedAt: new Date(), messageCount: 12 },
-        { id: 's2', title: '英语语法解惑', updatedAt: new Date(Date.now() - 86400000), messageCount: 8 },
-      ])
+      if (USE_MOCK) {
+        setSessions([
+          { id: 's1', title: '二次函数答疑', updatedAt: new Date(), messageCount: 12 },
+          { id: 's2', title: '英语语法解惑', updatedAt: new Date(Date.now() - 86400000), messageCount: 8 },
+        ])
+      }
     } finally { setLoadingSessions(false) }
   }
 
@@ -123,16 +128,18 @@ export default function TutorPage() {
       setResources(Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [])
       setResTotal(data?.total || 0)
     } catch {
-      const mockResources = [
-        { id: '1', type: 'document', title: '二次函数知识点总结', description: '系统梳理二次函数的核心概念、图像特征与常见题型解题技巧', tags: ['数学', '函数', '初中'], createdAt: new Date() },
-        { id: '2', type: 'quiz', title: '力学基础练习题', description: '涵盖牛顿三大定律、受力分析等基础概念的练习题目', tags: ['物理', '力学'], createdAt: new Date(Date.now() - 3600000) },
-        { id: '3', type: 'mindmap', title: '英语语法体系', description: '以思维导图形式展示英语时态、语态、从句等语法框架', tags: ['英语', '语法'], createdAt: new Date(Date.now() - 7200000) },
-        { id: '4', type: 'document', title: '电路分析方法', description: '讲解串并联电路、基尔霍夫定律等电路分析核心方法', tags: ['物理', '电学'], createdAt: new Date(Date.now() - 86400000) },
-        { id: '5', type: 'quiz', title: '二次函数专项练习', description: '精选二次函数典型例题，涵盖图像判断、最值问题等题型', tags: ['数学', '函数'], createdAt: new Date(Date.now() - 172800000) },
-        { id: '6', type: 'mindmap', title: '初中数学知识体系', description: '覆盖初中数学全部章节的知识结构思维导图', tags: ['数学', '综合'], createdAt: new Date(Date.now() - 259200000) },
-      ]
-      setResources(mockResources)
-      setResTotal(6)
+      if (USE_MOCK) {
+        const mockResources = [
+          { id: '1', type: 'document', title: '二次函数知识点总结', description: '系统梳理二次函数的核心概念、图像特征与常见题型解题技巧', tags: ['数学', '函数', '初中'], createdAt: new Date() },
+          { id: '2', type: 'quiz', title: '力学基础练习题', description: '涵盖牛顿三大定律、受力分析等基础概念的练习题目', tags: ['物理', '力学'], createdAt: new Date(Date.now() - 3600000) },
+          { id: '3', type: 'mindmap', title: '英语语法体系', description: '以思维导图形式展示英语时态、语态、从句等语法框架', tags: ['英语', '语法'], createdAt: new Date(Date.now() - 7200000) },
+          { id: '4', type: 'document', title: '电路分析方法', description: '讲解串并联电路、基尔霍夫定律等电路分析核心方法', tags: ['物理', '电学'], createdAt: new Date(Date.now() - 86400000) },
+          { id: '5', type: 'quiz', title: '二次函数专项练习', description: '精选二次函数典型例题，涵盖图像判断、最值问题等题型', tags: ['数学', '函数'], createdAt: new Date(Date.now() - 172800000) },
+          { id: '6', type: 'mindmap', title: '初中数学知识体系', description: '覆盖初中数学全部章节的知识结构思维导图', tags: ['数学', '综合'], createdAt: new Date(Date.now() - 259200000) },
+        ]
+        setResources(mockResources)
+        setResTotal(6)
+      }
     } finally { setResLoading(false) }
   }
 
@@ -145,8 +152,7 @@ export default function TutorPage() {
       const data = await getLearningPath('demo-student-01')
       setPathData(data)
     } catch {
-      setTimeout(() => { setPathData(mockPath); setPathLoading(false) }, 400)
-      return
+      if (USE_MOCK) { setTimeout(() => { setPathData(mockPath); setPathLoading(false) }, 400); return }
     }
     setPathLoading(false)
   }
@@ -182,8 +188,8 @@ export default function TutorPage() {
         }
       }
     } catch {
-      message.error('生成失败，已使用示例数据')
-      setPathData(mockPath)
+      message.error('生成失败')
+      if (USE_MOCK) setPathData(mockPath)
     } finally { setGenerating(false) }
   }
 

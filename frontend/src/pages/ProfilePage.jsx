@@ -33,6 +33,9 @@ import { getTutorSessions, createTutorSession } from '../api/tutor'
 import ResourcePage from '../pages/ResourcePage'
 import { mockPath, mockStats } from '../mock/learningPathData'
 import { formatRelativeTime } from '../utils/format'
+import { shouldUseMock } from '../utils/useMock'
+
+const USE_MOCK = shouldUseMock()
 
 const { Title, Text, Paragraph } = Typography
 
@@ -69,10 +72,12 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
       const data = await getTutorSessions(studentId)
       setSessions(Array.isArray(data) ? data : data?.sessions || [])
     } catch {
-      setSessions([
-        { id: 's1', title: '二次函数答疑', updatedAt: new Date(), messageCount: 12 },
-        { id: 's2', title: '英语语法解惑', updatedAt: new Date(Date.now() - 86400000), messageCount: 8 },
-      ])
+      if (USE_MOCK) {
+        setSessions([
+          { id: 's1', title: '二次函数答疑', updatedAt: new Date(), messageCount: 12 },
+          { id: 's2', title: '英语语法解惑', updatedAt: new Date(Date.now() - 86400000), messageCount: 8 },
+        ])
+      }
     } finally { setLoadingSessions(false) }
   }
 
@@ -176,12 +181,14 @@ function ResourcePanel() {
       const data = await getResources({ page, page_size: 12, keyword, type: type || undefined })
       setResources(Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [])
     } catch {
-      setResources([
-        { id: '1', type: 'document', title: '二次函数知识点总结', description: '核心概念与常见题型', tags: ['数学', '函数'], createdAt: new Date() },
-        { id: '2', type: 'quiz', title: '力学基础练习题', description: '牛顿三大定律、受力分析', tags: ['物理', '力学'], createdAt: new Date() },
-        { id: '3', type: 'mindmap', title: '英语语法体系', description: '时态、语态、从句框架', tags: ['英语', '语法'], createdAt: new Date() },
-        { id: '4', type: 'document', title: '电路分析方法', description: '基尔霍夫定律核心方法', tags: ['物理', '电学'], createdAt: new Date() },
-      ])
+      if (USE_MOCK) {
+        setResources([
+          { id: '1', type: 'document', title: '二次函数知识点总结', description: '核心概念与常见题型', tags: ['数学', '函数'], createdAt: new Date() },
+          { id: '2', type: 'quiz', title: '力学基础练习题', description: '牛顿三大定律、受力分析', tags: ['物理', '力学'], createdAt: new Date() },
+          { id: '3', type: 'mindmap', title: '英语语法体系', description: '时态、语态、从句框架', tags: ['英语', '语法'], createdAt: new Date() },
+          { id: '4', type: 'document', title: '电路分析方法', description: '基尔霍夫定律核心方法', tags: ['物理', '电学'], createdAt: new Date() },
+        ])
+      }
     } finally { setLoading(false) }
   }
 
@@ -233,7 +240,7 @@ function LearningPathPanel() {
   async function loadPath() {
     setLoading(true)
     try { const data = await getLearningPath('demo-student-01'); setPathData(data) }
-    catch { setTimeout(() => { setPathData(mockPath); setLoading(false) }, 600); return }
+    catch { if (USE_MOCK) { setTimeout(() => { setPathData(mockPath); setLoading(false) }, 600); return } }
     setLoading(false)
   }
 
@@ -254,7 +261,7 @@ function LearningPathPanel() {
           }
         }
       }
-    } catch (err) { message.error('生成失败'); setPathData(mockPath) }
+    } catch (err) { message.error('生成失败'); if (USE_MOCK) setPathData(mockPath) }
     finally { setGenerating(false) }
   }
 
