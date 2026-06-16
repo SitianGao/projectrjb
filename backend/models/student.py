@@ -1,7 +1,9 @@
 """学生 & 画像表"""
-from sqlalchemy import Column, String, Float, DateTime, Text, ForeignKey
-from . import Base
 import datetime
+
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+
+from . import Base
 
 
 class Student(Base):
@@ -18,12 +20,13 @@ class StudentProfile(Base):
 
     id = Column(String(36), primary_key=True)
     student_id = Column(String(36), ForeignKey("students.id"), nullable=False)
-    version = Column(Float, default=1)
+    version = Column(Integer, default=1)
 
     knowledge_level = Column(Text)
     learning_goal = Column(Text)
     learning_history = Column(Text)    # JSON
     cognitive_style = Column(Text)
+    pace_preference = Column(Text)     # 学习节奏偏好
     weakness = Column(Text)            # JSON
     interest = Column(Text)            # JSON
     chat_history = Column(Text)        # JSON

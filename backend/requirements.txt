@@ -12,6 +12,7 @@ python-pptx==1.*
 python-multipart==0.0.*
 httpx==0.28.*
 pydantic==2.*
+python-dotenv==1.*
 
 # 测试
 pytest==8.*

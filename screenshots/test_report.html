@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduAgent 交互测试报告 — ProfileAgent + PlannerAgent</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #333; line-height: 1.6; }
+.header { background: linear-gradient(135deg, #1a237e, #283593); color: white; padding: 32px 48px; }
+.header h1 { font-size: 24px; margin-bottom: 8px; }
+.header p { opacity: 0.85; font-size: 14px; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 48px; }
+.case-section { background: white; border-radius: 8px; padding: 28px; margin-bottom: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.case-section h2 { font-size: 20px; margin-bottom: 20px; }
+.case-section h3 { font-size: 16px; margin: 20px 0 12px; color: #555; }
+.two-col { display: flex; gap: 24px; margin-bottom: 16px; }
+.col { flex: 1; min-width: 0; }
+.profile-dims { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dim { background: #f8f9fa; border-radius: 4px; padding: 8px 12px; }
+.dim-label { font-size: 12px; color: #888; display: block; }
+.dim-value { font-size: 13px; color: #333; font-weight: 500; }
+.metrics { margin-top: 12px; font-size: 14px; color: #666; }
+.conv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.conv-table th { background: #f0f2f5; padding: 8px 10px; text-align: left; font-weight: 500; }
+.conv-table td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+.msg-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.path-summary { background: #f0f5ff; padding: 12px 16px; border-radius: 4px; margin-bottom: 12px; font-size: 14px; }
+.path-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+.path-table th { background: #f0f2f5; padding: 10px 12px; text-align: left; font-weight: 500; }
+.path-table td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+.stage-num { font-weight: 700; color: #1a237e; white-space: nowrap; }
+.desc { font-size: 12px; color: #999; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+.badge-初级 { background: #e8f5e9; color: #2e7d32; }
+.badge-中级 { background: #fff3e0; color: #e65100; }
+.badge-高级 { background: #fce4ec; color: #c62828; }
+.task-item { font-size: 12px; color: #666; padding: 2px 0; }
+.tasks-cell { max-width: 300px; }
+.adaptation { font-size: 13px; color: #888; font-style: italic; }
+.footer { text-align: center; padding: 32px; color: #999; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>EduAgent 交互测试报告</h1>
+    <p>ProfileAgent（多轮对话画像构建）→ PlannerAgent（个性化学习路径生成）| 2026-06-11 | 测试环境：Mock LLM + 规则降级</p>
+</div>
+<div class="container">
+    
+        <div class="case-section" style="border-left: 4px solid #4A90D9">
+            <h2 style="color: #4A90D9">案例 1：小张 — 零基础入门型（文科转专业，数学弱，偏好视频）</h2>
+
+            <div class="two-col">
+                <div class="col">
+                    <h3>📋 最终画像（6维）</h3>
+                    
+        <div class="profile-dims">
+            <div class="dim"><span class="dim-label">知识水平</span><span class="dim-value">初级（大二），Python入门，数学薄弱</span></div>
+            <div class="dim"><span class="dim-label">学习目标</span><span class="dim-value">通过人工智能导论考试，达到基本理解水平</span></div>
+            <div class="dim"><span class="dim-label">认知风格</span><span class="dim-value">视觉型（偏好视频/图解），不偏好阅读文本和独立编程</span></div>
+            <div class="dim"><span class="dim-label">学习节奏</span><span class="dim-value">慢速深入型</span></div>
+            <div class="dim"><span class="dim-label">薄弱点</span><span class="dim-value">计算机基础, 编程能力, 数学基础（高数、线代、概率论）</span></div>
+            <div class="dim"><span class="dim-label">兴趣方向</span><span class="dim-value">计算机视觉（人脸识别）, 语音识别（智能音箱）</span></div>
+        </div>
+                    <div class="metrics">
+                        <span>完整度: <strong>80%</strong></span>
+                        <span style="margin-left:16px">置信度: <strong>90%</strong></span>
+                    </div>
+                </div>
+                <div class="col">
+                    <h3>📈 多轮对话收敛过程</h3>
+                    
+        <table class="conv-table">
+            <thead><tr><th>轮次</th><th>学生消息</th><th>完整度</th><th>置信度</th></tr></thead>
+            <tbody>
+            <tr>
+                <td>第1轮</td>
+                <td class="msg-cell">老师你好，我是大二学生，这学期选了人工智能导论课。我之前是文科背景，计算机基础比较差，有点担心跟不上。...</td>
+                <td>35%</td>
+                <td>75%</td>
+            </tr>
+            <tr>
+                <td>第2轮</td>
+                <td class="msg-cell">我只上过一门大学计算机基础课，会一点Python基本语法，但也就hello world和if-else的水平。...</td>
+                <td>45%</td>
+                <td>78%</td>
+            </tr>
+            <tr>
+                <td>第3轮</td>
+                <td class="msg-cell">数学我坦白说不太行，高考数学刚及格，线性代数和概率论都还没学过。高数学过但基本忘光了。...</td>
+                <td>55%</td>
+                <td>82%</td>
+            </tr>
+            <tr>
+                <td>第4轮</td>
+                <td class="msg-cell">我比较喜欢看B站视频学习，很容易看懂。看书的话容易犯困走神，不太适合我。动手写代码的话基础太差经常卡住。...</td>
+                <td>70%</td>
+                <td>88%</td>
+            </tr>
+            <tr>
+                <td>第5轮</td>
+                <td class="msg-cell">兴趣的话...我对人脸识别和智能音箱这些比较好奇，日常生活中能接触到的。我的目标就是能听懂课、考试及格，不做太深入的项目。...</td>
+                <td>80%</td>
+                <td>90%</td>
+            </tr></tbody>
+        </table>
+                </div>
+            </div>
+
+            <h3>🗺️ 个性化学习路径</h3>
+            
+        <div class="path-summary">
+            <span>总目标: <strong>通过人工智能导论考试，达到基本理解水平</strong></span>
+            <span style="margin-left:24px">总天数: <strong>29天</strong></span>
+            <span style="margin-left:24px">难度: <strong>中级</strong></span>
+        </div>
+        <table class="path-table">
+            <thead><tr><th>#</th><th>阶段</th><th>难度</th><th>天数</th><th>知识点</th><th>任务</th></tr></thead>
+            <tbody>
+            <tr>
+                <td class="stage-num">Stage 1</td>
+                <td><strong>基础补强</strong><br><span class="desc">针对薄弱环节 计算机基础, 编程能力, 数学基础（高数、线代、概率论） 进行专项补强</span></td>
+                <td><span class="badge badge-初级">初级</span></td>
+                <td>3天</td>
+                <td>计算机基础, 编程能力, 数学基础（高数、线代、概率论）</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 计算机基础 的核心知识点 (45min)</div><div class="task-item">[exercise] 完成 编程能力 相关练习题 (60min)</div><div class="task-item">[exercise] 完成 数学基础（高数、线代、概率论） 相关练习题 (60min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 2</td>
+                <td><strong>核心阶段 1：基础概念与前置知识</strong><br><span class="desc">深入学习 基础概念与前置知识</span></td>
+                <td><span class="badge badge-初级">初级</span></td>
+                <td>5天</td>
+                <td>基础概念与前置知识</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 基础概念与前置知识 (45min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 3</td>
+                <td><strong>核心阶段 2：核心理论框架</strong><br><span class="desc">深入学习 核心理论框架</span></td>
+                <td><span class="badge badge-中级">中级</span></td>
+                <td>5天</td>
+                <td>核心理论框架</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 核心理论框架 (45min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 4</td>
+                <td><strong>核心阶段 3：关键方法与技术</strong><br><span class="desc">深入学习 关键方法与技术</span></td>
+                <td><span class="badge badge-高级">高级</span></td>
+                <td>5天</td>
+                <td>关键方法与技术</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 关键方法与技术 (45min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 5</td>
+                <td><strong>核心阶段 4：工具与实践</strong><br><span class="desc">深入学习 工具与实践</span></td>
+                <td><span class="badge badge-高级">高级</span></td>
+                <td>5天</td>
+                <td>工具与实践</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 工具与实践 (45min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 6</td>
+                <td><strong>综合实战</strong><br><span class="desc">结合计算机视觉（人脸识别）、语音识别（智能音箱）完成综合项目</span></td>
+                <td><span class="badge badge-高级">高级</span></td>
+                <td>6天</td>
+                <td>计算机视觉（人脸识别）, 语音识别（智能音箱）</td>
+                <td class="tasks-cell"><div class="task-item">[project] 完成一个与计算机视觉（人脸识别）相关的综合实战项目 (180min)</div><div class="task-item">[review] 回顾全部阶段知识点，整理学习笔记 (90min)</div></td>
+            </tr></tbody>
+        </table>
+        <div class="adaptation">📝 规则降级生成：基于知识水平(初级（大二），python入门，数学薄弱)、节奏(慢速深入型)、3个薄弱点、2个兴趣方向自动编排</div>
+        
+        </div>
+        
+        <div class="case-section" style="border-left: 4px solid #5CB85C">
+            <h2 style="color: #5CB85C">案例 2：小李 — 编程转AI型（计算机科班，数学推导弱，偏好代码）</h2>
+
+            <div class="two-col">
+                <div class="col">
+                    <h3>📋 最终画像（6维）</h3>
+                    
+        <div class="profile-dims">
+            <div class="dim"><span class="dim-label">知识水平</span><span class="dim-value">中高级（大三计算机），编程强，ML概念有科普级了解，具体算法原理未掌握</span></div>
+            <div class="dim"><span class="dim-label">学习目标</span><span class="dim-value">6个月内系统掌握ML/DL核心算法，Kaggle参赛，重点NLP + 知识图谱方向</span></div>
+            <div class="dim"><span class="dim-label">认知风格</span><span class="dim-value">动手型（偏好代码实现，从代码反推理论）</span></div>
+            <div class="dim"><span class="dim-label">学习节奏</span><span class="dim-value">中速均衡型</span></div>
+            <div class="dim"><span class="dim-label">薄弱点</span><span class="dim-value">数学推导（微积分/线代应用）, ML算法数学原理</span></div>
+            <div class="dim"><span class="dim-label">兴趣方向</span><span class="dim-value">NLP, 大语言模型, 对话系统, Kaggle竞赛, 图神经网络, 知识图谱</span></div>
+        </div>
+                    <div class="metrics">
+                        <span>完整度: <strong>85%</strong></span>
+                        <span style="margin-left:16px">置信度: <strong>90%</strong></span>
+                    </div>
+                </div>
+                <div class="col">
+                    <h3>📈 多轮对话收敛过程</h3>
+                    
+        <table class="conv-table">
+            <thead><tr><th>轮次</th><th>学生消息</th><th>完整度</th><th>置信度</th></tr></thead>
+            <tbody>
+            <tr>
+                <td>第1轮</td>
+                <td class="msg-cell">你好，我是计算机专业大三的，Java和Python都很熟，数据结构、算法这些基础课都学过了。这学期想系统学习机器学习和深度学习。...</td>
+                <td>35%</td>
+                <td>82%</td>
+            </tr>
+            <tr>
+                <td>第2轮</td>
+                <td class="msg-cell">我对NLP特别感兴趣，最近ChatGPT这些大模型太强了。我之前做过一个简单的Java聊天机器人，但完全基于规则的，现在想了解真正的AI是怎么做的。...</td>
+                <td>50%</td>
+                <td>85%</td>
+            </tr>
+            <tr>
+                <td>第3轮</td>
+                <td class="msg-cell">数学的话...实话实说我的微积分和线性代数都是应试过的，考试成绩还行但在实际推导的时候经常懵。概率论学得还不错。...</td>
+                <td>58%</td>
+                <td>84%</td>
+            </tr>
+            <tr>
+                <td>第4轮</td>
+                <td class="msg-cell">我觉得看代码实现对我来说最快！经常是看一遍源码就懂了，然后反过去看公式才有感觉。纯看数学推导的话我会比较吃力。时间上我希望半年内能打Kaggle比赛。...</td>
+                <td>72%</td>
+                <td>88%</td>
+            </tr>
+            <tr>
+                <td>第5轮</td>
+                <td class="msg-cell">监督学习无监督学习这些概念我大概了解过，看过一些科普文章。但具体算法比如SVM、随机森林、神经网络这些的数学原理还不太懂。对了，我还对图神经网络感兴趣，因为想做...</td>
+                <td>85%</td>
+                <td>90%</td>
+            </tr></tbody>
+        </table>
+                </div>
+            </div>
+
+            <h3>🗺️ 个性化学习路径</h3>
+            
+        <div class="path-summary">
+            <span>总目标: <strong>6个月内系统掌握ML/DL核心算法，Kaggle参赛，重点NLP + 知识图谱方向</strong></span>
+            <span style="margin-left:24px">总天数: <strong>12天</strong></span>
+            <span style="margin-left:24px">难度: <strong>高级</strong></span>
+        </div>
+        <table class="path-table">
+            <thead><tr><th>#</th><th>阶段</th><th>难度</th><th>天数</th><th>知识点</th><th>任务</th></tr></thead>
+            <tbody>
+            <tr>
+                <td class="stage-num">Stage 1</td>
+                <td><strong>基础补强</strong><br><span class="desc">针对薄弱环节 数学推导（微积分/线代应用）, ML算法数学原理 进行专项补强</span></td>
+                <td><span class="badge badge-初级">初级</span></td>
+                <td>2天</td>
+                <td>数学推导（微积分/线代应用）, ML算法数学原理</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 数学推导（微积分/线代应用） 的核心知识点 (45min)</div><div class="task-item">[exercise] 完成 ML算法数学原理 相关练习题 (60min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 2</td>
+                <td><strong>核心阶段 1：数学基础（线性代数/概率论） → Python 数据处理</strong><br><span class="desc">深入学习 数学基础（线性代数/概率论）, Python 数据处理, 监督学习基础, 决策树与随机森林, 支持向量机</span></td>
+                <td><span class="badge badge-中级">中级</span></td>
+                <td>3天</td>
+                <td>数学基础（线性代数/概率论）, Python 数据处理, 监督学习基础, 决策树与随机森林, 支持向量机</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 数学基础（线性代数/概率论） (45min)</div><div class="task-item">[exercise] 完成 Python 数据处理 练习题 (60min)</div><div class="task-item">[code] 完成 监督学习基础 代码实践 (75min)</div><div class="task-item">[study] 学习 决策树与随机森林 (45min)</div><div class="task-item">[exercise] 完成 支持向量机 练习题 (60min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 3</td>
+                <td><strong>核心阶段 2：神经网络基础 → 深度学习入门</strong><br><span class="desc">深入学习 神经网络基础, 深度学习入门, 模型评估与调优, 特征工程, 非监督学习与聚类</span></td>
+                <td><span class="badge badge-高级">高级</span></td>
+                <td>3天</td>
+                <td>神经网络基础, 深度学习入门, 模型评估与调优, 特征工程, 非监督学习与聚类</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 神经网络基础 (45min)</div><div class="task-item">[exercise] 完成 深度学习入门 练习题 (60min)</div><div class="task-item">[code] 完成 模型评估与调优 代码实践 (75min)</div><div class="task-item">[study] 学习 特征工程 (45min)</div><div class="task-item">[exercise] 完成 非监督学习与聚类 练习题 (60min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 4</td>
+                <td><strong>综合实战</strong><br><span class="desc">结合NLP、大语言模型完成综合项目</span></td>
+                <td><span class="badge badge-高级">高级</span></td>
+                <td>4天</td>
+                <td>NLP, 大语言模型, 对话系统</td>
+                <td class="tasks-cell"><div class="task-item">[project] 完成一个与NLP相关的综合实战项目 (180min)</div><div class="task-item">[review] 回顾全部阶段知识点，整理学习笔记 (90min)</div></td>
+            </tr></tbody>
+        </table>
+        <div class="adaptation">📝 规则降级生成：基于知识水平(中高级（大三计算机），编程强，ml概念有科普级了解，具体算法原理未掌握)、节奏(中速均衡型)、2个薄弱点、6个兴趣方向自动编排</div>
+        
+        </div>
+        
+        <div class="case-section" style="border-left: 4px solid #F0AD4E">
+            <h2 style="color: #F0AD4E">案例 3：小王 — 跨专业应用型（生物信息学研一，统计好，需针对性路径）</h2>
+
+            <div class="two-col">
+                <div class="col">
+                    <h3>📋 最终画像（6维）</h3>
+                    
+        <div class="profile-dims">
+            <div class="dim"><span class="dim-label">知识水平</span><span class="dim-value">中高级（研一生物信息学），统计扎实，Python中等，CNN有基础，GNN薄弱</span></div>
+            <div class="dim"><span class="dim-label">学习目标</span><span class="dim-value">3个月内（每周15h）：系统性补ML/DL基础 → GNN → 蛋白质结构预测应用，聚焦研究相关技术</span></div>
+            <div class="dim"><span class="dim-label">认知风格</span><span class="dim-value">动手+理论混合型（论文+代码学习，需结构化路径）</span></div>
+            <div class="dim"><span class="dim-label">学习节奏</span><span class="dim-value">快速聚焦型（限时+限定范围）</span></div>
+            <div class="dim"><span class="dim-label">薄弱点</span><span class="dim-value">Python编程深度, GNN, ML/DL系统性基础</span></div>
+            <div class="dim"><span class="dim-label">兴趣方向</span><span class="dim-value">蛋白质结构预测, 图神经网络, AlphaFold, Transformer, 蛋白质语言模型（ESM）</span></div>
+        </div>
+                    <div class="metrics">
+                        <span>完整度: <strong>85%</strong></span>
+                        <span style="margin-left:16px">置信度: <strong>91%</strong></span>
+                    </div>
+                </div>
+                <div class="col">
+                    <h3>📈 多轮对话收敛过程</h3>
+                    
+        <table class="conv-table">
+            <thead><tr><th>轮次</th><th>学生消息</th><th>完整度</th><th>置信度</th></tr></thead>
+            <tbody>
+            <tr>
+                <td>第1轮</td>
+                <td class="msg-cell">你好，我是生物信息学专业研一的学生。我的研究方向是蛋白质结构预测，需要用到深度学习的方法。...</td>
+                <td>35%</td>
+                <td>78%</td>
+            </tr>
+            <tr>
+                <td>第2轮</td>
+                <td class="msg-cell">我统计学基础比较好，本科做过很多统计分析和实验设计。R语言很熟练，Python也会写但不算是高手水平，大概能写个脚本处理数据这样。...</td>
+                <td>48%</td>
+                <td>83%</td>
+            </tr>
+            <tr>
+                <td>第3轮</td>
+                <td class="msg-cell">我读AlphaFold的论文时，CNN的部分能大概理解，但图神经网络（GNN）的部分就比较吃力了。因为蛋白质可以表示为3D图结构，GNN对这个很关键。我希望能针...</td>
+                <td>60%</td>
+                <td>85%</td>
+            </tr>
+            <tr>
+                <td>第4轮</td>
+                <td class="msg-cell">我平时主要是看论文+看官方代码实现来学习。但我发现一个问题：直接看代码经常卡在某个地方不理解，又不知道去哪里补基础知识。所以我希望有一个针对性强的学习路径，帮我...</td>
+                <td>75%</td>
+                <td>88%</td>
+            </tr>
+            <tr>
+                <td>第5轮</td>
+                <td class="msg-cell">每周大概能投入15个小时吧。另外我对Transformer也挺好奇的，看到有些蛋白质语言模型（比如ESM）用了Transformer架构。不过我不想学太杂，希望...</td>
+                <td>85%</td>
+                <td>91%</td>
+            </tr></tbody>
+        </table>
+                </div>
+            </div>
+
+            <h3>🗺️ 个性化学习路径</h3>
+            
+        <div class="path-summary">
+            <span>总目标: <strong>3个月内（每周15h）：系统性补ML/DL基础 → GNN → 蛋白质结构预测应用，聚焦研究相关技术</strong></span>
+            <span style="margin-left:24px">总天数: <strong>10天</strong></span>
+            <span style="margin-left:24px">难度: <strong>高级</strong></span>
+        </div>
+        <table class="path-table">
+            <thead><tr><th>#</th><th>阶段</th><th>难度</th><th>天数</th><th>知识点</th><th>任务</th></tr></thead>
+            <tbody>
+            <tr>
+                <td class="stage-num">Stage 1</td>
+                <td><strong>基础补强</strong><br><span class="desc">针对薄弱环节 Python编程深度, GNN, ML/DL系统性基础 进行专项补强</span></td>
+                <td><span class="badge badge-初级">初级</span></td>
+                <td>3天</td>
+                <td>Python编程深度, GNN, ML/DL系统性基础</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 Python编程深度 的核心知识点 (45min)</div><div class="task-item">[exercise] 完成 GNN 相关练习题 (60min)</div><div class="task-item">[exercise] 完成 ML/DL系统性基础 相关练习题 (60min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 2</td>
+                <td><strong>核心阶段 1：数学基础（线性代数/概率论） → Python 数据处理</strong><br><span class="desc">深入学习 数学基础（线性代数/概率论）, Python 数据处理, 监督学习基础, 决策树与随机森林, 支持向量机</span></td>
+                <td><span class="badge badge-中级">中级</span></td>
+                <td>2天</td>
+                <td>数学基础（线性代数/概率论）, Python 数据处理, 监督学习基础, 决策树与随机森林, 支持向量机</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 数学基础（线性代数/概率论） (45min)</div><div class="task-item">[exercise] 完成 Python 数据处理 练习题 (60min)</div><div class="task-item">[code] 完成 监督学习基础 代码实践 (75min)</div><div class="task-item">[study] 学习 决策树与随机森林 (45min)</div><div class="task-item">[exercise] 完成 支持向量机 练习题 (60min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 3</td>
+                <td><strong>核心阶段 2：神经网络基础 → 深度学习入门</strong><br><span class="desc">深入学习 神经网络基础, 深度学习入门, 模型评估与调优, 特征工程, 非监督学习与聚类</span></td>
+                <td><span class="badge badge-高级">高级</span></td>
+                <td>2天</td>
+                <td>神经网络基础, 深度学习入门, 模型评估与调优, 特征工程, 非监督学习与聚类</td>
+                <td class="tasks-cell"><div class="task-item">[study] 学习 神经网络基础 (45min)</div><div class="task-item">[exercise] 完成 深度学习入门 练习题 (60min)</div><div class="task-item">[code] 完成 模型评估与调优 代码实践 (75min)</div><div class="task-item">[study] 学习 特征工程 (45min)</div><div class="task-item">[exercise] 完成 非监督学习与聚类 练习题 (60min)</div></td>
+            </tr>
+            <tr>
+                <td class="stage-num">Stage 4</td>
+                <td><strong>综合实战</strong><br><span class="desc">结合蛋白质结构预测、图神经网络完成综合项目</span></td>
+                <td><span class="badge badge-高级">高级</span></td>
+                <td>3天</td>
+                <td>蛋白质结构预测, 图神经网络, AlphaFold</td>
+                <td class="tasks-cell"><div class="task-item">[project] 完成一个与蛋白质结构预测相关的综合实战项目 (180min)</div><div class="task-item">[review] 回顾全部阶段知识点，整理学习笔记 (90min)</div></td>
+            </tr></tbody>
+        </table>
+        <div class="adaptation">📝 规则降级生成：基于知识水平(中高级（研一生物信息学），统计扎实，python中等，cnn有基础，gnn薄弱)、节奏(快速聚焦型（限时+限定范围）)、3个薄弱点、5个兴趣方向自动编排</div>
+        
+        </div>
+        
+</div>
+<div class="footer">
+    EduAgent — 基于大模型的个性化学习资源生成与学习多智能体系统 | 第15届软件杯 A3
+</div>
+</body>
+</html>
