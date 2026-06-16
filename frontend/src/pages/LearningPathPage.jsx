@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Typography, Button, Space, Card, Row, Col, Statistic, Tag, message } from 'antd'
-const { Title, Text, Paragraph } = Typography
 import {
   PlusOutlined,
   ReloadOutlined,
@@ -27,7 +26,7 @@ function parseSSEEvent(eventText) {
   }
 }
 
-const { Title, Text } = Typography
+const { Title, Text, Paragraph } = Typography
 
 /**
  * 将后端 stages 转为 PathTimeline 期望的 nodes

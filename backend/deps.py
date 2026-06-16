@@ -14,9 +14,14 @@
 from agents.llm_client import LLMClient
 from agents.profile_agent import ProfileAgent
 from agents.planner_agent import PlannerAgent
+from agents.resource_agent import ResourceAgent
 from agents.orchestrator import AgentOrchestrator
 from services.profile_service import ProfileService
 from services.planner_service import PlannerService
+from services.resource_service import ResourceService
+from services.tutor_service import TutorService
+from services.evaluate_service import EvaluateService
+from services.task_service import TaskService
 from database import get_db
 
 # ── 全局单例 ──────────────────────────────────
@@ -28,11 +33,18 @@ profile_service = ProfileService(profile_agent, get_db)
 planner_agent = PlannerAgent(llm_client)
 planner_service = PlannerService(planner_agent, get_db, profile_service)
 
+resource_agent = ResourceAgent(llm_client)
+resource_service = ResourceService(resource_agent, profile_service)
+
+tutor_service = TutorService(llm_client, profile_service)
+evaluate_service = EvaluateService(profile_service)
+task_service = TaskService()
+
 orchestrator = AgentOrchestrator(llm_client)
 orchestrator.register_agents(
     profile_agent,
     planner_agent,
-    None,  # resource_agent — Day 6
+    resource_agent,
     None,  # tutor_agent — Day 9
     None,  # evaluate_agent — Day 10
 )
