@@ -13,6 +13,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
  *   status: 'idle'|'pending'|'running'|'completed'|'failed',
  *   result: any,
  *   error: string|null,
+ *   progress: number,
+ *   taskMessage: string,
  *   startPolling: (taskId: string) => void,
  *   reset: () => void,
  * }}
@@ -22,6 +24,8 @@ export function useTaskStatus(fetchStatus, { interval = 2000 } = {}) {
   const [status, setStatus] = useState('idle')
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [progress, setProgress] = useState(0)
+  const [taskMessage, setTaskMessage] = useState('')
 
   const timerRef = useRef(null)
   const fetchRef = useRef(fetchStatus)
@@ -32,6 +36,8 @@ export function useTaskStatus(fetchStatus, { interval = 2000 } = {}) {
       try {
         const data = await fetchRef.current(id)
         setStatus(data.status)
+        setProgress(data.progress ?? 0)
+        setTaskMessage(data.message ?? '')
 
         if (data.status === 'completed') {
           setResult(data.result)
@@ -70,6 +76,8 @@ export function useTaskStatus(fetchStatus, { interval = 2000 } = {}) {
     setStatus('idle')
     setResult(null)
     setError(null)
+    setProgress(0)
+    setTaskMessage('')
   }, [])
 
   // 组件卸载时清理定时器
@@ -77,5 +85,5 @@ export function useTaskStatus(fetchStatus, { interval = 2000 } = {}) {
     return () => clearTimeout(timerRef.current)
   }, [])
 
-  return { taskId, status, result, error, startPolling, reset }
+  return { taskId, status, result, error, progress, taskMessage, startPolling, reset }
 }

@@ -20,8 +20,11 @@ import RadarChart from '../components/RadarChart'
 import ScoreTrendChart from '../components/ScoreTrendChart'
 import ProgressBar from '../components/ProgressBar'
 import { deriveDimensions } from '../components/ProfileCard'
+import { shouldUseMock } from '../utils/useMock'
 
 const { Title, Text } = Typography
+
+const USE_MOCK = shouldUseMock()
 
 const STUDENT_ID = 'demo-student-01'
 
@@ -84,8 +87,8 @@ export default function HomePage() {
         ])
         if (cancelled) return
 
-        // 画像降级 Mock
-        setProfile(profileData || {
+        // 画像降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setProfile(profileData || (USE_MOCK ? {
           name: '张同学',
           level: '中级',
           progress: 68,
@@ -100,10 +103,10 @@ export default function HomePage() {
             { name: '英语语法', accuracy: 0.55 },
             { name: '三角函数', accuracy: 0.88 },
           ],
-        })
+        } : null))
 
-        // 评估降级 Mock
-        setEvaluation(evalData || {
+        // 评估降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setEvaluation(evalData || (USE_MOCK ? {
           overallScore: 78,
           recentTrend: 'up',
           completedTasks: 24,
@@ -123,14 +126,15 @@ export default function HomePage() {
             { date: '2026-06-06', score: 77, tasks: 4 },
             { date: '2026-06-07', score: 78, tasks: 3 },
           ],
-        })
+        } : null))
 
-        setProgressStats(statsData || {
+        // 学习进度降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setProgressStats(statsData || (USE_MOCK ? {
           totalTopics: 12,
           masteredTopics: 5,
           learningTopics: 4,
           notStartedTopics: 3,
-        })
+        } : null))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -140,8 +144,23 @@ export default function HomePage() {
     return () => { cancelled = true }
   }, [])
 
-  // 模拟生成评估
+  // 生成评估（Mock 模式下模拟进度，正式模式直接调接口）
   async function handleGenerate() {
+    if (!USE_MOCK) {
+      // 正式模式：直接调接口 + 轮询
+      try {
+        const data = await getEvaluation(STUDENT_ID)
+        setEvaluation(data)
+        const stats = await getProgressStats(STUDENT_ID)
+        if (stats) setProgressStats(stats)
+        message.success('评估已刷新')
+      } catch (err) {
+        message.error('获取评估失败: ' + (err.message || '未知错误'))
+      }
+      return
+    }
+
+    // Mock 模式：模拟生成进度
     setGenerating(true)
     setGenProgress(0)
     const timer = setInterval(() => {

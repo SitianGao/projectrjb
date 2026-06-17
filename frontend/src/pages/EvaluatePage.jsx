@@ -13,6 +13,9 @@ import ProgressBar from '../components/ProgressBar'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { getEvaluation, getProgressStats } from '../api/evaluate'
 import { formatPercent, formatDuration, formatDate } from '../utils/format'
+import { shouldUseMock } from '../utils/useMock'
+
+const USE_MOCK = shouldUseMock()
 
 const { Title, Text } = Typography
 
@@ -39,10 +42,7 @@ export default function EvaluatePage() {
         getEvaluation(studentId).catch(() => null),
         getProgressStats(studentId).catch(() => null),
       ])
-      setEvaluation(evalData)
-      setProgressStats(statsData)
-    } catch {
-      setEvaluation({
+      setEvaluation(evalData || (USE_MOCK ? {
         overallScore: 78,
         recentTrend: 'up',
         completedTasks: 24,
@@ -62,23 +62,35 @@ export default function EvaluatePage() {
           { date: '2026-06-06', score: 77, tasks: 4 },
           { date: '2026-06-07', score: 78, tasks: 3 },
         ],
-      })
-      setProgressStats({
+      } : null))
+      setProgressStats(statsData || (USE_MOCK ? {
         totalTopics: 12,
         masteredTopics: 5,
         learningTopics: 4,
         notStartedTopics: 3,
-      })
+      } : null))
     } finally {
       setLoading(false)
     }
   }
 
   async function handleGenerate() {
+    if (!USE_MOCK) {
+      try {
+        const data = await getEvaluation(studentId)
+        if (data) setEvaluation(data)
+        const stats = await getProgressStats(studentId)
+        if (stats) setProgressStats(stats)
+        message.success('评估已刷新')
+      } catch (err) {
+        message.error('获取评估失败: ' + (err.message || '未知错误'))
+      }
+      return
+    }
+
+    // Mock 模式：模拟生成进度
     setGenerating(true)
     setGenProgress(0)
-
-    // 模拟进度
     const timer = setInterval(() => {
       setGenProgress((prev) => {
         if (prev >= 100) {
