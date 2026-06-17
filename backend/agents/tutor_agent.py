@@ -2,17 +2,21 @@
 TutorAgent —— 智能辅导问答智能体
 
 面向学生即时问题，提供多风格解释、图表生成和学习建议。
+集成 RAG 检索引擎，回答时自动注入知识库参考来源。
 
 输出结构（对齐 docs/design.md §10.4.3）:
     answer: str               — 主要回答内容
     explanation_style: str    — 使用的解释风格: analogy | formula | visual | story
-    references: list[str]     — 参考来源列表
+    references: list[dict]    — 参考来源列表 [{title, source, content, similarity}]
     diagrams: list[str]       — Mermaid 图表文本数组（可为空）
 """
 import json
+import logging
 from typing import Optional, List, Dict
 
 from .base_agent import BaseAgent
+
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------------------
@@ -63,12 +67,14 @@ class TutorAgent(BaseAgent):
             "## 工作要求\n"
             "1. 根据学生认知水平调整解释难度：初级少用术语、中级适当公式、高级深入推导。\n"
             "2. 每回答一个问题，附带 1-2 个后续思考问题引导深入。\n"
-            "3. 如果问题超出学术范围（如天气、闲聊），礼貌引导回学习主题。\n\n"
+            "3. 如果问题超出学术范围（如天气、闲聊），礼貌引导回学习主题。\n"
+            "4. 优先使用「知识库参考资料」中的内容回答；若无参考资料或资料不充分，诚实说明。\n\n"
             "## 防幻觉约束\n"
             "1. 只回答你确定的内容，不确定请标注『建议核实』。\n"
             "2. 公式、定理、年份等务必核实准确性。\n"
-            "3. 超出知识范围请诚实告知。\n"
-            "4. 不生成违规、敏感或不安全的内容。\n\n"
+            "3. 超出知识范围请诚实告知，不得编造。\n"
+            "4. 不生成违规、敏感或不安全的内容。\n"
+            "5. 若参考资料不含相关信息，回复『资料库中暂未查到相关内容，建议核实后重新提问』。\n\n"
             "## 输出格式\n"
             "严格输出 JSON: {answer, explanation_style, references, diagrams}\n"
             "- answer: 主回答 Markdown 文本\n"
@@ -93,7 +99,7 @@ class TutorAgent(BaseAgent):
 
         Args:
             question: 学生问题
-            context: RAG 检索到的知识上下文
+            context: RAG 检索到的知识上下文（纯文本列表）
             explanation_style: 解释风格 — auto | analogy | formula | visual | story
             profile: 学生画像
         Returns:
@@ -122,6 +128,139 @@ class TutorAgent(BaseAgent):
                 pass
 
         return self._rule_based_tutor(question, explanation_style, knowledge, context or [])
+
+    # ------------------------------------------------------------------
+    # RAG 集成入口（Day 8 核心）
+    # ------------------------------------------------------------------
+    async def tutor_with_rag(
+        self,
+        question: str,
+        retriever=None,
+        explanation_style: str = "auto",
+        profile: Optional[dict] = None,
+        top_k: int = 3,
+    ) -> dict:
+        """带 RAG 知识检索的辅导问答 —— Day 8 核心方法。
+
+        自动从知识库检索相关知识点，注入 LLM 上下文并作为参考来源返回。
+
+        Args:
+            question: 学生问题
+            retriever: Retriever 实例（默认使用模块级 default_retriever）
+            explanation_style: 解释风格
+            profile: 学生画像
+            top_k: RAG 检索数量
+
+        Returns:
+            dict: {answer, explanation_style, references, diagrams}
+                  其中 references 为 [{title, source, content, similarity}]
+        """
+        # ---- RAG 检索 ----
+        rag_results = []
+        rag_context_text = ""
+
+        if retriever is None:
+            from backend.rag.retriever import default_retriever
+            retriever = default_retriever
+
+        try:
+            rag_results = retriever.retrieve(question, top_k=top_k, min_similarity=0.3)
+            if rag_results:
+                rag_context_text = self._build_rag_context(rag_results)
+                logger.info(
+                    f"RAG 检索命中 {len(rag_results)} 条: "
+                    + ", ".join(r["title"] for r in rag_results[:3])
+                )
+            else:
+                logger.info(f"RAG 检索无命中: '{question[:60]}'")
+        except Exception as e:
+            logger.warning(f"RAG 检索失败（降级为空上下文）: {e}")
+
+        # ---- 构建 Prompt ----
+        profile_inner = (profile or {}).get("profile", profile or {})
+        knowledge = profile_inner.get("knowledge_level", "中级")
+        style_instruction = STYLE_PROMPTS.get(explanation_style, STYLE_PROMPTS["auto"])
+
+        user_prompt = (
+            f"学生认知水平: {knowledge}\n"
+            f"问题: {question}\n\n"
+            + (f"## 知识库参考资料\n{rag_context_text}\n\n" if rag_context_text else "")
+            + "## 回答要求\n"
+            + style_instruction
+            + "\n\n请引用上方参考资料中的知识点来支撑你的回答。"
+        )
+
+        # ---- LLM 调用 ----
+        if self.llm:
+            try:
+                chunks = []
+                async for chunk in self.call_llm(user_prompt):
+                    chunks.append(chunk)
+                raw = "".join(chunks)
+                result = json.loads(raw)
+                # 注入 RAG 检索结果作为 references
+                result["references"] = self._format_references(rag_results)
+                return result
+            except Exception as e:
+                logger.warning(f"LLM 调用失败，使用规则化兜底: {e}")
+
+        # ---- 规则化兜底 ----
+        raw = self._rule_based_tutor(question, explanation_style, knowledge, [])
+        result = json.loads(raw)
+        if rag_results:
+            result["references"] = self._format_references(rag_results)
+        return result
+
+    # ------------------------------------------------------------------
+    # RAG 辅助方法
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _build_rag_context(rag_results: List[dict], max_chars: int = 2000) -> str:
+        """将 RAG 检索结果格式化为 LLM prompt 可用的上下文文本。
+
+        Args:
+            rag_results: retriever.retrieve() 的返回列表
+            max_chars: 总上下文最大字符数
+
+        Returns:
+            str: 格式化的参考知识文本
+        """
+        lines = []
+        total = 0
+        for i, r in enumerate(rag_results, 1):
+            snippet = r["content"][:400]  # 每段最多 400 字符
+            line = (
+                f"### [{i}] {r['title']}（来源: {r['source']}, 相似度: {r['similarity']:.0%}）\n"
+                f"{snippet}\n"
+            )
+            if total + len(line) > max_chars:
+                break
+            lines.append(line)
+            total += len(line)
+
+        return "\n".join(lines) if lines else "（资料库中未找到可靠依据）"
+
+    @staticmethod
+    def _format_references(rag_results: List[dict]) -> List[dict]:
+        """将 RAG 检索结果格式化为符合 §10.4.3 的 references 数组。
+
+        每个 reference 包含: {title, source, snippet, similarity}
+
+        Args:
+            rag_results: retriever.retrieve() 的返回列表
+
+        Returns:
+            list of dict
+        """
+        formatted = []
+        for r in rag_results:
+            formatted.append({
+                "title": r["title"],
+                "source": r["source"],
+                "snippet": r["content"][:200],
+                "similarity": r["similarity"],
+            })
+        return formatted
 
     # ------------------------------------------------------------------
     # 规则化兜底（无需 LLM）
