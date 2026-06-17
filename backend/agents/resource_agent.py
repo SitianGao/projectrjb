@@ -23,6 +23,60 @@ class ResourceAgent(BaseAgent):
     def __init__(self, llm_client=None):
         super().__init__(llm_client)
 
+    # 各资源类型的详细 Prompt 模板（Day 7: reading/mindmap/ppt 强化）
+    TYPE_PROMPTS = {
+        "document": (
+            "生成一份结构化 Markdown 讲解文档，要求：\n"
+            "- 从生活/工程场景切入，引出核心概念\n"
+            "- 给出清晰定义和关键公式（如有），配合文字解释\n"
+            "- 提供 1-2 个具体示例或应用案例\n"
+            "- 末尾列出 3-5 个关键要点和常见误区\n"
+            "- 标注「建议核实」若涉及具体数值或年代"
+        ),
+        "mindmap": (
+            "生成一个嵌套 Markdown 列表作为思维导图（前端用 markmap 渲染），要求：\n"
+            "- 根节点为知识点名称\n"
+            "- 第二层 3-5 个维度（如：概念定义、工作原理、应用场景、常见误区、相关技术）\n"
+            "- 第三层每个维度展开 2-4 个子节点\n"
+            "- 节点文字简短可控（8-15 字），可用 - 和缩进写出完整层级\n"
+            "- 不使用序号，纯 Markdown 列表，缩进用 2 个空格"
+        ),
+        "exercise": (
+            "生成 JSON 格式练习题，要求：\n"
+            "- 3-5 道题，覆盖概念理解、公式应用、场景判断\n"
+            "- 每道题含 question/options/answer/explanation\n"
+            "- 初级难度以单选和判断为主，中高级加入简答和代码补全\n"
+            "- 正确答案需逻辑正确，干扰项需有迷惑性"
+        ),
+        "code": (
+            "生成完整可运行的 Python 代码示例，要求：\n"
+            "- 包含必要的 import 和 main 入口\n"
+            "- 关键步骤用中文注释解释 WHY 而不仅仅是 WHAT\n"
+            "- 如有多个实现方式，提供对比并标注适用场景\n"
+            "- 代码风格遵循 PEP 8"
+        ),
+        "reading": (
+            "生成一份拓展阅读推荐材料，要求：\n"
+            "- 推荐 3-5 份高质量文献/教程/视频，覆盖「入门 → 深入 → 前沿」三层\n"
+            "- 每份材料附：标题、类型（论文/教材/博客/视频）、一句话推荐理由、适合什么阶段的读者\n"
+            "- 提供一个「建议阅读顺序」和预估总时长\n"
+            "- 若有开源代码或交互式 Demo，标注链接提示\n"
+            "- 文末附「拓展思考题」2-3 道，引导读者主动探索"
+        ),
+        "ppt": (
+            "生成一份 PPT 讲稿大纲（8-12 张 slide），要求：\n"
+            "- Slide 1: 标题页（知识点名称 + 一句话价值主张）\n"
+            "- Slide 2: 学习目标（3-4 条，以「学完本节你将能够…」开头）\n"
+            "- Slide 3-4: 概念导入（场景/问题驱动，引出为什么需要这个知识）\n"
+            "- Slide 5-7: 核心内容（每 slide 一个关键点，含定义/公式/图示说明）\n"
+            "- Slide 8-9: 示例/案例（对比 before/after 或代码/结果）\n"
+            "- Slide 10: 常见误区（3 个典型错误及正确理解）\n"
+            "- Slide 11: 小结（回顾 3 个关键 takeaway）\n"
+            "- Slide 12: 课后任务（练习题或拓展阅读推荐）\n"
+            "- 每 slide 含 slide 标题 + 3-5 个 bullet points，标注「讲师备注」提示"
+        ),
+    }
+
     def get_system_prompt(self) -> str:
         return (
             "你是学习资源生成智能体。\n"
@@ -32,8 +86,8 @@ class ResourceAgent(BaseAgent):
             "- mindmap: 嵌套 Markdown 列表（用 - 和缩进表示层级），前端用 markmap 渲染。\n"
             "- exercise: JSON 格式练习题，每道题含 question / options / answer / explanation。\n"
             "- code: 完整可运行的 Python 代码 + 详细注释。\n"
-            "- reading: 拓展阅读材料，含要点摘要和推荐理由。\n"
-            "- ppt: PPT 大纲，按 slide 组织，每 slide 含 title + bullets。\n\n"
+            "- reading: 拓展阅读材料，含分级推荐文献、阅读顺序、拓展思考题。\n"
+            "- ppt: 12-slide 讲稿大纲，每 slide 含标题、bullets、讲师备注。\n\n"
             "## 个性化要求\n"
             "- 初级: 多解释、多示例、避免术语堆砌。\n"
             "- 中级: 适当的公式和原理，配合实战练习。\n"
@@ -42,11 +96,40 @@ class ResourceAgent(BaseAgent):
             "## 防幻觉约束\n"
             "- 公式、定理务必核实，不编造。\n"
             "- 代码确保语法正确、逻辑合理。\n"
-            "- 不确定内容标注『建议核实』。\n"
+            "- 不确定内容标注「建议核实」。\n"
             "- 附带 sources 字段标注知识来源。\n\n"
             "## 输出格式\n"
-            "严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}"
+            "严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}\n"
+            "content 字段为 Markdown 字符串（exercise 类型为 JSON 字符串）。"
         )
+
+    def _build_generate_prompt(
+        self,
+        topic: str,
+        resource_types: list,
+        difficulty: str,
+        profile_json: str,
+        context_text: str,
+    ) -> str:
+        """为 LLM 构建含类型详细要求的生成提示词"""
+        lines = [
+            f"知识点: {topic}",
+            f"难度: {difficulty}",
+            f"资源类型: {json.dumps(resource_types, ensure_ascii=False)}",
+            f"学生画像:\n{profile_json}",
+        ]
+        if context_text:
+            lines.append(f"知识库上下文:\n{context_text}")
+
+        lines.append("\n## 各类型生成要求")
+        for rtype in resource_types:
+            detail = self.TYPE_PROMPTS.get(rtype, f"请生成 {rtype} 类型的资源。")
+            lines.append(f"\n### {rtype}\n{detail}")
+
+        lines.append(
+            "\n请严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}"
+        )
+        return "\n".join(lines)
 
     # ------------------------------------------------------------------
     # 主入口
@@ -74,17 +157,16 @@ class ResourceAgent(BaseAgent):
         resource_types = resource_types or ["document"]
         profile_json = json.dumps(profile or {}, ensure_ascii=False, indent=2)
         context_text = "\n".join(knowledge_context or [])
-        user_prompt = (
-            f"知识点: {topic}\n"
-            f"难度: {difficulty}\n"
-            f"资源类型: {json.dumps(resource_types, ensure_ascii=False)}\n"
-            f"学生画像:\n{profile_json}\n\n"
-            + (f"知识库上下文:\n{context_text}\n\n" if context_text else "")
-            + "请生成对应类型的个性化学习资源。"
-        )
 
         if self.llm:
             try:
+                user_prompt = self._build_generate_prompt(
+                    topic=topic,
+                    resource_types=resource_types,
+                    difficulty=difficulty,
+                    profile_json=profile_json,
+                    context_text=context_text,
+                )
                 chunks = []
                 async for chunk in self.call_llm(user_prompt):
                     chunks.append(chunk)
