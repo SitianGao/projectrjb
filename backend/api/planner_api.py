@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.response import ApiError, ok
+from api.response import ApiError, ok, sse_done, sse_error
 from database import SessionLocal, get_db
 from deps import planner_service, profile_service
 
@@ -42,6 +42,9 @@ async def generate_path(request: GeneratePathRequest):
                 goal=request.goal,
             ):
                 yield event
+        except Exception:
+            yield sse_error("PLANNER_GENERATE_FAILED", "学习路径生成失败，请稍后重试")
+            yield sse_done()
         finally:
             db.close()
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -15,8 +16,9 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app import app  # noqa: E402
+from api.response import generic_exception_handler  # noqa: E402
 from api import evaluate_api  # noqa: E402
-from deps import task_service  # noqa: E402
+from deps import task_service, tutor_service  # noqa: E402
 
 
 @pytest.fixture()
@@ -36,6 +38,14 @@ def assert_error_envelope(payload: dict, code: str):
     assert payload["error"] is True
     assert payload["code"] == code
     assert payload["message"]
+
+
+def parse_sse_events(text: str) -> list[dict]:
+    events = []
+    for line in text.splitlines():
+        if line.startswith("data: "):
+            events.append(json.loads(line[6:]))
+    return events
 
 
 def test_root_uses_success_envelope(client):
@@ -70,6 +80,79 @@ def test_tutor_session_creation_uses_success_envelope_and_compat_fields(client):
     assert payload["session_id"] == payload["data"]["session_id"]
 
 
+def test_tutor_chat_stream_uses_day8_sse_contract(monkeypatch, client):
+    class FakeRetriever:
+        def retrieve(self, query, top_k=3, min_similarity=0.3):
+            return [
+                {
+                    "title": "二次函数知识点",
+                    "source": "math.md",
+                    "content": "二次函数顶点式是 y=a(x-h)^2+k。",
+                    "similarity": 0.91,
+                }
+            ]
+
+    class FakeTutorAgent:
+        async def tutor(self, question, context=None, explanation_style="auto", profile=None):
+            return json.dumps({
+                "answer": "顶点式可以直接看出顶点坐标。",
+                "explanation_style": "analogy",
+                "references": [],
+                "diagrams": ["graph TD\nA[顶点式] --> B[顶点坐标]"],
+            }, ensure_ascii=False)
+
+    monkeypatch.setattr(tutor_service, "retriever", FakeRetriever())
+    monkeypatch.setattr(tutor_service, "tutor_agent", FakeTutorAgent())
+
+    response = client.post(
+        "/api/tutor/chat",
+        json={
+            "student_id": "contract-student",
+            "message": "解释二次函数顶点式",
+            "explanation_style": "analogy",
+            "top_k": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = parse_sse_events(response.text)
+    event_types = [event["type"] for event in events]
+    assert {"start", "delta", "data", "done"} <= set(event_types)
+
+    data_event = next(event for event in events if event["type"] == "data")
+    payload = data_event["data"]
+    assert payload["answer"] == "顶点式可以直接看出顶点坐标。"
+    assert payload["explanation_style"] == "analogy"
+    assert payload["diagrams"]
+    assert payload["references"][0]["title"] == "二次函数知识点"
+    assert payload["references"][0]["source"] == "math.md"
+
+
+def test_tutor_ask_stream_keeps_compatibility(monkeypatch, client):
+    class FakeTutorAgent:
+        async def tutor(self, question, context=None, explanation_style="auto", profile=None):
+            return json.dumps({
+                "answer": "兼容接口仍然可用。",
+                "explanation_style": "auto",
+                "references": [],
+                "diagrams": [],
+            }, ensure_ascii=False)
+
+    monkeypatch.setattr(tutor_service, "retriever", None)
+    monkeypatch.setattr(tutor_service, "tutor_agent", FakeTutorAgent())
+
+    response = client.post(
+        "/api/tutor/ask/stream",
+        json={"student_id": "contract-student", "message": "兼容测试"},
+    )
+
+    assert response.status_code == 200
+    events = parse_sse_events(response.text)
+    assert any(event["type"] == "data" for event in events)
+    assert events[-1]["type"] == "done"
+
+
 def test_evaluate_report_uses_success_envelope(monkeypatch, client):
     def fake_report(db, student_id):
         return {
@@ -96,6 +179,30 @@ def test_missing_profile_uses_error_envelope(client):
 
     assert response.status_code == 404
     assert_error_envelope(response.json(), "PROFILE_NOT_FOUND")
+
+
+def test_validation_error_uses_error_envelope(client):
+    response = client.post("/api/resource/generate", json={})
+
+    assert response.status_code == 422
+    assert_error_envelope(response.json(), "VALIDATION_ERROR")
+
+
+def test_unhandled_exception_uses_error_envelope():
+    from fastapi import FastAPI
+
+    probe_app = FastAPI()
+    probe_app.add_exception_handler(Exception, generic_exception_handler)
+
+    @probe_app.get("/boom")
+    async def boom():
+        raise RuntimeError("boom")
+
+    with TestClient(probe_app, raise_server_exceptions=False) as test_client:
+        response = test_client.get("/boom")
+
+    assert response.status_code == 500
+    assert_error_envelope(response.json(), "INTERNAL_SERVER_ERROR")
 
 
 def test_task_status_error_and_task_id_prefix(client):

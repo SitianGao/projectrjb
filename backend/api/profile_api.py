@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.response import ApiError, ok
+from api.response import ApiError, ok, sse_done, sse_error
 from database import SessionLocal, get_db
 from deps import profile_service
 
@@ -62,6 +62,9 @@ async def profile_chat(request: ProfileChatRequest):
                 current_profile=request.current_profile,
             ):
                 yield event
+        except Exception:
+            yield sse_error("PROFILE_CHAT_FAILED", "画像对话失败，请稍后重试")
+            yield sse_done()
         finally:
             db.close()
 
@@ -96,6 +99,9 @@ async def profile_chat_stream_by_student(
                 current_profile=request.current_profile,
             ):
                 yield event
+        except Exception:
+            yield sse_error("PROFILE_CHAT_FAILED", "画像对话失败，请稍后重试")
+            yield sse_done()
         finally:
             db.close()
 

@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from api.response import sse_done, sse_error
 from database import SessionLocal
 from deps import orchestrator, profile_service, planner_service
 
@@ -78,6 +79,9 @@ async def pipeline_generate(request: PipelineRequest):
                     except (json.JSONDecodeError, KeyError) as e:
                         logger.warning(f"解析 path_data 失败: {e}")
 
+        except Exception:
+            yield sse_error("PIPELINE_GENERATE_FAILED", "端到端生成失败，请稍后重试")
+            yield sse_done()
         finally:
             db.close()
 
