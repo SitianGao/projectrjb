@@ -3,7 +3,7 @@ TutorAgent + RAG 集成测试 — TC-R01 ~ TC-R08（Day 8 新增）
 
 验证:
 - tutor_with_rag() 返回 §10.4.3 四字段结构
-- RAG references 格式: {title, source, snippet, similarity}
+- RAG references 格式: {title, source, content, similarity}
 - 四种解释风格 + auto 模式
 - 空问题 / 非学术问题处理
 - _build_rag_context / _format_references 格式化
@@ -76,10 +76,10 @@ async def test_rag_returns_structured_output(agent, mock_retriever):
     assert isinstance(result["diagrams"], list)
 
 
-# ── TC-R02: references 元素包含 title/source/snippet/similarity ─────────
+# ── TC-R02: references 元素包含 title/source/content/similarity ─────────
 @pytest.mark.asyncio
 async def test_rag_references_format(agent, mock_retriever):
-    """TC-R02: 每条 reference 包含 title, source, snippet, similarity"""
+    """TC-R02: 每条 reference 包含 title, source, content, similarity"""
     result = await agent.tutor_with_rag(
         question="梯度下降和SGD有什么区别？",
         retriever=mock_retriever,
@@ -92,12 +92,12 @@ async def test_rag_references_format(agent, mock_retriever):
     for ref in refs:
         assert "title" in ref, f"缺少 title: {ref}"
         assert "source" in ref, f"缺少 source: {ref}"
-        assert "snippet" in ref, f"缺少 snippet: {ref}"
+        assert "content" in ref, f"缺少 content: {ref}"
         assert "similarity" in ref, f"缺少 similarity: {ref}"
         # 类型校验
         assert isinstance(ref["title"], str)
         assert isinstance(ref["source"], str)
-        assert isinstance(ref["snippet"], str)
+        assert isinstance(ref["content"], str)
         assert isinstance(ref["similarity"], (int, float))
         assert 0.0 <= ref["similarity"] <= 1.0
 
@@ -189,9 +189,9 @@ def test_build_rag_context_format():
     assert "这是测试内容" in context
 
 
-# ── TC-R08: _format_references 输出列表包含 snippet ──────────────────────
-def test_format_references_snippet():
-    """TC-R08: _format_references 将 RAG 结果转为 {title, source, snippet, similarity}"""
+# ── TC-R08: _format_references 输出列表包含 content ──────────────────────
+def test_format_references_content():
+    """TC-R08: _format_references 将 RAG 结果转为 {title, source, content, similarity}"""
     mock_results = [
         {
             "title": "Ref A",
@@ -205,5 +205,5 @@ def test_format_references_snippet():
     assert len(refs) == 1
     assert refs[0]["title"] == "Ref A"
     assert refs[0]["source"] == "source_a.md"
-    assert len(refs[0]["snippet"]) <= 200  # snippet 截断在 200 字符
+    assert len(refs[0]["content"]) <= 200  # content 截断在 200 字符
     assert refs[0]["similarity"] == 0.88

@@ -1,34 +1,32 @@
 """Tutor chat service —— 集成 TutorAgent + RAG 检索（Day 8）
 
 SSE 事件类型: start | delta | data | error | done
-data 事件携带: {references: [{title, source, snippet, similarity}]}
+data 事件携带: {references: [{title, source, content, similarity}]}
 """
 
 from __future__ import annotations
 
 import datetime
 import json
+import re
 import uuid
 from typing import Dict, List, Optional
-
-from backend.agents.tutor_agent import TutorAgent
-from backend.rag.retriever import default_retriever
 
 
 class TutorService:
     """提供 SSE tutor chat 和轻量内存会话管理。
 
     Day 8 升级：集成 TutorAgent 风格系统 + RAG 知识检索。
+    依赖通过 deps.py 注入，不在 service 内部直接 import agent 或 rag。
     """
 
-    def __init__(self, llm_client, profile_service):
+    def __init__(self, llm_client, profile_service, tutor_agent, retriever):
         self.llm_client = llm_client
         self.profile_service = profile_service
+        self._agent = tutor_agent
+        self._retriever = retriever
         self._sessions: Dict[str, Dict] = {}
         self._messages: Dict[str, List[Dict]] = {}
-
-        # 创建带 LLM 的 TutorAgent（用于 tutor_with_rag）
-        self._agent = TutorAgent(llm_client)
 
     # ---- 会话管理 ----
 
@@ -96,48 +94,49 @@ class TutorService:
         # ---- SSE: start ----
         yield (
             f'data: {{"type":"start","session_id":"{session_id}",'
-            f'"message":"正在检索知识库..."}}\n\n'
+            f'"message":"正在检索知识库…"}}\n\n'
         )
 
         # ---- RAG 检索 ----
-        rag_refs = []
+        rag_refs: List[Dict] = []
         try:
-            rag_results = default_retriever.retrieve(message, top_k=3, min_similarity=0.3)
+            rag_results = self._retriever.retrieve(message, top_k=3, min_similarity=0.3)
             if rag_results:
                 rag_refs = [
                     {
                         "title": r["title"],
                         "source": r["source"],
-                        "snippet": r["content"][:200],
+                        "content": r["content"][:200],
                         "similarity": r["similarity"],
                     }
                     for r in rag_results
                 ]
-                yield f'data: {{"type":"progress","progress":0.3,"message":"已检索到 {len(rag_refs)} 个相关知识点"}}\n\n'
-            else:
-                yield f'data: {{"type":"progress","progress":0.3,"message":"知识库中未找到直接相关的内容，将基于通用知识回答"}}\n\n'
-        except Exception as e:
-            yield f'data: {{"type":"progress","progress":0.3,"message":"知识库检索暂不可用: {str(e)[:80]}"}}\n\n'
+        except Exception:
+            # RAG 检索失败时静默降级，不中断流程
+            yield f'data: {{"type":"error","message":"知识库检索暂不可用，将基于通用知识回答"}}\n\n'
 
         # ---- TutorAgent 生成（含 RAG 上下文 + 风格） ----
-        yield f'data: {{"type":"progress","progress":0.5,"message":"正在生成回答..."}}\n\n'
-
         try:
             result = await self._agent.tutor_with_rag(
                 question=message,
-                retriever=default_retriever,
+                retriever=self._retriever,
                 explanation_style=explanation_style,
                 profile=profile,
             )
         except Exception:
             # RAG 降级：直接调用基础 tutor
-            result = json.loads(
-                await self._agent.tutor(
+            try:
+                raw = await self._agent.tutor(
                     question=message,
                     explanation_style=explanation_style,
                     profile=profile,
                 )
-            )
+                result = json.loads(raw)
+            except Exception:
+                # 完全兜底：返回错误信息
+                yield f'data: {{"type":"error","message":"问答生成失败，请稍后重试"}}\n\n'
+                yield f'data: {{"type":"done","session_id":"{session_id}"}}\n\n'
+                return
 
         answer = result.get("answer", "")
         used_style = result.get("explanation_style", explanation_style)
@@ -146,7 +145,6 @@ class TutorService:
 
         # ---- SSE: delta (流式输出答案) ----
         # 按句子拆分模拟流式效果
-        import re
         sentences = re.split(r'(?<=[。！？\n])', answer)
         for sentence in sentences:
             if sentence:

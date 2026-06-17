@@ -8,7 +8,7 @@ import logging
 import httpx
 from typing import AsyncIterator, Optional
 
-import backend.config as config
+import config
 
 logger = logging.getLogger(__name__)
 

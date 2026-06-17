@@ -160,7 +160,7 @@ class TutorAgent(BaseAgent):
         rag_context_text = ""
 
         if retriever is None:
-            from backend.rag.retriever import default_retriever
+            from rag.retriever import default_retriever
             retriever = default_retriever
 
         try:
@@ -244,7 +244,7 @@ class TutorAgent(BaseAgent):
     def _format_references(rag_results: List[dict]) -> List[dict]:
         """将 RAG 检索结果格式化为符合 §10.4.3 的 references 数组。
 
-        每个 reference 包含: {title, source, snippet, similarity}
+        每个 reference 包含: {title, source, content, similarity}
 
         Args:
             rag_results: retriever.retrieve() 的返回列表
@@ -257,7 +257,7 @@ class TutorAgent(BaseAgent):
             formatted.append({
                 "title": r["title"],
                 "source": r["source"],
-                "snippet": r["content"][:200],
+                "content": r["content"][:200],
                 "similarity": r["similarity"],
             })
         return formatted
