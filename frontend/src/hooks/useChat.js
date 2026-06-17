@@ -12,6 +12,8 @@ import { useState, useCallback, useRef } from 'react'
  * @param {Array} options.initialMessages - 初始消息列表
  * @param {Function} options.onProfileUpdate - (profile: object) => void
  *   当 SSE 返回 profile_update 事件时回调，传入更新后的画像数据
+ * @param {Function} options.onSSEEvent - (event: object) => void
+ *   当 SSE 返回结构化事件（含 diagrams/references 等字段）时回调
  * @returns {{
  *   messages: Array<{id, role, content}>,
  *   isLoading: boolean,
@@ -20,7 +22,7 @@ import { useState, useCallback, useRef } from 'react'
  *   abort: () => void,
  * }}
  */
-export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate } = {}) {
+export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate, onSSEEvent } = {}) {
   const [messages, setMessages] = useState(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
   const abortRef = useRef(null)
@@ -92,6 +94,11 @@ export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate }
                 continue
               }
 
+              // 通知外部回调（diagrams/references 等结构化数据）
+              if (onSSEEvent) {
+                onSSEEvent(parsed)
+              }
+
               // 跳过无内容的事件（如 type:start, type:done）
               if (parsed.type === 'start' || parsed.type === 'done') continue
 
@@ -136,7 +143,7 @@ export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate }
         abortRef.current = null
       }
     },
-    [streamFetcher, nextId, onProfileUpdate],
+    [streamFetcher, nextId, onProfileUpdate, onSSEEvent],
   )
 
   const clearMessages = useCallback(() => {
