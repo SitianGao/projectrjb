@@ -12,7 +12,7 @@ Base = declarative_base()
 from .student import Student, StudentProfile
 from .learning_path import LearningPath
 from .resource import Resource
-from .evaluation import LearningRecord
+from .evaluation import EvaluationReport, LearningRecord
 
 __all__ = [
     "Base",
@@ -20,5 +20,6 @@ __all__ = [
     "StudentProfile",
     "LearningPath",
     "Resource",
+    "EvaluationReport",
     "LearningRecord",
 ]
