@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import uuid
 from pathlib import Path
 
 import pytest
@@ -65,6 +66,15 @@ def test_resource_list_uses_success_envelope_and_compat_fields(client):
     assert_success_envelope(payload)
     assert {"items", "total", "page", "page_size"} <= payload["data"].keys()
     assert payload["items"] == payload["data"]["items"]
+
+
+def test_resource_plural_alias_matches_frontend_client(client):
+    response = client.get("/api/resources/list")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert_success_envelope(payload)
+    assert {"items", "total", "page", "page_size"} <= payload["data"].keys()
 
 
 def test_tutor_session_creation_uses_success_envelope_and_compat_fields(client):
@@ -172,6 +182,57 @@ def test_evaluate_report_uses_success_envelope(monkeypatch, client):
     assert_success_envelope(payload)
     assert payload["data"]["overall_score"] == 88
     assert payload["overall_score"] == 88
+
+
+def test_day9_evaluate_record_start_and_saved_report(client):
+    student_id = f"contract-day9-{uuid.uuid4()}"
+    records = [
+        {
+            "student_id": student_id,
+            "action": "complete",
+            "topic": "线性回归",
+            "score": 88,
+            "time_spent": 1800,
+        },
+        {
+            "student_id": student_id,
+            "action": "answer",
+            "topic": "梯度下降",
+            "score": 55,
+            "time_spent": 1500,
+        },
+    ]
+
+    for record in records:
+        response = client.post("/api/evaluate/record", json=record)
+        assert response.status_code == 200
+        payload = response.json()
+        assert_success_envelope(payload)
+        assert payload["data"]["topic"] == record["topic"]
+
+    start_response = client.post("/api/evaluate/start", json={"student_id": student_id})
+    assert start_response.status_code == 200
+    start_payload = start_response.json()
+    assert_success_envelope(start_payload)
+    report = start_payload["data"]
+    required = {"overall_score", "dimensions", "weak_topics", "suggestions", "review_plan"}
+    assert required <= report.keys()
+    assert report["report_id"]
+    assert report["overall_score"] == 72
+    assert "梯度下降" in report["weak_topics"]
+    assert report["review_plan"][0]["topic"] == "梯度下降"
+    assert "streak_days" in report
+    assert "weekly_activity" in report
+    assert "streak_days" in report["progress_stats"]
+    assert "weekly_activity" in report["progress_stats"]
+    assert len(report["weekly_activity"]) == 7
+
+    saved_response = client.get(f"/api/evaluate/report/{student_id}")
+    assert saved_response.status_code == 200
+    saved_payload = saved_response.json()
+    assert_success_envelope(saved_payload)
+    assert saved_payload["data"]["report_id"] == report["report_id"]
+    assert saved_payload["data"]["suggestions"]
 
 
 def test_missing_profile_uses_error_envelope(client):

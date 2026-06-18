@@ -89,10 +89,26 @@ async def get_report(student_id: str, db: Session = Depends(get_db)):
     return ok(evaluate_service.build_report(db, student_id))
 
 
+@router.get("/report/{student_id}/progress")
+async def get_report_progress(student_id: str, db: Session = Depends(get_db)):
+    """获取报告内的学习进度统计（前端兼容）"""
+    return ok(evaluate_service.get_progress_stats(db, student_id))
+
+
 @router.get("/progress/{student_id}")
 async def get_progress(student_id: str, db: Session = Depends(get_db)):
     """获取学习进度统计。"""
     return ok(evaluate_service.get_progress_stats(db, student_id))
+
+
+@router.get("/record")
+async def list_learning_records(
+    student_id: str,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    """获取学习记录列表（前端兼容）"""
+    return ok(evaluate_service.list_records(db, student_id, limit))
 
 
 @router.get("/{student_id}")
