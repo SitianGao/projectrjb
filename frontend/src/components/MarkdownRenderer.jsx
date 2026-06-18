@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import MermaidChart from './MermaidChart'
 
 const base = {
   fontSize: 15,
@@ -116,6 +117,18 @@ export default function MarkdownRenderer({ content = '', compact = false }) {
           code({ node, inline, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '')
             const codeStr = String(children).replace(/\n$/, '')
+            // Mermaid 图表渲染
+            if (!inline && match && match[1] === 'mermaid') {
+              return (
+                <div style={{ margin: '16px 0', borderRadius: 10, border: '1px solid #e2e8f0', padding: 12, background: '#fafafa' }}>
+                  <MermaidChart chart={codeStr} theme="default" />
+                  <details style={{ marginTop: 8 }}>
+                    <summary style={{ fontSize: 12, color: '#94a3b8', cursor: 'pointer' }}>查看原始代码</summary>
+                    <pre style={{ fontSize: 12, marginTop: 8, whiteSpace: 'pre-wrap', color: '#64748b' }}>{codeStr}</pre>
+                  </details>
+                </div>
+              )
+            }
             return !inline && match ? (
               <div style={preStyle}>
                 <SyntaxHighlighter

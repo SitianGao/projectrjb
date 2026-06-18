@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Typography, Input, Select, Button, Empty, Row, Col, message, Modal } from 'antd'
 import {
   SearchOutlined, ThunderboltOutlined, FileTextOutlined,
@@ -373,12 +373,35 @@ export default function ResourcePage() {
       : [],
   )
 
-  // 异步任务轮询 — 状态映射：后端 "done" → hook "completed"
+  // Mock 轮询计数器：模拟渐进式任务进度
+  const mockPollRef = useRef(0)
+
+  // 异步任务轮询 — Mock 模式模拟完整生命周期，真实模式轮询后端
   const {
     status, result, error,
     progress, taskMessage,
     startPolling, reset,
   } = useTaskStatus(async (taskId) => {
+    // ── Mock 路径：模拟 6 次轮询后完成任务 ──
+    if (USE_MOCK) {
+      mockPollRef.current += 1
+      const count = mockPollRef.current
+
+      if (count <= 2) {
+        return { status: 'running', progress: count * 15, message: '看看你想学什么…' }
+      }
+      if (count <= 4) {
+        return { status: 'running', progress: 30 + (count - 2) * 15, message: '整理相关资料中…' }
+      }
+      if (count <= 6) {
+        return { status: 'running', progress: 60 + (count - 4) * 20, message: '最后润色一下…' }
+      }
+      // 完成任务：返回 Mock 资源
+      const resources = generateMockResources(topic, difficulty, selectedTypes)
+      return { status: 'completed', progress: 100, message: '好了，帮你准备了 ' + resources.length + ' 份资料', result: resources }
+    }
+
+    // ── 真实路径：轮询后端 ──
     const data = await getTaskStatus(taskId)
     return {
       status: data.status === 'done' ? 'completed' : data.status,
@@ -393,14 +416,25 @@ export default function ResourcePage() {
   const isCompleted = status === 'completed'
   const isFailed = status === 'failed'
 
-  /** 点击生成 — 调后端异步接口，获取 task_id 后开始轮询 */
+  /** 点击生成 — Mock 模式模拟异步任务，真实模式调后端接口 */
   async function handleGenerate() {
     if (!topic.trim()) {
       message.warning('请输入学习主题')
       return
     }
+    if (selectedTypes.length === 0) {
+      message.warning('请至少选择一种资源类型')
+      return
+    }
 
     try {
+      if (USE_MOCK) {
+        // Mock: 重置计数器，直接用虚拟 task_id 启动轮询
+        mockPollRef.current = 0
+        startPolling('mock-task-' + Date.now())
+        return
+      }
+
       const diffLabel = DIFFICULTY_OPTIONS.find((d) => d.value === difficulty)?.label || '中级'
       const data = await generateResources({
         student_id: 'demo-student-01',
@@ -421,6 +455,11 @@ export default function ResourcePage() {
 
   /** 失败后重试 */
   function handleRetry() {
+    if (USE_MOCK) {
+      mockPollRef.current = 0
+      startPolling('mock-task-retry-' + Date.now())
+      return
+    }
     reset()
     handleGenerate()
   }
@@ -435,9 +474,9 @@ export default function ResourcePage() {
   /** 根据进度百分比推演步骤状态 */
   function buildSteps() {
     const phaseLabels = [
-      { key: 'analyze', label: '分析主题' },
-      { key: 'generate', label: '生成资源' },
-      { key: 'organize', label: '整理内容' },
+      { key: 'understand', label: '了解主题' },
+      { key: 'prepare', label: '准备资料' },
+      { key: 'polish', label: '排版整理' },
     ]
     return phaseLabels.map((phase, i) => {
       const threshold = (i + 1) / phaseLabels.length * 100
@@ -541,7 +580,7 @@ export default function ResourcePage() {
             status={status}
             percent={progress}
             steps={buildSteps()}
-            message={taskMessage || '正在准备生成...'}
+            message={taskMessage || '准备中…'}
             error={error}
           />
         </div>
