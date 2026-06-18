@@ -52,6 +52,23 @@ class EvaluateAgent(BaseAgent):
         )
 
     # ------------------------------------------------------------------
+    # 同步入口（供 service 层同步端点使用）
+    # ------------------------------------------------------------------
+    def evaluate_sync(
+        self,
+        student_id: str,
+        profile: dict,
+        records: List[dict],
+        path: Optional[dict] = None,
+    ) -> str:
+        """同步评估（规则化，不依赖 LLM）。
+
+        供 EvaluateService.build_report() 等同步端点调用，
+        直接使用统计规则生成评估报告。
+        """
+        return self._rule_based_evaluate(student_id, profile, records, path)
+
+    # ------------------------------------------------------------------
     # 主入口
     # ------------------------------------------------------------------
     async def evaluate(

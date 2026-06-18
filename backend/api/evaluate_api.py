@@ -22,6 +22,12 @@ from deps import evaluate_service
 router = APIRouter()
 
 
+def _sse_event(event_type: str, **payload) -> str:
+    """构建 SSE 事件字符串"""
+    data = {"type": event_type, **payload}
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 class EvaluationStartRequest(BaseModel):
     student_id: str = Field(..., examples=["demo-student-01"])
 
@@ -55,16 +61,48 @@ async def generate_evaluation(
 
 @router.post("/generate/stream")
 async def generate_evaluation_stream(request: EvaluationStartRequest):
-    """流式生成评估 (SSE)"""
+    """流式生成评估 (SSE) —— Day 9 升级：异步 AI 增强评估"""
 
     async def event_generator():
         db = SessionLocal()
         try:
-            yield 'data: {"type":"start","message":"开始生成学习评估"}\n\n'
-            report = evaluate_service.start_evaluation(db, request.student_id)
+            yield _sse_event("start", message="开始生成学习评估")
+
+            # Day 9: 异步 AI 增强评估
+            report = await evaluate_service.start_evaluation_async(db, request.student_id)
+
+            # 逐维度发送 delta（前端可逐步渲染雷达图）
+            for dim in report.get("dimensions", []):
+                yield _sse_event(
+                    "delta",
+                    dimension=dim.get("name"),
+                    score=dim.get("score"),
+                    comment=dim.get("comment"),
+                )
+
+            # 薄弱点识别完成
+            weak_topics = report.get("weak_topics", [])
+            if weak_topics:
+                yield _sse_event(
+                    "delta",
+                    weak_topics=weak_topics,
+                    message=f"检测到 {len(weak_topics)} 个薄弱知识点",
+                )
+
+            # 复习计划
+            review_plan = report.get("review_plan", [])
+            if review_plan:
+                yield _sse_event(
+                    "delta",
+                    review_plan_count=len(review_plan),
+                    message=f"生成 {len(review_plan)} 条复习建议",
+                )
+
+            # 最终完整报告
             payload = json.dumps(report, ensure_ascii=False)
-            yield f'data: {{"type":"data","data":{payload}}}\n\n'
-            yield 'data: {"type":"done"}\n\n'
+            yield f"data: {{\"type\":\"data\",\"data\":{payload}}}\n\n"
+            yield f'data: {{"type":"done","session_id":"{request.student_id}"}}\n\n'
+
         except Exception as exc:
             message = json.dumps(str(exc), ensure_ascii=False)
             yield f'data: {{"type":"error","code":"EVALUATE_FAILED","message":{message}}}\n\n'

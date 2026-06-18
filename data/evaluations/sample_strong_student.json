@@ -1,0 +1,50 @@
+{
+  "student_id": "demo-strong-001",
+  "evaluation_time": "2026-06-18T10:30:00+08:00",
+  "overall_score": 88.3,
+  "dimensions": [
+    {
+      "name": "knowledge_mastery",
+      "score": 92.0,
+      "comment": "掌握良好，正确率较高。核心概念理解扎实，能正确运用公式和定理解决问题。"
+    },
+    {
+      "name": "progress",
+      "score": 85.0,
+      "comment": "进度正常，按计划推进。已完成监督学习和无监督学习两个阶段，正在学习深度学习模块。"
+    },
+    {
+      "name": "efficiency",
+      "score": 88.0,
+      "comment": "学习效率良好。能够快速理解新概念并应用到练习中，单位时间掌握知识密度高。"
+    },
+    {
+      "name": "weakness_analysis",
+      "score": 85.0,
+      "comment": "无明显薄弱点。仅在 RNN/LSTM 序列建模部分出现过一次偏差，已通过针对性练习纠正。"
+    }
+  ],
+  "weak_topics": [
+    "LSTM长序列梯度消失问题"
+  ],
+  "suggestions": [
+    "继续保持当前学习节奏，可以尝试挑战更高难度的练习",
+    "建议阅读 LSTM 梯度流的原始论文（Hochreiter 1997），深入理解门控机制",
+    "可以尝试复现一个 Seq2Seq 翻译模型来巩固序列建模知识",
+    "下一个阶段可以考虑学习 Transformer 和注意力机制，进一步拓展架构视野"
+  ],
+  "review_plan": [
+    {
+      "topic": "LSTM长序列梯度消失问题",
+      "urgency": "low",
+      "reason": "距上次学习已过 2 天，记忆保留率约 82%，略低于阈值 60%，建议复习巩固。",
+      "recommended_resources": ["document", "exercise"]
+    },
+    {
+      "topic": "卷积神经网络（CNN）",
+      "urgency": "low",
+      "reason": "距上次学习已过 5 天，记忆保留率约 70%，建议周期性回顾以保持长期记忆。",
+      "recommended_resources": ["document"]
+    }
+  ]
+}

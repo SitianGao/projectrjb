@@ -1,0 +1,73 @@
+{
+  "student_id": "demo-struggling-003",
+  "evaluation_time": "2026-06-18T10:30:00+08:00",
+  "overall_score": 42.1,
+  "dimensions": [
+    {
+      "name": "knowledge_mastery",
+      "score": 38.0,
+      "comment": "基础薄弱，需要重新巩固核心概念。多数知识点正确率低于 60%，建议从最基础的定义和原理开始重新学习。"
+    },
+    {
+      "name": "progress",
+      "score": 45.0,
+      "comment": "进度偏慢，建议加快学习节奏。目前仅完成数据预处理阶段的一半内容，需要制定更紧凑的学习计划。"
+    },
+    {
+      "name": "efficiency",
+      "score": 35.0,
+      "comment": "学习效率偏低。可能存在基础概念不清导致每个新知识点都需要大量时间理解，建议先补齐前置知识。"
+    },
+    {
+      "name": "weakness_analysis",
+      "score": 55.0,
+      "comment": "检测到 5 个薄弱知识点，覆盖范围较广，涉及数学基础、编程基础和机器学习核心算法。"
+    }
+  ],
+  "weak_topics": [
+    "线性代数基础（矩阵运算）",
+    "概率论基础（条件概率）",
+    "Python NumPy 数组操作",
+    "线性回归梯度下降推导",
+    "数据归一化与标准化"
+  ],
+  "suggestions": [
+    "建议回顾课堂笔记和教材相关章节，重点理解核心概念而非死记公式",
+    "当前进度偏慢，建议每天固定 1-2 小时学习时间，优先补齐数学和编程基础",
+    "尝试用思维导图整理知识点，从最简单的概念开始，逐步建立知识关联",
+    "薄弱知识点较多（线性代数基础、概率论基础、Python NumPy 数组操作），建议逐个攻克而非跳跃学习",
+    "建议先完成数据预处理阶段的学习（归一化、标准化、缺失值处理），打好基础再进入模型训练阶段"
+  ],
+  "review_plan": [
+    {
+      "topic": "线性代数基础（矩阵运算）",
+      "urgency": "high",
+      "reason": "距上次学习已过 10 天，记忆保留率约 16%，远低于阈值 60%，需立即复习。这是后续机器学习算法的前置知识。",
+      "recommended_resources": ["document", "exercise"]
+    },
+    {
+      "topic": "概率论基础（条件概率）",
+      "urgency": "high",
+      "reason": "距上次学习已过 8 天，记忆保留率约 24%，低于阈值 60%，且练习正确率仅 32%。",
+      "recommended_resources": ["document", "exercise"]
+    },
+    {
+      "topic": "Python NumPy 数组操作",
+      "urgency": "high",
+      "reason": "练习正确率偏低（28%），属于薄弱知识点，代码实现能力是后续所有算法学习的工具基础。",
+      "recommended_resources": ["code", "exercise"]
+    },
+    {
+      "topic": "线性回归梯度下降推导",
+      "urgency": "medium",
+      "reason": "练习正确率偏低（35%），属于薄弱知识点，建议在补齐数学基础后再重点攻克。",
+      "recommended_resources": ["exercise", "document"]
+    },
+    {
+      "topic": "数据归一化与标准化",
+      "urgency": "medium",
+      "reason": "练习正确率偏低（40%），属于薄弱知识点，建议通过实际数据集操作加深理解。",
+      "recommended_resources": ["code", "exercise"]
+    }
+  ]
+}

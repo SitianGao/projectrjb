@@ -1,26 +1,34 @@
-"""Learning evaluation service."""
+"""Learning evaluation service —— 集成 EvaluateAgent（Day 9）
+
+提供学习记录管理 + AI 增强多维度评估报告。
+- 基础统计：overall_score、topic_scores、history、progress_stats
+- AI 增强（EvaluateAgent）：dimensions、weak_topics、suggestions、review_plan
+"""
 
 from __future__ import annotations
 
 import datetime
+import json
+import logging
 import uuid
 from collections import defaultdict
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
 from models.evaluation import LearningRecord
 
+logger = logging.getLogger(__name__)
+
 
 class EvaluateService:
-    """Stores learning records and computes a lightweight evaluation report."""
+    """学习记录管理 + 多维度评估报告（Day 9 升级：集成 EvaluateAgent）"""
 
-    def __init__(self, profile_service):
+    def __init__(self, profile_service, evaluate_agent=None):
         self.profile_service = profile_service
+        self.evaluate_agent = evaluate_agent
 
-    def start_evaluation(self, db: Session, student_id: str) -> Dict:
-        self.profile_service.get_or_create_student(db, student_id)
-        return self.build_report(db, student_id)
+    # ── 学习记录 ──────────────────────────────────────────
 
     def record_learning(
         self,
@@ -47,15 +55,52 @@ class EvaluateService:
         db.refresh(record)
         return self._record_to_dict(record)
 
-    def build_report(self, db: Session, student_id: str) -> Dict:
-        self.profile_service.get_or_create_student(db, student_id)
-        records = (
-            db.query(LearningRecord)
-            .filter(LearningRecord.student_id == student_id)
-            .order_by(LearningRecord.created_at.asc())
-            .all()
-        )
+    # ── 评估入口 ──────────────────────────────────────────
 
+    def start_evaluation(self, db: Session, student_id: str) -> Dict:
+        """同步评估入口（兼容旧接口）"""
+        self.profile_service.get_or_create_student(db, student_id)
+        return self.build_report(db, student_id)
+
+    async def start_evaluation_async(self, db: Session, student_id: str) -> Dict:
+        """异步评估入口（供 SSE 端点使用，含 AI 增强）"""
+        self.profile_service.get_or_create_student(db, student_id)
+        return await self.build_report_async(db, student_id)
+
+    # ── 核心：构建评估报告 ────────────────────────────────
+
+    def build_report(self, db: Session, student_id: str) -> Dict:
+        """构建评估报告（同步版：基础统计 + 规则化 AI 评估）
+
+        始终包含 5 个 Day 9 字段：
+        overall_score / dimensions / weak_topics / suggestions / review_plan
+        """
+        records = self._query_records(db, student_id)
+        profile = self._get_profile(db, student_id)
+        report = self._build_base_report(student_id, records)
+
+        # AI 增强：通过 EvaluateAgent 获取 dimensions/weak_topics/suggestions/review_plan
+        ai_fields = self._run_agent_eval_sync(student_id, profile, records)
+        report.update(ai_fields)
+
+        return report
+
+    async def build_report_async(self, db: Session, student_id: str) -> Dict:
+        """构建评估报告（异步版：基础统计 + LLM/AI 增强评估）"""
+        records = self._query_records(db, student_id)
+        profile = self._get_profile(db, student_id)
+        report = self._build_base_report(student_id, records)
+
+        # AI 增强：异步调用 EvaluateAgent
+        ai_fields = await self._run_agent_eval_async(student_id, profile, records)
+        report.update(ai_fields)
+
+        return report
+
+    # ── 基础统计（不依赖 Agent）───────────────────────────
+
+    def _build_base_report(self, student_id: str, records: List[LearningRecord]) -> Dict:
+        """纯统计报告：overall_score / topic_scores / history / progress_stats"""
         scored = [r for r in records if r.score is not None]
         completed = [r for r in records if r.action in {"complete", "answer"}]
         total_time = sum(r.time_spent or 0 for r in records)
@@ -129,8 +174,112 @@ class EvaluateService:
             "updated_at": datetime.datetime.utcnow().isoformat(),
         }
 
+    # ── Agent 调用（同步 / 异步）───────────────────────────
+
+    def _run_agent_eval_sync(
+        self,
+        student_id: str,
+        profile: Dict,
+        records: List[LearningRecord],
+    ) -> Dict:
+        """同步调用 EvaluateAgent（规则化兜底），返回 AI 增强字段"""
+        record_dicts = [self._record_to_dict(r) for r in records]
+        try:
+            raw = self.evaluate_agent.evaluate_sync(
+                student_id=student_id,
+                profile=profile,
+                records=record_dicts,
+                path=None,
+            )
+            return self._merge_agent_result(raw)
+        except Exception as exc:
+            logger.warning("EvaluateAgent 同步评估失败，使用内联规则兜底: %s", exc)
+            return self._fallback_ai_fields(student_id, profile, record_dicts)
+
+    async def _run_agent_eval_async(
+        self,
+        student_id: str,
+        profile: Dict,
+        records: List[LearningRecord],
+    ) -> Dict:
+        """异步调用 EvaluateAgent（LLM 优先），返回 AI 增强字段"""
+        record_dicts = [self._record_to_dict(r) for r in records]
+        try:
+            raw = await self.evaluate_agent.evaluate(
+                student_id=student_id,
+                profile=profile,
+                records=record_dicts,
+                path=None,
+            )
+            return self._merge_agent_result(raw)
+        except Exception as exc:
+            logger.warning("EvaluateAgent 异步评估失败，使用规则兜底: %s", exc)
+            return self._fallback_ai_fields(student_id, profile, record_dicts)
+
+    def _fallback_ai_fields(
+        self,
+        student_id: str,
+        profile: Dict,
+        records: List[Dict],
+    ) -> Dict:
+        """当 Agent 完全不可用时，由 service 层直接生成 AI 字段"""
+        # 直接调用 agent 的静态规则方法（不依赖 LLM）
+        if self.evaluate_agent:
+            raw = self.evaluate_agent._rule_based_evaluate(
+                student_id=student_id,
+                profile=profile,
+                records=records,
+                path=None,
+            )
+            return self._merge_agent_result(raw)
+        return {
+            "dimensions": [],
+            "weak_topics": [],
+            "suggestions": ["暂无评估建议，请先完成一些学习任务"],
+            "review_plan": [],
+        }
+
+    @staticmethod
+    def _merge_agent_result(raw: str) -> Dict:
+        """解析 Agent 输出 JSON，提取 4 个 AI 增强字段"""
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("Agent 返回非 JSON，使用空 AI 字段")
+            return {
+                "dimensions": [],
+                "weak_topics": [],
+                "suggestions": [],
+                "review_plan": [],
+            }
+        return {
+            "dimensions": data.get("dimensions", []),
+            "weak_topics": data.get("weak_topics", []),
+            "suggestions": data.get("suggestions", []),
+            "review_plan": data.get("review_plan", []),
+        }
+
+    # ── 辅助 ──────────────────────────────────────────────
+
     def get_progress_stats(self, db: Session, student_id: str) -> Dict:
-        return self.build_report(db, student_id)["progress_stats"]
+        return self.build_report(db, student_id).get("progress_stats", {})
+
+    @staticmethod
+    def _query_records(db: Session, student_id: str) -> List[LearningRecord]:
+        return (
+            db.query(LearningRecord)
+            .filter(LearningRecord.student_id == student_id)
+            .order_by(LearningRecord.created_at.asc())
+            .all()
+        )
+
+    def _get_profile(self, db: Session, student_id: str) -> Dict:
+        """获取学生画像 dict（供 Agent 使用）"""
+        try:
+            profile = self.profile_service.get_profile(db, student_id)
+            return profile if isinstance(profile, dict) else {}
+        except Exception:
+            return {}
 
     @staticmethod
     def _record_to_dict(record: LearningRecord) -> Dict:
