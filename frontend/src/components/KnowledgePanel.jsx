@@ -89,9 +89,9 @@ export default function KnowledgePanel({
                   <div key={i} style={{
                     marginBottom: 12,
                     borderRadius: 10,
-                    border: '1px solid #e8e8e8',
+                    border: '1px solid var(--border)',
                     padding: 10,
-                    background: '#fafbfc',
+                    background: 'var(--surface-secondary)',
                   }}>
                     {d.title && (
                       <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: 'block' }}>
@@ -119,7 +119,7 @@ export default function KnowledgePanel({
                       padding: '8px 12px',
                       borderRadius: 8,
                       marginBottom: 6,
-                      background: '#f8f9fb',
+                      background: 'var(--surface-secondary)',
                       border: 'none',
                     }}>
                       <List.Item.Meta

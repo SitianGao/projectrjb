@@ -281,14 +281,14 @@ export default function HomePage() {
         ].map((stat) => (
           <div key={stat.title} style={{ flex: '1 1 180px', minWidth: 0, display: 'flex' }}>
             <Card hoverable className="tech-stat-card"
-              style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04)' }}>
+              style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04)' }}>
               <div style={{ position: 'absolute', left: 0, top: '15%', height: '70%', width: 3, borderRadius: '0 3px 3px 0', background: `linear-gradient(180deg, ${stat.color}, ${stat.color}cc)`, opacity: 0.8 }} />
               <Statistic
-                title={<Text style={{ color: '#595959', fontSize: 13, fontWeight: 500 }}>{stat.title}</Text>}
+                title={<Text style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500 }}>{stat.title}</Text>}
                 value={stat.value}
                 suffix={<span style={{ fontSize: 14 }}>{stat.suffix} {stat.trend}</span>}
                 prefix={React.cloneElement(stat.icon, { style: { color: stat.color } })}
-                valueStyle={{ color: '#1a1a2e', fontWeight: 700, fontSize: 24 }}
+                valueStyle={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 24 }}
               />
             </Card>
           </div>
@@ -300,10 +300,10 @@ export default function HomePage() {
         {/* 六维学习画像 */}
         <Col xs={24} md={9}>
           <Card
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
+            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
             styles={{ body: { display: 'flex', flexDirection: 'column', alignItems: 'center' } }}
           >
-            <Title level={5} style={{ color: '#1a1a2e', marginBottom: 8, textAlign: 'center' }}>
+            <Title level={5} style={{ color: 'var(--text-primary)', marginBottom: 8, textAlign: 'center' }}>
               <UserOutlined style={{ color: '#8b5cf6', marginRight: 6 }} />
               六维学习画像
             </Title>
@@ -315,7 +315,7 @@ export default function HomePage() {
         <Col xs={24} md={6}>
           <Card
             title="学习进度总览"
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
+            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
           >
             {progressStats && (
               <Space direction="vertical" size="large" style={{ width: '100%', paddingTop: 8 }}>
@@ -336,7 +336,7 @@ export default function HomePage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <Text style={{ fontSize: 13 }}>⏳ 未开始</Text>
-                    <Text strong style={{ color: '#d9d9d9' }}>{progressStats.notStartedTopics}/{progressStats.totalTopics}</Text>
+                    <Text strong style={{ color: 'var(--text-muted)' }}>{progressStats.notStartedTopics}/{progressStats.totalTopics}</Text>
                   </div>
                   <Progress percent={Math.round((progressStats.notStartedTopics / progressStats.totalTopics) * 100)} strokeColor="#d9d9d9" size="small" />
                 </div>
@@ -349,13 +349,13 @@ export default function HomePage() {
         <Col xs={24} md={9}>
           <Card
             title="📈 评分趋势"
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
+            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
             styles={{ body: { padding: '12px 8px' } }}
           >
             {evaluation?.history?.length > 0 ? (
               <ScoreTrendChart data={evaluation.history} height={235} />
             ) : (
-              <div style={{ textAlign: 'center', padding: 48, color: '#999' }}>暂无趋势数据</div>
+              <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>暂无趋势数据</div>
             )}
           </Card>
         </Col>
@@ -364,7 +364,7 @@ export default function HomePage() {
       {/* ========== 知识点得分明细表 ========== */}
       {evaluation?.topicScores?.length > 0 && (
         <Card title={<><TrophyOutlined style={{ color: '#aa3bff', marginRight: 8 }} />知识点得分明细</>}
-          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <Table dataSource={evaluation.topicScores} columns={topicColumns} rowKey="topic" pagination={false} size="small" />
         </Card>
       )}
@@ -372,13 +372,13 @@ export default function HomePage() {
       {/* ========== 知识点掌握度 ========== */}
       {profile?.topics?.length > 0 && (
         <Card title={<><BookOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />知识点掌握度</>}
-          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           {profile.topics.map((topic) => {
             const pct = Math.round(topic.accuracy * 100)
             return (
               <div key={topic.name} style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Text style={{ color: '#1a1a2e', fontSize: 13, fontWeight: 500 }}>{topic.name}</Text>
+                  <Text style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500 }}>{topic.name}</Text>
                   <Text className="tech-percent" style={{ fontSize: 13, fontWeight: 600, color: pct >= 80 ? '#52c41a' : pct >= 60 ? '#fa8c16' : '#ff4d4f' }}>{pct}%</Text>
                 </div>
                 <Progress percent={pct} size="small" showInfo={false}
@@ -393,7 +393,7 @@ export default function HomePage() {
       {/* ========== 评估历史 ========== */}
       {evaluation?.history?.length > 0 && (
         <Card title="评估历史"
-          style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <Table
             dataSource={evaluation.history}
             columns={[

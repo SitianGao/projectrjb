@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from 'react'
-import { Input, Button, Space, Avatar, Typography, Spin, Tooltip } from 'antd'
+import { Input, Button, Space, Avatar, Typography, Spin, Tooltip, Segmented } from 'antd'
 import {
   SendOutlined,
   UserOutlined,
@@ -8,6 +8,7 @@ import {
   ArrowDownOutlined,
 } from '@ant-design/icons'
 import MarkdownRenderer from './MarkdownRenderer'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { Text } = Typography
 
@@ -69,6 +70,14 @@ function ThinkingDots() {
   )
 }
 
+// ========== 解释风格选项 ==========
+const STYLE_OPTIONS = [
+  { label: '💡 类比', value: 'analogy' },
+  { label: '📐 公式', value: 'formula' },
+  { label: '📊 图解', value: 'diagram' },
+  { label: '📖 故事', value: 'story' },
+]
+
 // ========== 主组件 ==========
 export default function ChatBox({
   messages = MOCK_MESSAGES,
@@ -80,11 +89,17 @@ export default function ChatBox({
   emptyText = '开始一段对话吧',
   suggestions = [],
   onSuggestionClick,
+  defaultStyle = 'analogy',
+  showStyleSelector = true,
 }) {
+  const { resolved } = useTheme()
+  const isDark = resolved === 'dark'
+
   const listRef = useRef(null)
   const [inputValue, setInputValue] = useState('')
   const [showScrollBtn, setShowScrollBtn] = useState(false)
   const [focused, setFocused] = useState(false)
+  const [style, setStyle] = useState(defaultStyle)
 
   useEffect(() => { injectKeyframes() }, [])
 
@@ -116,10 +131,10 @@ export default function ChatBox({
   const handleSend = useCallback(() => {
     const text = inputValue.trim()
     if (!text || isLoading) return
-    onSend?.(text)
+    onSend?.(text, { style })
     setInputValue('')
     setTimeout(() => scrollToBottom(false), 60)
-  }, [inputValue, isLoading, onSend, scrollToBottom])
+  }, [inputValue, isLoading, onSend, scrollToBottom, style])
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
@@ -134,20 +149,46 @@ export default function ChatBox({
   const isEmpty = messages.length === 0
 
   return (
-    <div className="chatbox" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-card)' }}>
+    <div className="chatbox" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-card)', position: 'relative' }}>
+      {/* 解释风格选择器 — 置顶 */}
+      {showStyleSelector && (
+        <div style={{
+          borderBottom: '1px solid var(--border)',
+          padding: '10px 24px',
+          background: 'var(--bg-card)',
+          flexShrink: 0,
+          display: 'flex', justifyContent: 'center',
+          position: 'relative', zIndex: 2,
+        }}>
+          <Segmented
+            value={style}
+            onChange={setStyle}
+            options={STYLE_OPTIONS}
+            size="small"
+            style={{
+              background: 'var(--input-bar-bg, #f5f5f5)',
+              padding: 3,
+              borderRadius: 10,
+            }}
+          />
+        </div>
+      )}
+
       {/* 消息列表 */}
       <div ref={listRef} className="chatbox-list" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', minHeight: 0 }}>
         {isEmpty && showEmpty ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 300 }}>
             <div style={{
               width: 72, height: 72, borderRadius: 20,
-              background: 'linear-gradient(135deg, #f0e6ff 0%, #e6f0ff 100%)',
+              background: isDark
+                ? 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(22,119,255,0.08) 100%)'
+                : 'linear-gradient(135deg, #f0e6ff 0%, #e6f0ff 100%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginBottom: 20,
             }}>
               <RobotOutlined style={{ fontSize: 34, color: '#8b5cf6' }} />
             </div>
-            <Text style={{ fontSize: 16, fontWeight: 600, color: '#1a1a2e', marginBottom: 6 }}>有什么可以帮你的？</Text>
+            <Text style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>有什么可以帮你的？</Text>
             <Text type="secondary" style={{ fontSize: 13, marginBottom: 20 }}>{emptyText}</Text>
 
             {suggestions.length > 0 && (
@@ -155,15 +196,15 @@ export default function ChatBox({
                 {suggestions.map((s, i) => (
                   <div
                     key={i}
-                    onClick={() => onSuggestionClick?.(s)}
+                    onClick={() => onSuggestionClick?.(s, { style })}
                     style={{
                       padding: '8px 16px', borderRadius: 20, fontSize: 13,
-                      background: '#fff', border: '1px solid #e8e8e8',
+                      background: 'var(--bg-card)', border: '1px solid var(--border)',
                       cursor: 'pointer', transition: 'all 0.2s',
-                      color: '#595959',
+                      color: 'var(--text-secondary)',
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8b5cf6'; e.currentTarget.style.color = '#8b5cf6' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e8e8e8'; e.currentTarget.style.color = '#595959' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.color = '' }}
                   >
                     {s}
                   </div>
@@ -201,10 +242,12 @@ export default function ChatBox({
                       padding: '12px 18px',
                       borderRadius: isUser ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
                       background: isUser
-                        ? 'linear-gradient(135deg, #e6f4ff 0%, #f0f8ff 100%)'
-                        : '#fff',
-                      border: isUser ? '1px solid rgba(22,119,255,0.12)' : '1px solid #f0f0f0',
-                      boxShadow: isUser ? 'none' : '0 1px 3px rgba(0,0,0,0.04)',
+                        ? 'var(--msg-user-bg)'
+                        : 'var(--msg-bubble-bg)',
+                      border: isUser
+                        ? '1px solid var(--msg-user-border)'
+                        : '1px solid var(--msg-bubble-border)',
+                      boxShadow: isUser ? 'none' : (isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.04)'),
                     }}>
                       {isUser ? (
                         <Text style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: '1.6' }}>{msg.content}</Text>
@@ -251,18 +294,18 @@ export default function ChatBox({
 
       {/* 输入区 */}
       <div style={{
-        borderTop: '1px solid #f0f0f0', padding: '14px 24px 16px',
-        background: '#fff',
+        borderTop: '1px solid var(--border)', padding: '14px 24px 16px',
+        background: 'var(--bg-card)',
         flexShrink: 0,
         borderRadius: '0 0 12px 12px',
       }}>
         <div style={{ maxWidth: 800, margin: '0 auto', width: '100%' }}>
           <div style={{
             display: 'flex', gap: 8, alignItems: 'flex-end',
-            background: '#f5f6f8', borderRadius: 12, padding: '6px 6px 6px 16px',
+            background: 'var(--input-bar-bg)', borderRadius: 12, padding: '6px 6px 6px 16px',
             border: '1.5px solid transparent',
             transition: 'border-color 0.2s, box-shadow 0.2s',
-            ...(focused ? { borderColor: '#8b5cf6', boxShadow: '0 0 0 3px rgba(139,92,246,0.08)' } : {}),
+            ...(focused ? { borderColor: '#8b5cf6', boxShadow: isDark ? '0 0 0 3px rgba(139,92,246,0.15)' : '0 0 0 3px rgba(139,92,246,0.08)' } : {}),
           }}>
             <Input.TextArea
               value={inputValue}

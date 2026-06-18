@@ -54,9 +54,10 @@ const DOC_SECTIONS = [
     content: (
       <>
         <Paragraph style={{ fontSize: 14, lineHeight: 2 }}>
-          智能辅导模块提供<strong>实时 AI 对话</strong>功能。你可以：
+          智能辅导功能已集成到<strong>个人中心</strong>页面中。你可以：
         </Paragraph>
         <ul style={{ fontSize: 14, lineHeight: 2 }}>
+          <li>在个人中心右侧面板找到 AI 辅导老师</li>
           <li>向 AI 辅导老师提问任何学习问题</li>
           <li>上传题目让 AI 帮你分析和解答</li>
           <li>获得针对你薄弱环节的个性化建议</li>
@@ -64,7 +65,6 @@ const DOC_SECTIONS = [
         </ul>
         <Paragraph style={{ fontSize: 14, lineHeight: 2 }}>
           AI 采用<strong>流式 SSE 响应</strong>，打字机效果实时呈现答案，对话体验流畅自然。
-          底部 Tab 栏可以在<strong>学习资源</strong>和<strong>学习路径</strong>之间切换，一边对话一边查看相关内容。
         </Paragraph>
       </>
     ),
@@ -84,7 +84,7 @@ const DOC_SECTIONS = [
           <Tag color="orange">思维导图</Tag>
         </Space>
         <Paragraph style={{ fontSize: 14, lineHeight: 2 }}>
-          你可以在辅导页底部的<strong>资源 Tab</strong>中浏览和筛选资源。支持关键词搜索和类型过滤，
+          你可以在资源页中浏览和筛选资源。支持关键词搜索和类型过滤，
           点击资源卡片可以查看详情预览。平台还支持<strong>AI 自动生成</strong>定制化学习资源。
         </Paragraph>
       </>

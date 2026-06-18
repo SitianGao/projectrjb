@@ -8,6 +8,7 @@ import {
   BulbOutlined,
   EditOutlined,
 } from '@ant-design/icons'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { Text } = Typography
 
@@ -35,6 +36,9 @@ export default function ProgressBar({
   message = '',
   error = '',
 }) {
+  const { resolved } = useTheme()
+  const isDark = resolved === 'dark'
+
   const isRunning = status === 'pending' || status === 'running'
   const isCompleted = status === 'completed'
   const isFailed = status === 'failed'
@@ -83,13 +87,13 @@ export default function ProgressBar({
             <CloseCircleOutlined style={{ fontSize: 48 }} />
           ) : (
             <span>
-              {displayPercent}
+              {Math.round(displayPercent)}
               <span style={{ fontSize: 28, fontWeight: 500 }}>%</span>
             </span>
           )}
         </div>
         {message && (
-          <Text style={{ fontSize: 14, color: '#6b7280', marginTop: 6, display: 'block' }}>
+          <Text style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 6, display: 'block' }}>
             {isRunning && <LoadingOutlined style={{ marginRight: 6 }} spin />}
             {message}
           </Text>
@@ -102,7 +106,7 @@ export default function ProgressBar({
           style={{
             height: 6,
             borderRadius: 3,
-            background: '#f3f4f6',
+            background: 'var(--progress-track)',
             overflow: 'hidden',
             position: 'relative',
           }}
@@ -185,23 +189,23 @@ export default function ProgressBar({
                       fontSize: 16,
                       transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                       background: isDone || isCompleted
-                        ? 'linear-gradient(135deg, #dcfce7, #f0fdf4)'
+                        ? (isDark ? 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(34,197,94,0.05))' : 'linear-gradient(135deg, #dcfce7, #f0fdf4)')
                         : isCurrent
-                          ? 'linear-gradient(135deg, #ede9fe, #f5f3ff)'
-                          : '#f9fafb',
+                          ? (isDark ? 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(124,58,237,0.05))' : 'linear-gradient(135deg, #ede9fe, #f5f3ff)')
+                          : 'var(--surface-secondary)',
                       border: `2px solid ${
                         isDone || isCompleted
                           ? '#22c55e'
                           : isCurrent
                             ? '#7c3aed'
-                            : '#e5e7eb'
+                            : 'var(--border)'
                       }`,
                       color:
                         isDone || isCompleted
                           ? '#22c55e'
                           : isCurrent
                             ? '#7c3aed'
-                            : '#d1d5db',
+                            : 'var(--text-muted)',
                       position: 'relative',
                     }}
                   >
@@ -229,7 +233,7 @@ export default function ProgressBar({
                         ? '#22c55e'
                         : isCurrent
                           ? '#7c3aed'
-                          : '#9ca3af',
+                          : 'var(--text-muted)',
                       whiteSpace: 'nowrap',
                       transition: 'color 0.3s',
                     }}
@@ -248,7 +252,7 @@ export default function ProgressBar({
                       borderRadius: 1,
                       background: isDone || isCompleted
                         ? 'linear-gradient(90deg, #22c55e, #86efac)'
-                        : '#f3f4f6',
+                        : 'var(--progress-track)',
                       transition: 'background 0.6s',
                     }}
                   />
@@ -268,8 +272,8 @@ export default function ProgressBar({
             marginRight: 16,
             padding: '10px 14px',
             borderRadius: 8,
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
+            background: isDark ? 'rgba(220,38,38,0.08)' : '#fef2f2',
+            border: isDark ? '1px solid rgba(220,38,38,0.2)' : '1px solid #fecaca',
           }}
         >
           <Text style={{ fontSize: 12, color: '#dc2626' }}>{error}</Text>

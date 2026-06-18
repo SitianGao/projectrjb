@@ -33,9 +33,10 @@ export async function updateProfile(studentId, data) {
  * @param {string} params.message          — 当前轮用户消息
  * @param {string[]} [params.history]      — 历史对话消息
  * @param {object} [params.current_profile] — 已有画像（增量更新时传入）
+ * @param {string} [params.style] — 解释风格：analogy | formula | diagram | story
  * @returns {Promise<Response>} fetch Response，SSE 流
  */
-export async function startProfileChat({ student_id, message, history, current_profile } = {}) {
+export async function startProfileChat({ student_id, message, history, current_profile, style } = {}) {
   const response = await fetch('/api/profile/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -44,6 +45,7 @@ export async function startProfileChat({ student_id, message, history, current_p
       message,
       ...(history && { history }),
       ...(current_profile && { current_profile }),
+      ...(style && { style }),
     }),
   })
   if (!response.ok) {

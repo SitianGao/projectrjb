@@ -12,9 +12,9 @@ import {
   UserOutlined,
   BulbOutlined,
   SafetyOutlined,
-  ArrowRightOutlined,
   StarOutlined,
   CheckCircleOutlined,
+  TrophyOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -23,10 +23,11 @@ const { Title, Text, Paragraph } = Typography
 
 // 核心功能
 const MODULES = [
-  { key: 'tutor', icon: <RobotOutlined />, title: '智能辅导', desc: 'AI 辅导老师随时待命，解答疑问、批改作业，提供个性化学习建议', route: '/tutor', color: '#8b5cf6' },
-  { key: 'resource', icon: <BookOutlined />, title: '学习资源', desc: '海量资源库，涵盖文档、练习题、思维导图，支持 AI 智能生成', route: '/tutor', color: '#1677ff' },
-  { key: 'path', icon: <CompassOutlined />, title: '学习路径', desc: 'AI 根据学习画像定制个性化路线，分阶段达成学习目标', route: '/tutor', color: '#52c41a' },
-  { key: 'profile', icon: <BarChartOutlined />, title: '学习画像', desc: '六维雷达图 + 评分趋势，全面掌握学习状态与进步轨迹', route: '/', color: '#fa8c16' },
+  { key: 'profile', icon: <BarChartOutlined />, title: '学习画像', desc: '六维雷达图 + 评分趋势，全面掌握学习状态与进步轨迹', route: '/home', color: '#fa8c16' },
+  { key: 'resource', icon: <BookOutlined />, title: '学习资源', desc: '海量资源库，涵盖文档、练习题、思维导图，支持 AI 智能生成', route: '/resources', color: '#1677ff' },
+  { key: 'path', icon: <CompassOutlined />, title: '学习路径', desc: 'AI 根据学习画像定制个性化路线，分阶段达成学习目标', route: '/learning-path/1', color: '#52c41a' },
+  { key: 'tutor', icon: <RobotOutlined />, title: '智能辅导', desc: 'AI 辅导老师随时待命，解答疑问、批改作业，提供个性化学习建议', route: '/', color: '#8b5cf6' },
+  { key: 'evaluate', icon: <TrophyOutlined />, title: '学习评估', desc: '综合评分 + 知识点掌握度分析，精准定位强弱项，追踪学习趋势', route: '/home', color: '#eb2f96' },
 ]
 
 // 亮点
@@ -155,15 +156,14 @@ export default function LandingPage() {
           <Title level={2} style={{ fontSize: TITLE_FONT_SIZE, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
             核心功能
           </Title>
-          <Text type="secondary" style={{ fontSize: 16 }}>四大模块协同工作，为你提供完整的学习闭环</Text>
+          <Text type="secondary" style={{ fontSize: 16 }}>五大模块协同工作，为你提供完整的学习闭环</Text>
         </div>
 
-        <Row gutter={[20, 20]}>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           {MODULES.map((mod) => (
-            <Col xs={24} sm={12} lg={6} key={mod.key}>
+            <div key={mod.key} style={{ flex: '1 1 180px', minWidth: 0 }}>
               <Card
                 hoverable
-                onClick={() => navigate(mod.route)}
                 className="home-module-card"
                 style={{
                   borderRadius: 16, height: '100%', border: 'none', boxShadow: 'none',
@@ -188,13 +188,10 @@ export default function LandingPage() {
                   {mod.desc}
                 </Text>
 
-                <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 4, color: mod.color, fontSize: 13, fontWeight: 500 }}>
-                  立即体验 <ArrowRightOutlined style={{ fontSize: 12 }} />
-                </div>
               </Card>
-            </Col>
+            </div>
           ))}
-        </Row>
+        </div>
       </div>
 
       {/* ==================== 学习流程 ==================== */}

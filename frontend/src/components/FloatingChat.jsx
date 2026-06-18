@@ -11,6 +11,13 @@ const SUGGESTIONS = [
   '推荐适合我的学习资源',
 ]
 
+const STYLE_PROMPTS = {
+  analogy: '请用生动的生活类比和比喻来解释以下问题：',
+  formula: '请用严谨的数学公式和推导步骤来解释以下问题：',
+  diagram: '请用文字描述流程图或使用 mermaid 语法画图的方式来解释以下问题：',
+  story: '请用一个有趣的故事或真实案例来讲解以下知识点：',
+}
+
 /**
  * 右下角悬浮对话按钮 + 抽屉式对话窗格
  */
@@ -18,7 +25,12 @@ export default function FloatingChat() {
   const [open, setOpen] = useState(false)
 
   const streamFetcher = useCallback(
-    (message, signal) => startProfileChat({ student_id: 'demo-student-01', message }),
+    (message, signal, options) => {
+      const style = options?.style
+      const stylePrompt = STYLE_PROMPTS[style]
+      const styledMsg = stylePrompt ? `${stylePrompt}\n\n${message}` : message
+      return startProfileChat({ student_id: 'demo-student-01', message: styledMsg, style })
+    },
     [],
   )
 
@@ -88,7 +100,7 @@ export default function FloatingChat() {
             onAbort={abort}
             placeholder="说说你的学习情况..."
             suggestions={SUGGESTIONS}
-            onSuggestionClick={(text) => sendMessage(text)}
+            onSuggestionClick={(text, opts) => sendMessage(text, opts)}
           />
         </div>
       </Drawer>
