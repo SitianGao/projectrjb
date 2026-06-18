@@ -15,14 +15,14 @@ import {
 import LoadingSkeleton from './components/LoadingSkeleton'
 import NotificationCenter from './components/NotificationCenter'
 import { useAuth } from './contexts/AuthContext'
-import { ThemeProvider, useTheme, THEMES } from './contexts/ThemeContext'
+import { useTheme, THEMES } from './contexts/ThemeContext'
 import './App.css'
 
 // 页面组件懒加载
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
-const TutorPage = lazy(() => import('./pages/TutorPage'))
+
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
@@ -124,7 +124,7 @@ function AuthLayout() {
           <Dropdown menu={{
             items: Object.values(THEMES).map((t) => ({
               key: t.key,
-              icon: t.icon === 'sun' ? <SunOutlined /> : t.icon === 'moon' ? <MoonOutlined /> : <SunOutlined style={{ opacity: 0.5 }} />,
+              icon: t.icon === 'sun' ? <SunOutlined /> : <MoonOutlined />,
               label: t.label,
               onClick: () => setMode(t.key),
             })),
@@ -158,7 +158,7 @@ function AuthLayout() {
             <Route path="/" element={<ProfilePage />} />
             <Route path="/home" element={<HomePage />} />
             <Route path="/landing" element={<LandingPage />} />
-            <Route path="/tutor" element={<TutorPage />} />
+
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/resources" element={<ResourcePage />} />
             <Route path="/learning-path/:pathId" element={<LearningPathPage />} />
@@ -178,34 +178,32 @@ function RequireAuth({ children }) {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-        {/* 登录/注册/忘记密码 — 独立页面，不需要布局 */}
-        <Route path="/forgot-password" element={
-          <Suspense fallback={<LoadingSkeleton type="detail" />}>
-            <ForgotPasswordPage />
-          </Suspense>
-        } />
-        <Route path="/login" element={
-          <Suspense fallback={<LoadingSkeleton type="detail" />}>
-            <LoginPage />
-          </Suspense>
-        } />
-        <Route path="/register" element={
-          <Suspense fallback={<LoadingSkeleton type="detail" />}>
-            <RegisterPage />
-          </Suspense>
-        } />
+    <BrowserRouter>
+      <Routes>
+      {/* 登录/注册/忘记密码 — 独立页面，不需要布局 */}
+      <Route path="/forgot-password" element={
+        <Suspense fallback={<LoadingSkeleton type="detail" />}>
+          <ForgotPasswordPage />
+        </Suspense>
+      } />
+      <Route path="/login" element={
+        <Suspense fallback={<LoadingSkeleton type="detail" />}>
+          <LoginPage />
+        </Suspense>
+      } />
+      <Route path="/register" element={
+        <Suspense fallback={<LoadingSkeleton type="detail" />}>
+          <RegisterPage />
+        </Suspense>
+      } />
 
-        {/* 需要登录的页面 */}
-        <Route path="/*" element={
-          <RequireAuth>
-            <AuthLayout />
-          </RequireAuth>
-        } />
-      </Routes>
-    </BrowserRouter>
-    </ThemeProvider>
+      {/* 需要登录的页面 */}
+      <Route path="/*" element={
+        <RequireAuth>
+          <AuthLayout />
+        </RequireAuth>
+      } />
+    </Routes>
+  </BrowserRouter>
   )
 }

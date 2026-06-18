@@ -573,8 +573,8 @@ export default function ResourcePage() {
       {/* ── 生成进度区 ── */}
       {isRunning && (
         <div style={{
-          background: '#fff', borderRadius: 12, padding: '24px 32px',
-          border: '1px solid #f0f0f0',
+          background: 'var(--bg-card)', borderRadius: 12, padding: '24px 32px',
+          border: '1px solid var(--border)',
         }}>
           <ProgressBar
             status={status}
@@ -591,7 +591,7 @@ export default function ResourcePage() {
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', minHeight: 320,
-          background: '#fafafa', borderRadius: 12, gap: 16,
+          background: 'var(--surface-secondary)', borderRadius: 12, gap: 16,
         }}>
           <ProgressBar
             status="failed"
@@ -623,7 +623,7 @@ export default function ResourcePage() {
         ) : isCompleted && resultResources.length === 0 ? (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            minHeight: 320, background: '#fafafa', borderRadius: 12,
+            minHeight: 320, background: 'var(--surface-secondary)', borderRadius: 12,
           }}>
             <Empty description={<Text type="secondary">没有匹配的资源</Text>} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           </div>
@@ -638,7 +638,7 @@ export default function ResourcePage() {
         ) : (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            minHeight: 320, background: '#fafafa', borderRadius: 12,
+            minHeight: 320, background: 'var(--surface-secondary)', borderRadius: 12,
           }}>
             <Empty description={<Text type="secondary">暂无资源，先输入主题生成</Text>} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           </div>
@@ -651,9 +651,9 @@ export default function ResourcePage() {
         open={!!detailResource}
         onCancel={() => setDetailResource(null)}
         footer={null}
-        width={800}
-        style={{ top: 24 }}
-        styles={{ body: { maxHeight: '70vh', overflow: 'auto', padding: '24px 32px' } }}
+        width={960}
+        style={{ top: 40 }}
+        styles={{ body: { maxHeight: '80vh', overflow: 'auto', padding: '24px 32px' } }}
       >
         {detailResource && <MarkdownRenderer content={detailResource.content} />}
       </Modal>

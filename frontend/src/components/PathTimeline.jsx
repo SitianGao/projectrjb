@@ -14,6 +14,7 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons'
 import { SKILL_TAGS, RESOURCE_TYPES } from '../mock/learningPathData'
+import { useTheme } from '../contexts/ThemeContext'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -67,6 +68,16 @@ export default function PathTimeline({
   onNodeClick,
 }) {
   const [expandedId, setExpandedId] = useState(null)
+  const { resolved } = useTheme()
+  const isDark = resolved === 'dark'
+
+  // 深色模式下的阶段卡片背景
+  const darkBgMap = {
+    completed: 'rgba(82,196,26,0.06)',
+    in_progress: 'rgba(22,119,255,0.06)',
+    pending: 'rgba(255,255,255,0.02)',
+    locked: 'rgba(255,255,255,0.015)',
+  }
 
   // 统一数据源：优先使用 stages
   const items = stages || nodes || []
@@ -80,7 +91,7 @@ export default function PathTimeline({
     return (
       <Card>
         <div style={{ textAlign: 'center', padding: 48 }}>
-          <BookOutlined style={{ fontSize: 40, color: '#d9d9d9' }} />
+          <BookOutlined style={{ fontSize: 40, color: 'var(--text-muted)' }} />
           <Paragraph type="secondary" style={{ marginTop: 16 }}>暂无学习路径，点击上方按钮生成</Paragraph>
         </div>
       </Card>
@@ -170,10 +181,10 @@ export default function PathTimeline({
                 boxShadow: isActive ? `0 0 0 4px ${cfg.color}30` : 'none',
               }}
             >
-              <Icon style={{ fontSize: 14, color: stageStatus === 'pending' || stageStatus === 'locked' ? '#999' : '#fff' }} />
+              <Icon style={{ fontSize: 14, color: stageStatus === 'pending' || stageStatus === 'locked' ? 'var(--text-muted)' : '#fff' }} />
             </div>
             {!isLast && (
-              <div className="timeline-line" style={{ background: stageStatus === 'completed' ? '#52c41a' : '#e8e8e8' }} />
+              <div className="timeline-line" style={{ background: stageStatus === 'completed' ? '#52c41a' : 'var(--border)' }} />
             )}
           </div>
 
@@ -187,7 +198,7 @@ export default function PathTimeline({
               }
             }}
             style={{
-              background: cfg.bg,
+              background: isDark ? darkBgMap[stageStatus] : cfg.bg,
               borderColor: isActive ? cfg.color : 'transparent',
               cursor: stageStatus === 'locked' ? 'default' : 'pointer',
               opacity: stageStatus === 'locked' ? 0.6 : 1,
@@ -197,8 +208,8 @@ export default function PathTimeline({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <Space size={8}>
-                  <FlagFilled style={{ color: isActive ? '#1677ff' : '#999' }} />
-                  <Text strong style={{ fontSize: 15, color: stageStatus === 'locked' ? '#999' : '#1a1a2e' }}>
+                  <FlagFilled style={{ color: isActive ? '#1677ff' : 'var(--text-muted)' }} />
+                  <Text strong style={{ fontSize: 15, color: stageStatus === 'locked' ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                     第{stage.stage_id}阶段：{stage.title}
                   </Text>
                   <Tag color={cfg.color === '#d9d9d9' ? 'default' : cfg.color}>{cfg.label}</Tag>
@@ -219,7 +230,7 @@ export default function PathTimeline({
                 {stageStatus !== 'locked' && (
                   <CaretRightOutlined
                     style={{
-                      fontSize: 12, color: '#999',
+                      fontSize: 12, color: 'var(--text-muted)',
                       transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s',
                     }}
@@ -260,7 +271,7 @@ export default function PathTimeline({
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
                           padding: '6px 10px', borderRadius: 6,
-                          background: '#fff', border: '1px solid #f0f0f0',
+                          background: 'var(--surface-secondary)', border: '1px solid var(--border)',
                           fontSize: 13,
                         }}
                       >
@@ -306,10 +317,10 @@ export default function PathTimeline({
                 boxShadow: isActive ? `0 0 0 4px ${cfg.color}30` : 'none',
               }}
             >
-              <Icon style={{ fontSize: 14, color: node.status === 'pending' || node.status === 'locked' ? '#999' : '#fff' }} />
+              <Icon style={{ fontSize: 14, color: node.status === 'pending' || node.status === 'locked' ? 'var(--text-muted)' : '#fff' }} />
             </div>
             {!isLast && (
-              <div className="timeline-line" style={{ background: node.status === 'completed' ? '#52c41a' : '#e8e8e8' }} />
+              <div className="timeline-line" style={{ background: node.status === 'completed' ? '#52c41a' : 'var(--border)' }} />
             )}
           </div>
 
@@ -323,7 +334,7 @@ export default function PathTimeline({
               }
             }}
             style={{
-              background: cfg.bg,
+              background: isDark ? darkBgMap[node.status] : cfg.bg,
               borderColor: isActive ? cfg.color : 'transparent',
               cursor: node.status === 'locked' ? 'default' : 'pointer',
               opacity: node.status === 'locked' ? 0.6 : 1,
@@ -333,7 +344,7 @@ export default function PathTimeline({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <Space size={8}>
-                  <Text strong style={{ fontSize: 15, color: node.status === 'locked' ? '#999' : '#1a1a2e' }}>
+                  <Text strong style={{ fontSize: 15, color: node.status === 'locked' ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                     {node.title}
                   </Text>
                   <Tag color={cfg.color === '#d9d9d9' ? 'default' : cfg.color}>{cfg.label}</Tag>
@@ -359,7 +370,7 @@ export default function PathTimeline({
                 {node.status !== 'locked' && (
                   <CaretRightOutlined
                     style={{
-                      fontSize: 12, color: '#999',
+                      fontSize: 12, color: 'var(--text-muted)',
                       transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s',
                     }}
@@ -400,7 +411,7 @@ export default function PathTimeline({
                         style={{
                           display: 'flex', alignItems: 'center', gap: 8,
                           padding: '6px 10px', borderRadius: 6,
-                          background: '#fff', border: '1px solid #f0f0f0',
+                          background: 'var(--surface-secondary)', border: '1px solid var(--border)',
                           fontSize: 13,
                         }}
                       >

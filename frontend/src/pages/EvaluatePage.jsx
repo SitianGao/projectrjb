@@ -147,7 +147,7 @@ export default function EvaluatePage() {
     ? `graph LR\n${evaluation.history.map((h, i) => {
         const next = evaluation.history[i + 1]
         const trend = next ? (next.score >= h.score ? '↑' : '↓') : ''
-        return `  D${i}["${h.date.slice(5)}<br/>${h.score}分"]${next ? ` -->|${trend}| D${i + 1}` : ''}`
+        return `  D${i}["${h.date.slice(5)}<br>${h.score}分"]${next ? ` -->|${trend}| D${i + 1}` : ''}`
       }).join('\n')}\n  classDef up fill:#f6ffed,stroke:#52c41a\n  classDef down fill:#fff2f0,stroke:#ff4d4f`
     : ''
 

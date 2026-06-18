@@ -27,7 +27,7 @@ const typeConfig = {
  */
 export default function ResourceCard({ resource, onClick, onDownload, loading = false, showContent = false }) {
   if (loading) {
-    return <Card loading style={{ borderRadius: 12, border: '1px solid #f0f0f0' }} />
+    return <Card loading style={{ borderRadius: 12, border: '1px solid var(--border)' }} />
   }
 
   if (!resource) {
@@ -47,7 +47,7 @@ export default function ResourceCard({ resource, onClick, onDownload, loading = 
       style={{
         height: '100%',
         borderRadius: 12,
-        border: '1px solid #f0f0f0',
+        border: '1px solid var(--border)',
         transition: 'box-shadow 0.25s, transform 0.25s',
       }}
       styles={{ body: { padding: '20px 22px', display: 'flex', flexDirection: 'column', height: '100%' } }}
@@ -62,7 +62,7 @@ export default function ResourceCard({ resource, onClick, onDownload, loading = 
           {showContent && (
             <Tooltip title="点击查看详情">
               <ExpandOutlined
-                style={{ color: '#94a3b8', cursor: 'pointer', fontSize: 15 }}
+                style={{ color: 'var(--text-muted)', cursor: 'pointer', fontSize: 15 }}
                 onClick={(e) => {
                   e.stopPropagation()
                   onClick?.(resource)
@@ -85,8 +85,8 @@ export default function ResourceCard({ resource, onClick, onDownload, loading = 
               maxHeight: 300,
               overflow: 'auto',
               padding: '8px 0',
-              borderTop: '1px solid #f1f5f9',
-              borderBottom: '1px solid #f1f5f9',
+              borderTop: '1px solid var(--border)',
+              borderBottom: '1px solid var(--border)',
             }}
           >
             <MarkdownRenderer content={resource.content} compact />
