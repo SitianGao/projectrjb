@@ -17,7 +17,7 @@ from agents.planner_agent import PlannerAgent
 from agents.resource_agent import ResourceAgent
 from agents.tutor_agent import TutorAgent
 from agents.orchestrator import AgentOrchestrator
-from rag import default_retriever
+from rag.retriever import default_retriever
 from services.profile_service import ProfileService
 from services.planner_service import PlannerService
 from services.resource_service import ResourceService
@@ -48,6 +48,6 @@ orchestrator.register_agents(
     profile_agent,
     planner_agent,
     resource_agent,
-    tutor_agent,
+    tutor_agent,  # tutor_agent — Day 9
     None,  # evaluate_agent — Day 10
 )

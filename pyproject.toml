@@ -1,0 +1,7 @@
+[tool.pytest.ini_options]
+# 自动识别 async def test_* 为异步测试，无需 @pytest.mark.asyncio 装饰器
+asyncio_mode = "auto"
+# 测试发现路径
+testpaths = ["test"]
+# 默认异步 fixture 作用域
+asyncio_default_fixture_loop_scope = "function"

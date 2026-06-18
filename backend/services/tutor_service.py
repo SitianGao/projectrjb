@@ -1,4 +1,8 @@
-"""Tutor chat service."""
+"""Tutor chat service —— 集成 TutorAgent + RAG 检索（Day 8）
+
+SSE 事件类型: start | delta | data | error | done
+data 事件携带: {references: [{title, source, content, similarity}]}
+"""
 
 from __future__ import annotations
 
@@ -9,7 +13,11 @@ from typing import Any, Dict, List, Optional
 
 
 class TutorService:
-    """Provides SSE tutor chat and lightweight in-memory sessions."""
+    """提供 SSE tutor chat 和轻量内存会话管理。
+
+    Day 8 升级：集成 TutorAgent 风格系统 + RAG 知识检索。
+    依赖通过 deps.py 注入，不在 service 内部直接 import agent 或 rag。
+    """
 
     def __init__(self, llm_client, profile_service, tutor_agent=None, retriever=None):
         self.llm_client = llm_client
@@ -18,6 +26,8 @@ class TutorService:
         self.retriever = retriever
         self._sessions: Dict[str, Dict] = {}
         self._messages: Dict[str, List[Dict]] = {}
+
+    # ---- 会话管理 ----
 
     def list_sessions(self, student_id: str) -> Dict:
         sessions = [
@@ -44,6 +54,8 @@ class TutorService:
         self._sessions[session_id] = session
         self._messages[session_id] = []
         return session
+
+    # ---- 核心：流式辅导对话（Day 8 升级版） ----
 
     async def chat_stream(
         self,
@@ -107,6 +119,7 @@ class TutorService:
         self._messages.setdefault(session_id, []).append({
             "role": "assistant",
             "content": answer,
+            "references": references,
             "created_at": _now_iso(),
         })
         self._touch_session(session_id)
