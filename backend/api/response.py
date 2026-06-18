@@ -6,12 +6,16 @@ contract moves clients to success/data/message.
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any, Optional
 
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = logging.getLogger(__name__)
 
 
 def ok(data: Any = None, message: str = "ok") -> dict:
@@ -39,6 +43,19 @@ def error_payload(code: str, message: str) -> dict:
 
 def fail(code: str, message: str, status_code: int = 400) -> JSONResponse:
     return JSONResponse(status_code=status_code, content=error_payload(code, message))
+
+
+def sse_error(code: str, message: str) -> str:
+    payload = {
+        "type": "error",
+        "code": code,
+        "message": message,
+    }
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def sse_done() -> str:
+    return 'data: {"type":"done"}\n\n'
 
 
 class ApiError(Exception):
@@ -83,3 +100,8 @@ async def validation_exception_handler(
     first_error: Optional[dict] = exc.errors()[0] if exc.errors() else None
     message = first_error.get("msg", "参数校验失败") if first_error else "参数校验失败"
     return fail("VALIDATION_ERROR", message, 422)
+
+
+async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled API error: %s %s", request.method, request.url.path)
+    return fail("INTERNAL_SERVER_ERROR", "服务器内部错误，请稍后重试", 500)

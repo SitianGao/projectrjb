@@ -301,18 +301,40 @@ type 可选，document/exercise/code/mindmap/reading
   "student_id": "demo-student-01",
   "message": "请解释一下二次函数顶点式",
   "session_id": "可选",
-  "history": ["可选历史消息"]
+  "history": ["可选历史消息"],
+  "explanation_style": "auto",
+  "top_k": 3
 }
+```
+
+`explanation_style` 可选值：
+
+```text
+auto | analogy | formula | visual | story
 ```
 
 SSE 事件：
 
 ```text
 data: {"type":"start","session_id":"...","message":"开始生成辅导回复"}
-data: {"type":"chat","content":"..."}
+data: {"type":"delta","content":"...","delta":"..."}
+data: {"type":"data","data":{"answer":"...","explanation_style":"analogy","references":[],"diagrams":[],"session_id":"..."}}
 data: {"type":"error","code":"LLM_ERROR","message":"..."}
 data: {"type":"done","session_id":"..."}
 ```
+
+`references[]` 标准结构：
+
+```json
+{
+  "title": "文档标题",
+  "source": "来源文件",
+  "content": "知识片段",
+  "similarity": 0.82
+}
+```
+
+兼容接口：`POST /api/tutor/ask`、`POST /api/tutor/ask/stream` 暂时保留，内部复用 `/api/tutor/chat` 同一套逻辑。
 
 ### GET `/api/tutor/sessions?student_id=demo-student-01`
 

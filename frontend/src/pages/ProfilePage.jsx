@@ -23,6 +23,7 @@ import MindMapViewer from '../components/MindMapViewer'
 import MermaidChart from '../components/MermaidChart'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import PathTimeline from '../components/PathTimeline'
+import ForgettingCurve from '../components/ForgettingCurve'
 import FloatingChat from '../components/FloatingChat'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { useChat } from '../hooks/useChat'
@@ -33,6 +34,9 @@ import { getTutorSessions, createTutorSession } from '../api/tutor'
 import ResourcePage from '../pages/ResourcePage'
 import { mockPath, mockStats } from '../mock/learningPathData'
 import { formatRelativeTime } from '../utils/format'
+import { shouldUseMock } from '../utils/useMock'
+
+const USE_MOCK = shouldUseMock()
 
 const { Title, Text, Paragraph } = Typography
 
@@ -42,6 +46,14 @@ const SUGGESTIONS = [
   '推荐适合我的学习资源',
   '制定一个学习计划',
 ]
+
+// 解释风格 → 提示词前缀
+const STYLE_PROMPTS = {
+  analogy: '请用生动的生活类比和比喻来解释以下问题，让我能通过熟悉的事物直观理解：',
+  formula: '请用严谨的数学公式、推导步骤和逻辑论证来解释以下问题：',
+  diagram: '请用文字描述流程图或使用 mermaid 语法画图的方式来解释以下问题，让结构一目了然：',
+  story: '请用一个有趣的故事或真实案例来讲解以下知识点，让我在情境中自然理解：',
+}
 
 const TYPE_OPTIONS = [
   { value: '', label: '全部类型' },
@@ -69,10 +81,12 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
       const data = await getTutorSessions(studentId)
       setSessions(Array.isArray(data) ? data : data?.sessions || [])
     } catch {
-      setSessions([
-        { id: 's1', title: '二次函数答疑', updatedAt: new Date(), messageCount: 12 },
-        { id: 's2', title: '英语语法解惑', updatedAt: new Date(Date.now() - 86400000), messageCount: 8 },
-      ])
+      if (USE_MOCK) {
+        setSessions([
+          { id: 's1', title: '二次函数答疑', updatedAt: new Date(), messageCount: 12 },
+          { id: 's2', title: '英语语法解惑', updatedAt: new Date(Date.now() - 86400000), messageCount: 8 },
+        ])
+      }
     } finally { setLoadingSessions(false) }
   }
 
@@ -91,8 +105,8 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
       width: collapsed ? 44 : 260,
       flexShrink: 0,
       display: 'flex',
-      borderRight: '1px solid rgba(255,255,255,0.06)',
-      background: 'rgba(255,255,255,0.04)',
+      borderRight: '1px solid var(--sidebar-border)',
+      background: 'var(--sidebar-bg)',
       transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       overflow: 'hidden',
       height: '100%',
@@ -114,7 +128,7 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
         opacity: collapsed ? 0 : 1,
         transition: 'opacity 0.15s',
       }}>
-        <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--sidebar-border, rgba(255,255,255,0.06))' }}>
           <Space size={4}>
             <MessageOutlined style={{ color: '#8b5cf6' }} />
             <Text strong style={{ fontSize: 13 }}>辅导会话</Text>
@@ -139,8 +153,8 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
               <List.Item onClick={() => setActiveId(s.id)}
                 style={{
                   cursor: 'pointer', padding: '8px 12px',
-                  background: s.id === activeId ? '#e6f4ff' : 'transparent',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                  background: s.id === activeId ? 'var(--session-highlight)' : 'transparent',
+                  borderBottom: '1px solid var(--sidebar-border)',
                 }}>
                 <List.Item.Meta
                   title={<Text style={{ fontSize: 13 }}>{s.title}</Text>}
@@ -176,12 +190,14 @@ function ResourcePanel() {
       const data = await getResources({ page, page_size: 12, keyword, type: type || undefined })
       setResources(Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [])
     } catch {
-      setResources([
-        { id: '1', type: 'document', title: '二次函数知识点总结', description: '核心概念与常见题型', tags: ['数学', '函数'], createdAt: new Date() },
-        { id: '2', type: 'quiz', title: '力学基础练习题', description: '牛顿三大定律、受力分析', tags: ['物理', '力学'], createdAt: new Date() },
-        { id: '3', type: 'mindmap', title: '英语语法体系', description: '时态、语态、从句框架', tags: ['英语', '语法'], createdAt: new Date() },
-        { id: '4', type: 'document', title: '电路分析方法', description: '基尔霍夫定律核心方法', tags: ['物理', '电学'], createdAt: new Date() },
-      ])
+      if (USE_MOCK) {
+        setResources([
+          { id: '1', type: 'document', title: '二次函数知识点总结', description: '核心概念与常见题型', tags: ['数学', '函数'], createdAt: new Date() },
+          { id: '2', type: 'quiz', title: '力学基础练习题', description: '牛顿三大定律、受力分析', tags: ['物理', '力学'], createdAt: new Date() },
+          { id: '3', type: 'mindmap', title: '英语语法体系', description: '时态、语态、从句框架', tags: ['英语', '语法'], createdAt: new Date() },
+          { id: '4', type: 'document', title: '电路分析方法', description: '基尔霍夫定律核心方法', tags: ['物理', '电学'], createdAt: new Date() },
+        ])
+      }
     } finally { setLoading(false) }
   }
 
@@ -206,14 +222,14 @@ function ResourcePanel() {
             ))}
           </Row>
           {preview && (
-            <div style={{ marginTop: 24, borderTop: '1px solid #f0f0f0', paddingTop: 20 }}>
+            <div style={{ marginTop: 24, borderTop: '1px solid var(--border)', paddingTop: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
                 <Title level={5} style={{ margin: 0 }}>预览：{preview.title}</Title>
                 <Button size="small" onClick={() => setPreview(null)}>关闭</Button>
               </div>
               {preview.type === 'mindmap' ? <MindMapViewer content={`# ${preview.title}\n## ${preview.description}`} />
                 : preview.type === 'document' ? <MarkdownRenderer content={`# ${preview.title}\n\n${preview.description}`} />
-                  : <MermaidChart chart={`graph TD\n  A[${preview.title}] --> B[基础]\n  A --> C[进阶]`} />}
+                  : <MermaidChart chart={`graph TD\n  A["${String(preview.title).replace(/"/g, '\\"')}"] --> B["基础"]\n  A --> C["进阶"]`} />}
             </div>
           )}
         </>
@@ -233,7 +249,7 @@ function LearningPathPanel() {
   async function loadPath() {
     setLoading(true)
     try { const data = await getLearningPath('demo-student-01'); setPathData(data) }
-    catch { setTimeout(() => { setPathData(mockPath); setLoading(false) }, 600); return }
+    catch { if (USE_MOCK) { setTimeout(() => { setPathData(mockPath); setLoading(false) }, 600); return } }
     setLoading(false)
   }
 
@@ -254,7 +270,7 @@ function LearningPathPanel() {
           }
         }
       }
-    } catch (err) { message.error('生成失败'); setPathData(mockPath) }
+    } catch (err) { message.error('生成失败'); if (USE_MOCK) setPathData(mockPath) }
     finally { setGenerating(false) }
   }
 
@@ -279,12 +295,13 @@ function LearningPathPanel() {
         <Col xs={12} sm={6}><Card size="small"><Statistic title="学习时长" value={mockStats.totalStudyTime} prefix={<ClockCircleOutlined style={{ color: '#fa8c16' }} />} /></Card></Col>
         <Col xs={12} sm={6}><Card size="small"><Statistic title="连续学习" value={mockStats.streak} suffix="天" prefix={<FireOutlined style={{ color: '#eb2f96' }} />} /></Card></Col>
       </Row>
+      <ForgettingCurve compact style={{ marginBottom: 16 }} />
       {pathData ? (
         <PathTimeline title={pathData.title} stages={stages} overallProgress={pathData.overallProgress}
           onStageClick={(s) => console.log('Stage:', s.title)} />
       ) : (
         <Card><div style={{ textAlign: 'center', padding: 32 }}>
-          <BookOutlined style={{ fontSize: 32, color: '#d9d9d9' }} />
+          <BookOutlined style={{ fontSize: 32, color: 'var(--text-muted)' }} />
           <Paragraph type="secondary" style={{ marginTop: 12 }}>还没有学习路径</Paragraph>
           <Button type="primary" icon={<ThunderboltOutlined />} onClick={handleGenerate} loading={generating}>AI 生成学习路径</Button>
         </div></Card>
@@ -306,7 +323,12 @@ export default function ProfilePage() {
   }, [])
 
   const streamFetcher = useCallback(
-    (msg, signal) => startProfileChat({ student_id: 'demo-student-01', message: msg }),
+    (msg, signal, options) => {
+      const style = options?.style
+      const stylePrompt = STYLE_PROMPTS[style]
+      const styledMsg = stylePrompt ? `${stylePrompt}\n\n${msg}` : msg
+      return startProfileChat({ student_id: 'demo-student-01', message: styledMsg, style })
+    },
     [],
   )
   const { messages, isLoading, sendMessage, abort } = useChat({
@@ -318,7 +340,7 @@ export default function ProfilePage() {
       content: '你好！我是你的专属学习助手 🤖\n\n让我们来聊聊你的学习情况吧：\n- 你的年级和目标？\n- 你擅长或不擅长的科目？\n- 你更喜欢的学习方式（看视频📺、读书📖、做题✏️）？\n\n告诉我这些，我会为你定制最佳学习路径！',
     }],
   })
-  const handleSuggestion = useCallback((t) => sendMessage(t), [sendMessage])
+  const handleSuggestion = useCallback((t, opts) => sendMessage(t, opts), [sendMessage])
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--bg-page)' }}>
@@ -341,11 +363,11 @@ export default function ProfilePage() {
         {/* 对话区 */}
         <div style={{
           display: 'flex', flexDirection: 'column',
-          padding: '64px 24px 0',
+          padding: '20px 24px 0',
           background: 'var(--bg-chat)',
         }}>
           {/* 项目标题 */}
-          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
             <Title level={2} style={{ margin: 0, fontWeight: 700, background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: 2 }}>
               🤖 智能学习平台
             </Title>
@@ -354,12 +376,12 @@ export default function ProfilePage() {
 
           {/* ChatBox 卡片 */}
           <div style={{
-            height: 350,
+            height: 480,
             maxWidth: 800, margin: '0 auto', width: '100%',
             borderRadius: 16,
             overflow: 'hidden',
             background: 'var(--bg-card)',
-            border: '1px solid #e8e8ed',
+            border: '1px solid var(--border)',
             boxShadow: '0 2px 8px rgba(0,0,0,0.04), 0 12px 32px rgba(139,92,246,0.06)',
           }}>
             <ChatBox

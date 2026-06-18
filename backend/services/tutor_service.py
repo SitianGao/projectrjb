@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import datetime
 import json
-import re
 import uuid
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class TutorService:
@@ -20,11 +19,11 @@ class TutorService:
     依赖通过 deps.py 注入，不在 service 内部直接 import agent 或 rag。
     """
 
-    def __init__(self, llm_client, profile_service, tutor_agent, retriever):
+    def __init__(self, llm_client, profile_service, tutor_agent=None, retriever=None):
         self.llm_client = llm_client
         self.profile_service = profile_service
-        self._agent = tutor_agent
-        self._retriever = retriever
+        self.tutor_agent = tutor_agent
+        self.retriever = retriever
         self._sessions: Dict[str, Dict] = {}
         self._messages: Dict[str, List[Dict]] = {}
 
@@ -64,21 +63,14 @@ class TutorService:
         student_id: str,
         message: str,
         session_id: Optional[str] = None,
-        history: Optional[List[str]] = None,  # noqa: ARG001 (reserved for future use)
+        history: Optional[List[str]] = None,
         explanation_style: str = "auto",
+        top_k: int = 3,
     ):
-        """Stream tutor answers as SSE events.
-
-        Day 8 流程:
-        1. 获取学生画像
-        2. RAG 检索知识库
-        3. TutorAgent 生成（含风格 + RAG 上下文）
-        4. SSE 流式输出, data 事件包含 references
-        """
+        """Stream tutor answers as unified SSE events with RAG references."""
         self.profile_service.get_or_create_student(db, student_id)
         profile = self.profile_service.get_profile(db, student_id)
 
-        # ---- 会话初始化 ----
         if not session_id or session_id not in self._sessions:
             session = self.create_session(student_id, title=message[:24] or "辅导会话")
             session_id = session["session_id"]
@@ -91,89 +83,116 @@ class TutorService:
         })
         self._touch_session(session_id)
 
-        # ---- SSE: start ----
-        yield (
-            f'data: {{"type":"start","session_id":"{session_id}",'
-            f'"message":"正在检索知识库…"}}\n\n'
-        )
+        yield _sse_event("start", session_id=session_id, message="开始生成辅导回复")
 
-        # ---- RAG 检索 ----
-        rag_refs: List[Dict] = []
-        try:
-            rag_results = self._retriever.retrieve(message, top_k=3, min_similarity=0.3)
-            if rag_results:
-                rag_refs = [
-                    {
-                        "title": r["title"],
-                        "source": r["source"],
-                        "content": r["content"][:200],
-                        "similarity": r["similarity"],
-                    }
-                    for r in rag_results
-                ]
-        except Exception:
-            # RAG 检索失败时静默降级，不中断流程
-            yield f'data: {{"type":"error","message":"知识库检索暂不可用，将基于通用知识回答"}}\n\n'
+        references = self._retrieve_references(message, top_k=top_k)
+        context = _references_to_context(references)
+        if not context:
+            context = ["资料库中未找到可靠依据。回答时请明确说明资料不足，不要编造来源。"]
 
-        # ---- TutorAgent 生成（含 RAG 上下文 + 风格） ----
         try:
-            result = await self._agent.tutor_with_rag(
+            result = await self._build_tutor_result(
                 question=message,
-                retriever=self._retriever,
-                explanation_style=explanation_style,
                 profile=profile,
+                context=context,
+                explanation_style=explanation_style,
+                references=references,
             )
-        except Exception:
-            # RAG 降级：直接调用基础 tutor
-            try:
-                raw = await self._agent.tutor(
-                    question=message,
-                    explanation_style=explanation_style,
-                    profile=profile,
-                )
-                result = json.loads(raw)
-            except Exception:
-                # 完全兜底：返回错误信息
-                yield f'data: {{"type":"error","message":"问答生成失败，请稍后重试"}}\n\n'
-                yield f'data: {{"type":"done","session_id":"{session_id}"}}\n\n'
-                return
+        except Exception as exc:
+            fallback = "AI 服务暂时不可用。你可以先把题目、已知条件和卡住的步骤发给我，我会按解题步骤帮你拆解。"
+            yield _sse_event("error", code="LLM_ERROR", message=str(exc))
+            result = {
+                "answer": fallback,
+                "explanation_style": _normalize_style(explanation_style),
+                "references": references,
+                "diagrams": [],
+                "session_id": session_id,
+            }
 
-        answer = result.get("answer", "")
-        used_style = result.get("explanation_style", explanation_style)
-        references = result.get("references", rag_refs)
-        diagrams = result.get("diagrams", [])
+        answer = result.get("answer") or ""
+        for chunk in _chunk_text(answer):
+            yield _sse_event("delta", content=chunk, delta=chunk)
 
-        # ---- SSE: delta (流式输出答案) ----
-        # 按句子拆分模拟流式效果
-        sentences = re.split(r'(?<=[。！？\n])', answer)
-        for sentence in sentences:
-            if sentence:
-                escaped = json.dumps(sentence, ensure_ascii=False)
-                yield f'data: {{"type":"delta","content":{escaped}}}\n\n'
+        result["session_id"] = session_id
+        yield _sse_event("data", data=result)
 
-        # ---- SSE: data (结构化结果) ----
-        data_payload = json.dumps({
-            "answer": answer,
-            "explanation_style": used_style,
-            "references": references,
-            "diagrams": diagrams,
-        }, ensure_ascii=False)
-        yield f'data: {{"type":"data","data":{data_payload}}}\n\n'
-
-        # ---- 保存消息 ----
         self._messages.setdefault(session_id, []).append({
             "role": "assistant",
             "content": answer,
             "references": references,
-            "style": used_style,
             "created_at": _now_iso(),
         })
         self._touch_session(session_id)
+        yield _sse_event("done", session_id=session_id)
 
-        # ---- SSE: done ----
-        yield f'data: {{"type":"done","session_id":"{session_id}"}}\n\n'
+    def _retrieve_references(self, message: str, top_k: int = 3) -> List[Dict]:
+        if not self.retriever:
+            return []
+        try:
+            rows = self.retriever.retrieve(
+                query=message,
+                top_k=max(1, min(top_k or 3, 8)),
+                min_similarity=0.3,
+            )
+        except Exception:
+            return []
 
-    # ---- 内部 ----
+        references = []
+        for row in rows:
+            references.append({
+                "title": row.get("title") or row.get("source") or "参考资料",
+                "source": row.get("source") or "unknown",
+                "content": (row.get("content") or "")[:500],
+                "similarity": row.get("similarity"),
+            })
+        return references
+
+    async def _build_tutor_result(
+        self,
+        question: str,
+        profile: Optional[Dict],
+        context: List[str],
+        explanation_style: str,
+        references: List[Dict],
+    ) -> Dict:
+        style = _normalize_style(explanation_style)
+        if self.tutor_agent:
+            raw = await self.tutor_agent.tutor(
+                question=question,
+                context=context,
+                explanation_style=style,
+                profile=profile,
+            )
+            result = _parse_agent_result(raw)
+        else:
+            result = await self._llm_fallback(question, profile, context)
+
+        result["answer"] = result.get("answer") or "暂时无法生成回答，请稍后重试。"
+        result["explanation_style"] = _normalize_style(result.get("explanation_style") or style)
+        result["references"] = references or _normalize_reference_list(result.get("references"))
+        result["diagrams"] = _normalize_list(result.get("diagrams"))
+        return result
+
+    async def _llm_fallback(
+        self,
+        question: str,
+        profile: Optional[Dict],
+        context: List[str],
+    ) -> Dict:
+        system_prompt = (
+            "你是 EduAgent 的智能辅导老师。回答要准确、分步骤、适合学生水平；"
+            "如果资料不足，请明确说明不确定，不要编造。"
+        )
+        user_prompt = _build_tutor_prompt(question, profile, context)
+        chunks = []
+        async for chunk in self.llm_client.chat_stream(system=system_prompt, user=user_prompt):
+            chunks.append(chunk)
+        return {
+            "answer": "".join(chunks),
+            "explanation_style": "auto",
+            "references": [],
+            "diagrams": [],
+        }
 
     def _touch_session(self, session_id: str):
         session = self._sessions.get(session_id)
@@ -185,6 +204,91 @@ class TutorService:
         session["messageCount"] = count
         session["updated_at"] = now
         session["updatedAt"] = now
+
+
+def _build_tutor_prompt(message: str, profile: Optional[Dict], history: Optional[List[str]]) -> str:
+    parts = ["## 学生问题", message]
+    if profile:
+        parts.append("\n## 学生画像")
+        parts.append(json.dumps(profile, ensure_ascii=False, indent=2))
+    if history:
+        parts.append("\n## 最近对话")
+        parts.extend(history[-10:])
+    parts.append("\n请用中文回答，先给结论，再分步骤解释，最后给一个可执行的练习建议。")
+    return "\n".join(parts)
+
+
+def _parse_agent_result(raw: Any) -> Dict:
+    if isinstance(raw, dict):
+        return dict(raw)
+    if not isinstance(raw, str):
+        return {"answer": str(raw)}
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.startswith("json"):
+            text = text[4:].strip()
+    try:
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else {"answer": text}
+    except json.JSONDecodeError:
+        return {"answer": raw}
+
+
+def _references_to_context(references: List[Dict]) -> List[str]:
+    context = []
+    for item in references:
+        title = item.get("title") or "参考资料"
+        source = item.get("source") or "unknown"
+        content = item.get("content") or ""
+        if content:
+            context.append(f"[{title} | {source}]\n{content}")
+    return context
+
+
+def _normalize_reference_list(value: Any) -> List[Dict]:
+    if not value:
+        return []
+    items = value if isinstance(value, list) else [value]
+    references = []
+    for item in items:
+        if isinstance(item, dict):
+            references.append({
+                "title": item.get("title") or item.get("source") or "参考资料",
+                "source": item.get("source") or "unknown",
+                "content": item.get("content") or item.get("text") or "",
+                "similarity": item.get("similarity"),
+            })
+        else:
+            references.append({
+                "title": str(item),
+                "source": "agent",
+                "content": "",
+                "similarity": None,
+            })
+    return references
+
+
+def _normalize_list(value: Any) -> List:
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _normalize_style(value: Optional[str]) -> str:
+    allowed = {"auto", "analogy", "formula", "visual", "story"}
+    return value if value in allowed else "auto"
+
+
+def _chunk_text(text: str, size: int = 80) -> List[str]:
+    if not text:
+        return []
+    return [text[index:index + size] for index in range(0, len(text), size)]
+
+
+def _sse_event(event_type: str, **payload) -> str:
+    data = {"type": event_type, **payload}
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 def _now_iso() -> str:

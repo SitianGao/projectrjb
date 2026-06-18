@@ -41,3 +41,8 @@ export async function getResourceTypes() {
 export async function bookmarkResource(resourceId) {
   return client.post(`/resources/${resourceId}/bookmark`)
 }
+
+// 查询异步任务状态（轮询用）
+export async function getTaskStatus(taskId) {
+  return client.get(`/task/${taskId}/status`)
+}

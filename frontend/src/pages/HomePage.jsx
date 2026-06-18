@@ -20,8 +20,11 @@ import RadarChart from '../components/RadarChart'
 import ScoreTrendChart from '../components/ScoreTrendChart'
 import ProgressBar from '../components/ProgressBar'
 import { deriveDimensions } from '../components/ProfileCard'
+import { shouldUseMock } from '../utils/useMock'
 
 const { Title, Text } = Typography
+
+const USE_MOCK = shouldUseMock()
 
 const STUDENT_ID = 'demo-student-01'
 
@@ -84,8 +87,8 @@ export default function HomePage() {
         ])
         if (cancelled) return
 
-        // 画像降级 Mock
-        setProfile(profileData || {
+        // 画像降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setProfile(profileData || (USE_MOCK ? {
           name: '张同学',
           level: '中级',
           progress: 68,
@@ -100,10 +103,10 @@ export default function HomePage() {
             { name: '英语语法', accuracy: 0.55 },
             { name: '三角函数', accuracy: 0.88 },
           ],
-        })
+        } : null))
 
-        // 评估降级 Mock
-        setEvaluation(evalData || {
+        // 评估降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setEvaluation(evalData || (USE_MOCK ? {
           overallScore: 78,
           recentTrend: 'up',
           completedTasks: 24,
@@ -123,14 +126,15 @@ export default function HomePage() {
             { date: '2026-06-06', score: 77, tasks: 4 },
             { date: '2026-06-07', score: 78, tasks: 3 },
           ],
-        })
+        } : null))
 
-        setProgressStats(statsData || {
+        // 学习进度降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setProgressStats(statsData || (USE_MOCK ? {
           totalTopics: 12,
           masteredTopics: 5,
           learningTopics: 4,
           notStartedTopics: 3,
-        })
+        } : null))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -140,8 +144,23 @@ export default function HomePage() {
     return () => { cancelled = true }
   }, [])
 
-  // 模拟生成评估
+  // 生成评估（Mock 模式下模拟进度，正式模式直接调接口）
   async function handleGenerate() {
+    if (!USE_MOCK) {
+      // 正式模式：直接调接口 + 轮询
+      try {
+        const data = await getEvaluation(STUDENT_ID)
+        setEvaluation(data)
+        const stats = await getProgressStats(STUDENT_ID)
+        if (stats) setProgressStats(stats)
+        message.success('评估已刷新')
+      } catch (err) {
+        message.error('获取评估失败: ' + (err.message || '未知错误'))
+      }
+      return
+    }
+
+    // Mock 模式：模拟生成进度
     setGenerating(true)
     setGenProgress(0)
     const timer = setInterval(() => {
@@ -262,14 +281,14 @@ export default function HomePage() {
         ].map((stat) => (
           <div key={stat.title} style={{ flex: '1 1 180px', minWidth: 0, display: 'flex' }}>
             <Card hoverable className="tech-stat-card"
-              style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04)' }}>
+              style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04)' }}>
               <div style={{ position: 'absolute', left: 0, top: '15%', height: '70%', width: 3, borderRadius: '0 3px 3px 0', background: `linear-gradient(180deg, ${stat.color}, ${stat.color}cc)`, opacity: 0.8 }} />
               <Statistic
-                title={<Text style={{ color: '#595959', fontSize: 13, fontWeight: 500 }}>{stat.title}</Text>}
+                title={<Text style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500 }}>{stat.title}</Text>}
                 value={stat.value}
                 suffix={<span style={{ fontSize: 14 }}>{stat.suffix} {stat.trend}</span>}
                 prefix={React.cloneElement(stat.icon, { style: { color: stat.color } })}
-                valueStyle={{ color: '#1a1a2e', fontWeight: 700, fontSize: 24 }}
+                valueStyle={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 24 }}
               />
             </Card>
           </div>
@@ -281,10 +300,10 @@ export default function HomePage() {
         {/* 六维学习画像 */}
         <Col xs={24} md={9}>
           <Card
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
+            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
             styles={{ body: { display: 'flex', flexDirection: 'column', alignItems: 'center' } }}
           >
-            <Title level={5} style={{ color: '#1a1a2e', marginBottom: 8, textAlign: 'center' }}>
+            <Title level={5} style={{ color: 'var(--text-primary)', marginBottom: 8, textAlign: 'center' }}>
               <UserOutlined style={{ color: '#8b5cf6', marginRight: 6 }} />
               六维学习画像
             </Title>
@@ -296,7 +315,7 @@ export default function HomePage() {
         <Col xs={24} md={6}>
           <Card
             title="学习进度总览"
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
+            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
           >
             {progressStats && (
               <Space direction="vertical" size="large" style={{ width: '100%', paddingTop: 8 }}>
@@ -317,7 +336,7 @@ export default function HomePage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <Text style={{ fontSize: 13 }}>⏳ 未开始</Text>
-                    <Text strong style={{ color: '#d9d9d9' }}>{progressStats.notStartedTopics}/{progressStats.totalTopics}</Text>
+                    <Text strong style={{ color: 'var(--text-muted)' }}>{progressStats.notStartedTopics}/{progressStats.totalTopics}</Text>
                   </div>
                   <Progress percent={Math.round((progressStats.notStartedTopics / progressStats.totalTopics) * 100)} strokeColor="#d9d9d9" size="small" />
                 </div>
@@ -330,13 +349,13 @@ export default function HomePage() {
         <Col xs={24} md={9}>
           <Card
             title="📈 评分趋势"
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
+            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
             styles={{ body: { padding: '12px 8px' } }}
           >
             {evaluation?.history?.length > 0 ? (
               <ScoreTrendChart data={evaluation.history} height={235} />
             ) : (
-              <div style={{ textAlign: 'center', padding: 48, color: '#999' }}>暂无趋势数据</div>
+              <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>暂无趋势数据</div>
             )}
           </Card>
         </Col>
@@ -345,7 +364,7 @@ export default function HomePage() {
       {/* ========== 知识点得分明细表 ========== */}
       {evaluation?.topicScores?.length > 0 && (
         <Card title={<><TrophyOutlined style={{ color: '#aa3bff', marginRight: 8 }} />知识点得分明细</>}
-          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <Table dataSource={evaluation.topicScores} columns={topicColumns} rowKey="topic" pagination={false} size="small" />
         </Card>
       )}
@@ -353,13 +372,13 @@ export default function HomePage() {
       {/* ========== 知识点掌握度 ========== */}
       {profile?.topics?.length > 0 && (
         <Card title={<><BookOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />知识点掌握度</>}
-          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           {profile.topics.map((topic) => {
             const pct = Math.round(topic.accuracy * 100)
             return (
               <div key={topic.name} style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Text style={{ color: '#1a1a2e', fontSize: 13, fontWeight: 500 }}>{topic.name}</Text>
+                  <Text style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500 }}>{topic.name}</Text>
                   <Text className="tech-percent" style={{ fontSize: 13, fontWeight: 600, color: pct >= 80 ? '#52c41a' : pct >= 60 ? '#fa8c16' : '#ff4d4f' }}>{pct}%</Text>
                 </div>
                 <Progress percent={pct} size="small" showInfo={false}
@@ -374,7 +393,7 @@ export default function HomePage() {
       {/* ========== 评估历史 ========== */}
       {evaluation?.history?.length > 0 && (
         <Card title="评估历史"
-          style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
           <Table
             dataSource={evaluation.history}
             columns={[

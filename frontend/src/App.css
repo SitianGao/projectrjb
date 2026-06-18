@@ -13,6 +13,22 @@
   --topbar-text: #1a1a2e;
   --sidebar-bg: rgba(255,255,255,0.04);
   --sidebar-border: rgba(0,0,0,0.06);
+  /* ── 新增语义 token ── */
+  --surface-secondary: #fafbfc;
+  --input-bar-bg: #f5f6f8;
+  --progress-track: #f3f4f6;
+  --session-highlight: #e6f4ff;
+  --md-code-bg: #f1f5f9;
+  --md-code-text: #7c3aed;
+  --md-border: #e2e8f0;
+  --md-th-bg: #f1f5f9;
+  --md-blockquote-bg: #f8f7ff;
+  --md-blockquote-text: #475569;
+  --msg-bubble-bg: #fff;
+  --msg-bubble-border: #f0f0f0;
+  --msg-user-bg: linear-gradient(135deg, #e6f4ff 0%, #f0f8ff 100%);
+  --msg-user-border: rgba(22,119,255,0.12);
+  --scrollbar-thumb: #c1c1c1;
 }
 
 [data-theme='dark'] {
@@ -28,6 +44,24 @@
   --topbar-text: rgba(255,255,255,0.9);
   --sidebar-bg: rgba(255,255,255,0.03);
   --sidebar-border: rgba(255,255,255,0.06);
+  /* ── 新增语义 token ── */
+  --surface-secondary: rgba(255,255,255,0.025);
+  --input-bar-bg: rgba(255,255,255,0.05);
+  --progress-track: rgba(255,255,255,0.06);
+  --session-highlight: rgba(22,119,255,0.1);
+  --md-code-bg: rgba(255,255,255,0.06);
+  --md-code-text: #a78bfa;
+  --md-border: rgba(255,255,255,0.08);
+  --md-th-bg: rgba(255,255,255,0.04);
+  --md-blockquote-bg: rgba(139,92,246,0.05);
+  --md-blockquote-text: #94a3b8;
+  --msg-bubble-bg: rgba(255,255,255,0.04);
+  --msg-bubble-border: rgba(255,255,255,0.06);
+  --msg-user-bg: linear-gradient(135deg, rgba(22,119,255,0.1) 0%, rgba(22,119,255,0.04) 100%);
+  --msg-user-border: rgba(22,119,255,0.15);
+  --scrollbar-thumb: rgba(255,255,255,0.2);
+  /* ── 阴影 ── */
+  --shadow: rgba(0,0,0,0.45) 0 10px 15px -3px, rgba(0,0,0,0.3) 0 4px 6px -2px;
 }
 
 /* ===== 布局 ===== */
@@ -49,7 +83,7 @@
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  color: #595959;
+  color: var(--text-secondary);
   font-size: 18px;
   cursor: pointer;
   transition: all 0.2s;
@@ -78,7 +112,7 @@
   background: rgba(139, 92, 246, 0.06);
 }
 .top-user-name {
-  color: #1a1a2e;
+  color: var(--text-primary);
   font-size: 13px;
   max-width: 80px;
   overflow: hidden;
@@ -110,7 +144,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--bg-page);
   padding: 48px;
   max-height: 100vh;
   overflow-y: auto;
@@ -185,6 +219,20 @@
   top: 50%; left: 30%;
   animation-delay: -1s;
   background: rgba(255, 255, 255, 0.4);
+}
+
+/* 深色模式：登录页 */
+[data-theme='dark'] .login-left {
+  background: linear-gradient(160deg, #0f172a 0%, #0d1638 30%, #0f1a40 60%, #111130 100%);
+}
+[data-theme='dark'] .deco-circle {
+  background: rgba(139, 92, 246, 0.06);
+}
+[data-theme='dark'] .deco-circle.c4 {
+  background: rgba(139, 92, 246, 0.04);
+}
+[data-theme='dark'] .char-group-hint {
+  color: rgba(255, 255, 255, 0.45);
 }
 
 /* 响应式 */
@@ -379,7 +427,7 @@
 
 /* ===== 页面卡片容器 ===== */
 .page-card {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 8px;
   padding: 24px;
 }
@@ -391,7 +439,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
@@ -522,7 +570,7 @@
 }
 .stat-mini-card .ant-statistic-title {
   font-size: 13px;
-  color: #8c8c8c;
+  color: var(--text-muted);
 }
 .stat-mini-card .ant-statistic-content {
   font-size: 22px;
@@ -614,8 +662,16 @@
   border-color: #1677ff;
 }
 
+[data-theme='dark'] .timeline-card:not(.locked):hover {
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+[data-theme='dark'] .timeline-card.active {
+  box-shadow: 0 2px 12px rgba(22, 119, 255, 0.18);
+}
+
 .timeline-resources {
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--border);
   padding-top: 12px;
 }
 
@@ -623,7 +679,7 @@
   transition: background 0.2s;
 }
 .resource-item:hover {
-  background: #f0f5ff !important;
+  background: var(--session-highlight) !important;
 }
 
 /* ===== 对话全屏页面 ===== */
@@ -633,10 +689,7 @@
   flex-direction: column;
   align-items: center;
   padding: 0 24px;
-  background:
-    radial-gradient(ellipse at 20% 50%, rgba(139,92,246,0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(22,119,255,0.03) 0%, transparent 50%),
-    #f7f8fa;
+  background: var(--bg-page);
 }
 
 .chat-page-header {
@@ -651,9 +704,9 @@
   min-height: 0;
   width: 100%;
   max-width: 800px;
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 16px;
-  border: 1px solid #e5e4e7;
+  border: 1px solid var(--border);
   box-shadow: 0 2px 4px rgba(0,0,0,0.03), 0 8px 24px rgba(0,0,0,0.06);
   overflow: hidden;
   display: flex;
@@ -674,16 +727,16 @@
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
-  color: #595959;
-  background: #fff;
-  border: 1px solid #e8e8e8;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   cursor: pointer;
   transition: all 0.2s;
 }
 .chat-quick-link:hover {
   color: #8b5cf6;
   border-color: #d4c8f5;
-  background: #f9f7ff;
+  background: rgba(139,92,246,0.06);
 }
 
 /* ===== 主页（平台介绍）样式 ===== */
@@ -757,26 +810,31 @@
   }
 }
 
-/* ===== 辅导页底部资源/路径 Tab  ===== */
-.tutor-bottom-tabs {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+/* ===== 深色模式：卡片 hover 阴影 ===== */
+[data-theme='dark'] .tech-stat-card:hover {
+  box-shadow: 0 8px 25px rgba(139,92,246,0.12), 0 0 0 1px rgba(170,59,255,0.25);
 }
-.tutor-bottom-tabs > .ant-tabs-nav {
-  margin-bottom: 0 !important;
-  flex-shrink: 0;
+[data-theme='dark'] .tech-quick-card:hover {
+  box-shadow: 0 8px 25px rgba(139,92,246,0.12), 0 0 0 1px rgba(170,59,255,0.3);
 }
-.tutor-bottom-tabs > .ant-tabs-content-holder {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+[data-theme='dark'] .tech-profile-card:hover {
+  box-shadow: 0 8px 25px rgba(139,92,246,0.1), 0 0 0 1px rgba(170,59,255,0.2);
 }
-.tutor-bottom-tabs > .ant-tabs-content-holder > .ant-tabs-content {
-  height: 100%;
+[data-theme='dark'] .tech-profile-chat:hover {
+  box-shadow: 0 8px 25px rgba(139,92,246,0.1), 0 0 0 1px rgba(170,59,255,0.2);
 }
-.tutor-bottom-tabs .ant-tabs-tabpane {
-  height: 100%;
-  overflow-y: auto;
+[data-theme='dark'] .stat-mini-card:hover {
+  box-shadow: 0 4px 16px rgba(139,92,246,0.1);
+}
+[data-theme='dark'] .home-module-card:hover {
+  box-shadow: 0 12px 32px rgba(139,92,246,0.1);
+}
+[data-theme='dark'] .home-highlight-card:hover {
+  box-shadow: 0 8px 24px rgba(139,92,246,0.08);
+}
+[data-theme='dark'] .home-tech-item:hover {
+  box-shadow: 0 6px 16px rgba(139,92,246,0.06);
+}
+[data-theme='dark'] .path-main-card {
+  box-shadow: 0 2px 12px rgba(139,92,246,0.06);
 }

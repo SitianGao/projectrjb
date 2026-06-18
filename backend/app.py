@@ -13,6 +13,7 @@ from database import init_db
 from api.response import (
     ApiError,
     api_error_handler,
+    generic_exception_handler,
     http_exception_handler,
     ok,
     validation_exception_handler,
@@ -40,6 +41,7 @@ app.add_middleware(
 app.add_exception_handler(ApiError, api_error_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
 
 
 # ---- 注册各模块路由 ----

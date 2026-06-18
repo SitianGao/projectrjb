@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 /**
  * 通用对话 Hook
@@ -7,37 +7,107 @@ import { useState, useCallback, useRef } from 'react'
  * 不绑定具体 API —— 调用方传入 streamFetcher 来对接不同后端。
  *
  * @param {Object} options
- * @param {Function} options.streamFetcher - (message: string, signal?: AbortSignal) => Promise<Response>
- *   发起流式请求，返回 fetch Response。body 应为 SSE 流或纯文本流。
+ * @param {Function} options.streamFetcher - (message: string, signal?: AbortSignal, sendOptions?: object) => Promise<Response>
+ *   发起流式请求，返回 fetch Response。body 应为 SSE 流或纯文本流。sendOptions 为 sendMessage 透传的附加参数。
  * @param {Array} options.initialMessages - 初始消息列表
  * @param {Function} options.onProfileUpdate - (profile: object) => void
  *   当 SSE 返回 profile_update 事件时回调，传入更新后的画像数据
+ * @param {Function} options.onSSEEvent - (event: object) => void
+ *   当 SSE 返回结构化事件（含 diagrams/references 等字段）时回调
  * @returns {{
  *   messages: Array<{id, role, content}>,
  *   isLoading: boolean,
- *   sendMessage: (content: string) => Promise<void>,
+ *   sendMessage: (content: string, options?: object) => Promise<void>,
  *   clearMessages: () => void,
  *   abort: () => void,
  * }}
  */
-export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate } = {}) {
+export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate, onSSEEvent } = {}) {
   const [messages, setMessages] = useState(initialMessages)
+  const [displayedMessages, setDisplayedMessages] = useState(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
   const abortRef = useRef(null)
   const idCounter = useRef(0)
+  const typewriterTimerRef = useRef(null)
+  const displayedPosRef = useRef(0)
 
   const nextId = useCallback(() => {
     idCounter.current += 1
     return `msg-${Date.now()}-${idCounter.current}`
   }, [])
 
+  // ========== 逐字打字机动画 ==========
+  useEffect(() => {
+    // 清理前一个定时器
+    const clearTimer = () => {
+      if (typewriterTimerRef.current) {
+        clearInterval(typewriterTimerRef.current)
+        typewriterTimerRef.current = null
+      }
+    }
+
+    if (!isLoading) {
+      // 流式结束 → 立即同步全部内容
+      setDisplayedMessages(messages)
+      displayedPosRef.current = 0
+      clearTimer()
+      return
+    }
+
+    // 找到正在流式填充的 assistant 消息
+    const lastMsg = messages[messages.length - 1]
+    if (!lastMsg || lastMsg.role !== 'assistant') {
+      clearTimer()
+      return
+    }
+
+    const targetContent = lastMsg.content
+    const targetLen = targetContent.length
+
+    // 如果内容没变且已经追上了，不需要重新启动定时器
+    if (displayedPosRef.current >= targetLen) {
+      clearTimer()
+      return
+    }
+
+    clearTimer()
+
+    typewriterTimerRef.current = setInterval(() => {
+      if (displayedPosRef.current >= targetLen) {
+        clearTimer()
+        return
+      }
+
+      // 自适应速度：落后较多时快一些，接近时逐字出现
+      const lag = targetLen - displayedPosRef.current
+      const charsPerTick = lag > 30 ? 2 : 1
+      displayedPosRef.current += charsPerTick
+      // 防止越界
+      if (displayedPosRef.current > targetLen) {
+        displayedPosRef.current = targetLen
+      }
+
+      setDisplayedMessages((prev) => {
+        const updated = [...prev]
+        const last = { ...updated[updated.length - 1] }
+        last.content = targetContent.slice(0, displayedPosRef.current)
+        updated[updated.length - 1] = last
+        return updated
+      })
+    }, 25) // ~25ms/tick
+
+    return clearTimer
+  }, [messages, isLoading])
+
   const sendMessage = useCallback(
-    async (content) => {
+    async (content, options = {}) => {
       if (!content?.trim() || !streamFetcher) return
 
       const userMsg = { id: nextId(), role: 'user', content }
       setMessages((prev) => [...prev, userMsg])
       setIsLoading(true)
+      // 重置打字机位置
+      displayedPosRef.current = 0
 
       const assistantId = nextId()
       // 先插入一条空的 assistant 消息用于流式填充
@@ -47,7 +117,7 @@ export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate }
       abortRef.current = controller
 
       try {
-        const response = await streamFetcher(content, controller.signal)
+        const response = await streamFetcher(content, controller.signal, options)
 
         if (!response.body) {
           throw new Error('不支持流式响应')
@@ -90,6 +160,11 @@ export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate }
                   onProfileUpdate(profileData)
                 }
                 continue
+              }
+
+              // 通知外部回调（diagrams/references 等结构化数据）
+              if (onSSEEvent) {
+                onSSEEvent(parsed)
               }
 
               // 跳过无内容的事件（如 type:start, type:done）
@@ -136,16 +211,18 @@ export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate }
         abortRef.current = null
       }
     },
-    [streamFetcher, nextId, onProfileUpdate],
+    [streamFetcher, nextId, onProfileUpdate, onSSEEvent],
   )
 
   const clearMessages = useCallback(() => {
     setMessages([])
+    setDisplayedMessages([])
+    displayedPosRef.current = 0
   }, [])
 
   const abort = useCallback(() => {
     abortRef.current?.abort()
   }, [])
 
-  return { messages, isLoading, sendMessage, clearMessages, abort, setMessages }
+  return { messages: displayedMessages, isLoading, sendMessage, clearMessages, abort, setMessages }
 }

@@ -1,8 +1,17 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Typography, Input, Select, Button, Empty, Row, Col, message, Modal } from 'antd'
-import { SearchOutlined, ThunderboltOutlined, FileTextOutlined, EditOutlined, CodeOutlined } from '@ant-design/icons'
+import {
+  SearchOutlined, ThunderboltOutlined, FileTextOutlined,
+  EditOutlined, CodeOutlined, ReloadOutlined,
+} from '@ant-design/icons'
 import ResourceCard from '../components/ResourceCard'
 import MarkdownRenderer from '../components/MarkdownRenderer'
+import ProgressBar from '../components/ProgressBar'
+import { useTaskStatus } from '../hooks/useTaskStatus'
+import { generateResources, getTaskStatus } from '../api/resource'
+import { shouldUseMock } from '../utils/useMock'
+
+const USE_MOCK = shouldUseMock()
 
 const { Text } = Typography
 
@@ -30,7 +39,7 @@ const TYPE_ICONS = {
   code: <CodeOutlined />,
 }
 
-/** 模拟生成资源 */
+/** 模拟生成资源（页面初始展示用） */
 function generateMockResources(topic, difficulty, types) {
   const diffLabel = DIFFICULTY_OPTIONS.find((d) => d.value === difficulty)?.label || '中级'
 
@@ -290,22 +299,22 @@ import pytest
 
 
 def test_empty():
-    \"\"\"空数组应返回 0\"\"\"
+    """空数组应返回 0"""
     assert solve([]) == 0
 
 
 def test_single():
-    \"\"\"单元素数组\"\"\"
+    """单元素数组"""
     assert solve([5]) == 25
 
 
 def test_negative():
-    \"\"\"负数平方后为正\"\"\"
+    """负数平方后为正"""
     assert solve([-1, -2, -3]) == 14
 
 
 def test_large():
-    \"\"\"大数值测试\"\"\"
+    """大数值测试"""
     assert solve([1000, 2000]) == 5_000_000
 \`\`\`
 
@@ -343,33 +352,143 @@ LIMIT 10;
   }))
 }
 
+/**
+ * 学习资源页
+ * - 接入 useTaskStatus 轮询异步任务进度
+ * - 生成中显示 ProgressBar + 阶段文案，按钮禁用
+ * - 完成后自动替换为资源卡片
+ * - 失败时显示重试按钮
+ */
 export default function ResourcePage() {
   const defaultTopic = '二次函数'
   const [topic, setTopic] = useState(defaultTopic)
   const [difficulty, setDifficulty] = useState('intermediate')
   const [selectedTypes, setSelectedTypes] = useState(['document', 'exercise', 'code'])
-  const [resources, setResources] = useState(() => generateMockResources(defaultTopic, 'intermediate', ['document', 'exercise', 'code']))
-  const [generated, setGenerated] = useState(true)
-  const [generating, setGenerating] = useState(false)
   const [detailResource, setDetailResource] = useState(null)
 
-  function handleGenerate() {
+  // 页面初始 Mock 展示（仅在 VITE_USE_MOCK=true 时启用）
+  const [initialResources] = useState(() =>
+    USE_MOCK
+      ? generateMockResources(defaultTopic, 'intermediate', ['document', 'exercise', 'code'])
+      : [],
+  )
+
+  // Mock 轮询计数器：模拟渐进式任务进度
+  const mockPollRef = useRef(0)
+
+  // 异步任务轮询 — Mock 模式模拟完整生命周期，真实模式轮询后端
+  const {
+    status, result, error,
+    progress, taskMessage,
+    startPolling, reset,
+  } = useTaskStatus(async (taskId) => {
+    // ── Mock 路径：模拟 6 次轮询后完成任务 ──
+    if (USE_MOCK) {
+      mockPollRef.current += 1
+      const count = mockPollRef.current
+
+      if (count <= 2) {
+        return { status: 'running', progress: count * 15, message: '看看你想学什么…' }
+      }
+      if (count <= 4) {
+        return { status: 'running', progress: 30 + (count - 2) * 15, message: '整理相关资料中…' }
+      }
+      if (count <= 6) {
+        return { status: 'running', progress: 60 + (count - 4) * 20, message: '最后润色一下…' }
+      }
+      // 完成任务：返回 Mock 资源
+      const resources = generateMockResources(topic, difficulty, selectedTypes)
+      return { status: 'completed', progress: 100, message: '好了，帮你准备了 ' + resources.length + ' 份资料', result: resources }
+    }
+
+    // ── 真实路径：轮询后端 ──
+    const data = await getTaskStatus(taskId)
+    return {
+      status: data.status === 'done' ? 'completed' : data.status,
+      result: data.result,
+      error: data.error,
+      progress: data.progress ?? 0,
+      message: data.message ?? '',
+    }
+  })
+
+  const isRunning = status === 'pending' || status === 'running'
+  const isCompleted = status === 'completed'
+  const isFailed = status === 'failed'
+
+  /** 点击生成 — Mock 模式模拟异步任务，真实模式调后端接口 */
+  async function handleGenerate() {
     if (!topic.trim()) {
       message.warning('请输入学习主题')
       return
     }
-    setGenerating(true)
-    setTimeout(() => {
-      setResources(generateMockResources(topic.trim(), difficulty, selectedTypes))
-      setGenerated(true)
-      setGenerating(false)
-      message.success(`已为「${topic}」生成 ${selectedTypes.length} 个资源`)
-    }, 1000)
+    if (selectedTypes.length === 0) {
+      message.warning('请至少选择一种资源类型')
+      return
+    }
+
+    try {
+      if (USE_MOCK) {
+        // Mock: 重置计数器，直接用虚拟 task_id 启动轮询
+        mockPollRef.current = 0
+        startPolling('mock-task-' + Date.now())
+        return
+      }
+
+      const diffLabel = DIFFICULTY_OPTIONS.find((d) => d.value === difficulty)?.label || '中级'
+      const data = await generateResources({
+        student_id: 'demo-student-01',
+        topic: topic.trim(),
+        types: selectedTypes,
+        difficulty: diffLabel,
+      })
+
+      if (data.task_id) {
+        startPolling(data.task_id)
+      } else {
+        message.error('未获取到任务 ID')
+      }
+    } catch (err) {
+      message.error('生成请求失败: ' + (err.message || '未知错误'))
+    }
+  }
+
+  /** 失败后重试 */
+  function handleRetry() {
+    if (USE_MOCK) {
+      mockPollRef.current = 0
+      startPolling('mock-task-retry-' + Date.now())
+      return
+    }
+    reset()
+    handleGenerate()
+  }
+
+  /** 从 result 中提取资源列表 */
+  const resultResources = (() => {
+    if (!isCompleted || !result) return []
+    if (Array.isArray(result)) return result
+    return result.items || result.resources || []
+  })()
+
+  /** 根据进度百分比推演步骤状态 */
+  function buildSteps() {
+    const phaseLabels = [
+      { key: 'understand', label: '了解主题' },
+      { key: 'prepare', label: '准备资料' },
+      { key: 'polish', label: '排版整理' },
+    ]
+    return phaseLabels.map((phase, i) => {
+      const threshold = (i + 1) / phaseLabels.length * 100
+      if (progress >= threshold || isCompleted) return { ...phase, status: 'finish' }
+      if (progress >= i / phaseLabels.length * 100 && isRunning) return { ...phase, status: 'process' }
+      return { ...phase, status: 'wait' }
+    })
   }
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
-      {/* 参数输入区 */}
+      {/* ── 参数输入区 ── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
         marginBottom: 24,
@@ -382,12 +501,14 @@ export default function ResourcePage() {
           onPressEnter={handleGenerate}
           style={{ flex: 1, minWidth: 180, borderRadius: 8 }}
           allowClear
+          disabled={isRunning}
         />
         <Select
           value={difficulty}
           onChange={setDifficulty}
           style={{ width: 100, borderRadius: 8 }}
           popupMatchSelectWidth={false}
+          disabled={isRunning}
         >
           {DIFFICULTY_OPTIONS.map((opt) => (
             <Select.Option key={opt.value} value={opt.value}
@@ -415,6 +536,7 @@ export default function ResourcePage() {
           options={TYPE_OPTIONS}
           style={{ width: 130, borderRadius: 8 }}
           placeholder="资源类型"
+          disabled={isRunning}
           optionRender={(option) => (
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ color: '#8b5cf6' }}>{TYPE_ICONS[option.value]}</span>
@@ -434,7 +556,8 @@ export default function ResourcePage() {
           type="primary"
           icon={<ThunderboltOutlined />}
           onClick={handleGenerate}
-          loading={generating}
+          loading={isRunning}
+          disabled={isRunning}
           style={{
             background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
             border: 'none',
@@ -443,39 +566,94 @@ export default function ResourcePage() {
             flexShrink: 0,
           }}
         >
-          {generating ? '生成中...' : '生成资源'}
+          {isRunning ? '生成中...' : '生成资源'}
         </Button>
       </div>
 
-      {/* 结果区 */}
-      {!generated ? (
+      {/* ── 生成进度区 ── */}
+      {isRunning && (
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          minHeight: 320, background: '#fafafa', borderRadius: 12,
+          background: 'var(--bg-card)', borderRadius: 12, padding: '24px 32px',
+          border: '1px solid var(--border)',
         }}>
-          <Empty description={<Text type="secondary">暂无资源，先输入主题生成</Text>} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <ProgressBar
+            status={status}
+            percent={progress}
+            steps={buildSteps()}
+            message={taskMessage || '准备中…'}
+            error={error}
+          />
         </div>
-      ) : resources.length === 0 ? (
-        <Empty description="没有匹配的资源" />
-      ) : (
-        <Row gutter={[16, 16]}>
-          {resources.map((r) => (
-            <Col key={r.id} xs={24} md={8}>
-              <ResourceCard resource={r} onClick={(res) => setDetailResource(res)} />
-            </Col>
-          ))}
-        </Row>
       )}
 
-      {/* 详情弹窗 */}
+      {/* ── 失败区 ── */}
+      {isFailed && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', minHeight: 320,
+          background: 'var(--surface-secondary)', borderRadius: 12, gap: 16,
+        }}>
+          <ProgressBar
+            status="failed"
+            percent={progress}
+            message={taskMessage || '生成失败'}
+            error={error}
+          />
+          <Button
+            type="primary"
+            icon={<ReloadOutlined />}
+            onClick={handleRetry}
+            style={{ borderRadius: 8 }}
+          >
+            重新生成
+          </Button>
+        </div>
+      )}
+
+      {/* ── 结果区 / 初始 Mock 展示 ── */}
+      {!isRunning && !isFailed && (
+        isCompleted && resultResources.length > 0 ? (
+          <Row gutter={[16, 16]}>
+            {resultResources.map((r) => (
+              <Col key={r.id} xs={24} md={8}>
+                <ResourceCard resource={r} onClick={(res) => setDetailResource(res)} />
+              </Col>
+            ))}
+          </Row>
+        ) : isCompleted && resultResources.length === 0 ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minHeight: 320, background: 'var(--surface-secondary)', borderRadius: 12,
+          }}>
+            <Empty description={<Text type="secondary">没有匹配的资源</Text>} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          </div>
+        ) : initialResources.length > 0 ? (
+          <Row gutter={[16, 16]}>
+            {initialResources.map((r) => (
+              <Col key={r.id} xs={24} md={8}>
+                <ResourceCard resource={r} onClick={(res) => setDetailResource(res)} />
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            minHeight: 320, background: 'var(--surface-secondary)', borderRadius: 12,
+          }}>
+            <Empty description={<Text type="secondary">暂无资源，先输入主题生成</Text>} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          </div>
+        )
+      )}
+
+      {/* ── 详情弹窗 ── */}
       <Modal
         title={detailResource?.title}
         open={!!detailResource}
         onCancel={() => setDetailResource(null)}
         footer={null}
-        width={800}
-        style={{ top: 24 }}
-        styles={{ body: { maxHeight: '70vh', overflow: 'auto', padding: '24px 32px' } }}
+        width={960}
+        style={{ top: 40 }}
+        styles={{ body: { maxHeight: '80vh', overflow: 'auto', padding: '24px 32px' } }}
       >
         {detailResource && <MarkdownRenderer content={detailResource.content} />}
       </Modal>
