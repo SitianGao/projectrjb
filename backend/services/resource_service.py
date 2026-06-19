@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import datetime
+import json
+import logging
 import uuid
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
 from models.resource import Resource
+
+logger = logging.getLogger(__name__)
 
 
 class ResourceService:
@@ -36,13 +40,13 @@ class ResourceService:
 
         _emit_progress(on_progress, 35, "generating", "正在调用资源生成逻辑")
         if self.resource_agent:
-            result = await self.resource_agent.generate(
+            raw = await self.resource_agent.generate_resources(
                 topic=topic,
-                types=types,
+                resource_types=_normalize_types(types),
                 difficulty=difficulty,
-                student_profile=profile,
-                count=count,
+                profile=profile,
             )
+            result = _coerce_resource_result(raw, topic, types, difficulty, count)
         else:
             result = _template_resources(topic, types, difficulty, count)
 
@@ -88,22 +92,17 @@ class ResourceService:
         difficulty: str = "中级",
         count: int = 1,
     ):
-        """Proxy the resource agent SSE stream."""
-        self.profile_service.get_or_create_student(db, student_id)
-        profile = self.profile_service.get_profile(db, student_id)
-        if self.resource_agent:
-            async for event in self.resource_agent.generate_stream(
-                topic=topic,
-                types=types,
-                difficulty=difficulty,
-                student_profile=profile,
-                count=count,
-            ):
-                yield event
-            return
-
+        """Generate resources and expose the result as SSE events."""
         yield f'data: {{"type":"start","message":"开始生成{topic}学习资源"}}\n\n'
-        result = _template_resources(topic, types, difficulty, count)
+        yield f'data: {{"type":"progress","progress":20,"message":"正在准备资源生成任务"}}\n\n'
+        result = await self.generate_resources(
+            db=db,
+            student_id=student_id,
+            topic=topic,
+            types=types,
+            difficulty=difficulty,
+            count=count,
+        )
         yield f'data: {{"type":"data","data":{_json_dumps(result)}}}\n\n'
         yield f'data: {{"type":"done"}}\n\n'
 
@@ -183,8 +182,6 @@ def _now_iso() -> str:
 
 
 def _json_dumps(value) -> str:
-    import json
-
     return json.dumps(value, ensure_ascii=False)
 
 
@@ -198,16 +195,87 @@ def _emit_progress(
         callback(progress, phase, message)
 
 
+def _coerce_resource_result(
+    raw: Any,
+    topic: str,
+    types: Optional[List[str]],
+    difficulty: str,
+    count: int,
+) -> Dict:
+    """Normalize ResourceAgent output and fall back when its JSON is invalid."""
+    try:
+        data = _parse_agent_json(raw)
+        resources = data.get("resources")
+        if not isinstance(resources, list) or not resources:
+            raise ValueError("ResourceAgent output missing non-empty resources list")
+
+        normalized = []
+        for item in resources:
+            if not isinstance(item, dict):
+                continue
+            normalized.append({
+                "type": item.get("type") or "document",
+                "title": item.get("title") or f"{topic} 学习资源",
+                "topic": item.get("topic") or topic,
+                "difficulty": item.get("difficulty") or difficulty,
+                "content": item.get("content") or "",
+            })
+        if not normalized:
+            raise ValueError("ResourceAgent resources list contains no valid objects")
+
+        return {
+            **data,
+            "topic": data.get("topic", topic),
+            "difficulty": data.get("difficulty", difficulty),
+            "resources": normalized,
+            "generated_at": data.get("generated_at") or _now_iso(),
+        }
+    except Exception as exc:
+        logger.warning("ResourceAgent 输出解析失败，使用模板资源兜底: %s", exc)
+        return _template_resources(topic, types, difficulty, count)
+
+
+def _parse_agent_json(raw: Any) -> Dict:
+    if isinstance(raw, dict):
+        return raw
+    if not isinstance(raw, str):
+        raise ValueError(f"unsupported ResourceAgent output type: {type(raw).__name__}")
+
+    text = raw.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+        if text.startswith("json"):
+            text = text[4:].strip()
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end >= start:
+        text = text[start:end + 1]
+
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise ValueError("ResourceAgent JSON root must be an object")
+    return data
+
+
+def _normalize_types(types: Optional[List[str]]) -> List[str]:
+    allowed = {"document", "exercise", "code", "mindmap", "reading"}
+    normalized = [item for item in (types or ["document", "exercise", "code"]) if item in allowed]
+    return normalized or ["document", "exercise", "code"]
+
+
 def _template_resources(
     topic: str,
     types: Optional[List[str]],
     difficulty: str,
     count: int,
 ) -> Dict:
-    allowed = {"document", "exercise", "code", "mindmap", "reading"}
-    normalized_types = [item for item in (types or ["document", "exercise", "code"]) if item in allowed]
-    if not normalized_types:
-        normalized_types = ["document", "exercise", "code"]
+    normalized_types = _normalize_types(types)
 
     content_by_type = {
         "document": (
