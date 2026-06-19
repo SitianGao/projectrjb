@@ -5,6 +5,7 @@ LLM 统一调用封装
 import os
 import json
 import logging
+import asyncio
 import httpx
 from typing import AsyncIterator, Optional
 
@@ -23,8 +24,9 @@ class LLMClient:
     ):
         self.primary = primary
         self.fallback = fallback
-        self.timeout = config.LLM_TIMEOUT
-        self.max_retries = config.LLM_MAX_RETRIES
+        self.timeout_seconds = max(1, int(config.LLM_TIMEOUT))
+        self.max_retries = max(1, int(config.LLM_MAX_RETRIES))
+        self.retry_base_delay = 0.5
 
     async def chat_stream(
         self,
@@ -54,9 +56,8 @@ class LLMClient:
                     spark_failed = True
                     logger.warning(f"[LLMClient] Spark 第{attempt + 1}次尝试失败: {e}")
                     if attempt < self.max_retries - 1:
-                        import asyncio
                         yield f"[提示: 讯飞星火响应超时，正在重试（第{attempt + 1}/{self.max_retries}次）...]\n"
-                        await asyncio.sleep(2 ** attempt)
+                        await asyncio.sleep(self.retry_base_delay * (2 ** attempt))
 
             if spark_failed:
                 logger.warning("[LLMClient] Spark 全部重试失败，切换至 DeepSeek 备用模型")
@@ -83,7 +84,7 @@ class LLMClient:
         )
         model_name = model or os.getenv("SPARK_MODEL", "4.0Ultra")
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self._timeout()) as client:
             async with client.stream(
                 "POST",
                 api_url,
@@ -100,6 +101,7 @@ class LLMClient:
                     "stream": True,
                 },
             ) as response:
+                response.raise_for_status()
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
                         data = line[6:]
@@ -120,7 +122,7 @@ class LLMClient:
             yield "[提示: DeepSeek API Key 未配置，请检查 .env 文件]"
             return
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self._timeout()) as client:
             async with client.stream(
                 "POST",
                 "https://api.deepseek.com/v1/chat/completions",
@@ -137,6 +139,7 @@ class LLMClient:
                     "stream": True,
                 },
             ) as response:
+                response.raise_for_status()
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
                         data = line[6:]
@@ -149,3 +152,12 @@ class LLMClient:
                                 yield content
                         except (json.JSONDecodeError, KeyError):
                             continue
+
+    def _timeout(self) -> httpx.Timeout:
+        return httpx.Timeout(
+            self.timeout_seconds,
+            connect=min(self.timeout_seconds, 5),
+            read=self.timeout_seconds,
+            write=min(self.timeout_seconds, 10),
+            pool=min(self.timeout_seconds, 5),
+        )

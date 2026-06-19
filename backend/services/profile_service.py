@@ -142,6 +142,7 @@ class ProfileService:
         在收到 profile_update 后自动持久化到数据库。
         """
         yield f'data: {{"type":"start","message":"开始分析学习画像"}}\n\n'
+        self.get_or_create_student(db, student_id)
 
         full_chat = []
         profile_received = None

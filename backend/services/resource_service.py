@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -27,11 +27,14 @@ class ResourceService:
         difficulty: str = "中级",
         count: int = 1,
         path_id: Optional[str] = None,
+        on_progress: Optional[Callable[[int, str, str], None]] = None,
     ) -> Dict:
         """Generate resources with the agent and persist the result."""
+        _emit_progress(on_progress, 10, "preparing", "正在准备学生画像和生成参数")
         self.profile_service.get_or_create_student(db, student_id)
         profile = self.profile_service.get_profile(db, student_id)
 
+        _emit_progress(on_progress, 35, "generating", "正在调用资源生成逻辑")
         if self.resource_agent:
             result = await self.resource_agent.generate(
                 topic=topic,
@@ -43,6 +46,7 @@ class ResourceService:
         else:
             result = _template_resources(topic, types, difficulty, count)
 
+        _emit_progress(on_progress, 75, "persisting", "正在保存学习资源")
         saved = []
         for item in result.get("resources", []):
             resource = Resource(
@@ -63,6 +67,7 @@ class ResourceService:
         for resource in saved:
             db.refresh(resource)
 
+        _emit_progress(on_progress, 90, "formatting", "正在整理资源结果")
         items = [self._resource_to_dict(resource) for resource in saved]
         return {
             "student_id": student_id,
@@ -181,6 +186,16 @@ def _json_dumps(value) -> str:
     import json
 
     return json.dumps(value, ensure_ascii=False)
+
+
+def _emit_progress(
+    callback: Optional[Callable[[int, str, str], None]],
+    progress: int,
+    phase: str,
+    message: str,
+) -> None:
+    if callback:
+        callback(progress, phase, message)
 
 
 def _template_resources(

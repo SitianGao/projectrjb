@@ -50,6 +50,7 @@ DATABASE_URL=sqlite:///./eduagent.db
 - Base URL: `/api`
 - JSON 请求头: `Content-Type: application/json`
 - SSE 响应头: `Content-Type: text/event-stream`
+- 健康检查: `GET /api/health`
 - 普通 JSON 成功响应统一包装：
 
 ```json
@@ -78,10 +79,44 @@ data: {"type":"done"}
 ```
 
 - FastAPI 参数校验失败返回 `422`，格式同统一失败响应。
-- 未找到资源返回 `404`：
+- 未找到资源返回 `404`，具体 `code` 使用业务错误码：
 
 ```json
-{"success":false,"error":true,"code":"NOT_FOUND","message":"资源不存在或任务不存在"}
+{"success":false,"error":true,"code":"RESOURCE_NOT_FOUND","message":"学习资源不存在"}
+```
+
+### 1.1 统一错误码
+
+| code | HTTP | 场景 |
+| --- | ---: | --- |
+| `VALIDATION_ERROR` | 422 | 请求参数校验失败 |
+| `PROFILE_NOT_FOUND` | 404 | 学生画像不存在 |
+| `PROFILE_UPDATE_EMPTY` | 400 | 更新画像没有提供字段 |
+| `PATH_NOT_FOUND` | 404 | 学习路径不存在 |
+| `RESOURCE_NOT_FOUND` | 404 | 学习资源不存在 |
+| `RESOURCE_GENERATE_FAILED` | 500 | 资源生成失败 |
+| `TASK_NOT_FOUND` | 404 | 异步任务不存在 |
+| `TUTOR_CHAT_FAILED` | 500 | 智能辅导失败 |
+| `EVALUATE_FAILED` | 500 | 学习评估失败 |
+| `DATABASE_UNAVAILABLE` | 503 | 数据库不可用 |
+| `INTERNAL_SERVER_ERROR` | 500 | 未捕获服务端异常 |
+
+### 1.2 Health API
+
+`GET /api/health`
+
+成功返回：
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "ok",
+    "service": "EduAgent Backend",
+    "database": "ok"
+  },
+  "message": "ok"
+}
 ```
 
 ## 2. Profile API
@@ -212,18 +247,42 @@ document | exercise | code | mindmap | reading
     "task_id": "task_abc12345",
     "status": "pending",
     "progress": 0,
+    "phase": "queued",
     "message": "资源生成任务已创建",
     "result": null,
     "error": null,
     "created_at": "2026-06-15T14:00:00Z",
-    "updated_at": "2026-06-15T14:00:00Z"
+    "updated_at": "2026-06-15T14:00:00Z",
+    "started_at": null,
+    "finished_at": null,
+    "duration_ms": null,
+    "progress_history": [
+      {
+        "progress": 0,
+        "message": "资源生成任务已创建",
+        "phase": "queued",
+        "at": "2026-06-15T14:00:00Z"
+      }
+    ]
   },
   "message": "资源生成任务已创建",
   "task_id": "task_abc12345",
   "status": "pending",
   "progress": 0,
+  "phase": "queued",
   "result": null,
-  "error": null
+  "error": null,
+  "started_at": null,
+  "finished_at": null,
+  "duration_ms": null,
+  "progress_history": [
+    {
+      "progress": 0,
+      "message": "资源生成任务已创建",
+      "phase": "queued",
+      "at": "2026-06-15T14:00:00Z"
+    }
+  ]
 }
 ```
 
@@ -434,14 +493,38 @@ data: {"type":"done","session_id":"..."}
     "task_id": "task_abc12345",
     "status": "pending|running|done|failed",
     "progress": 80,
+    "phase": "generating",
     "message": "正在生成学习资源",
     "result": {},
     "error": null,
     "created_at": "2026-06-15T14:00:00Z",
-    "updated_at": "2026-06-15T14:00:01Z"
+    "updated_at": "2026-06-15T14:00:01Z",
+    "started_at": "2026-06-15T14:00:00Z",
+    "finished_at": null,
+    "duration_ms": null,
+    "progress_history": [
+      {
+        "progress": 0,
+        "message": "资源生成任务已创建",
+        "phase": "queued",
+        "at": "2026-06-15T14:00:00Z"
+      },
+      {
+        "progress": 35,
+        "message": "正在调用资源生成逻辑",
+        "phase": "generating",
+        "at": "2026-06-15T14:00:01Z"
+      }
+    ]
   },
   "message": "ok"
 }
+```
+
+`phase` 标准值：
+
+```text
+queued | started | preparing | generating | persisting | formatting | completed | failed
 ```
 
 ## 8. 前端队员必须修改的调用点

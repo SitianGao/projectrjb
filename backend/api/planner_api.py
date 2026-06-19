@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from api.openapi_examples import json_responses, sse_responses
 from api.response import ApiError, ok, sse_done, sse_error
 from database import SessionLocal, get_db
 from deps import planner_service, profile_service
@@ -26,16 +27,13 @@ class GeneratePathRequest(BaseModel):
 
 # ── 端点实现 ─────────────────────────────────
 
-@router.post("/generate")
+@router.post("/generate", responses=sse_responses("PROFILE_NOT_FOUND", "PLANNER_GENERATE_FAILED"))
 async def generate_path(request: GeneratePathRequest):
     """生成学习路径，SSE 流式返回"""
 
     async def event_generator():
         db = SessionLocal()
         try:
-            # 确保学生存在
-            profile_service.get_or_create_student(db, request.student_id)
-
             async for event in planner_service.generate_stream(
                 db=db,
                 student_id=request.student_id,
@@ -59,10 +57,10 @@ async def generate_path(request: GeneratePathRequest):
     )
 
 
-@router.get("/{student_id}")
+@router.get("/{student_id}", responses=json_responses("PATH_NOT_FOUND"))
 async def get_path(student_id: str, db: Session = Depends(get_db)):
     """获取学生当前学习路径"""
     path = planner_service.get_current_path(db, student_id)
     if not path:
-        raise ApiError("PATH_NOT_FOUND", "学习路径未找到，请先生成路径", 404)
+        raise ApiError("PATH_NOT_FOUND")
     return ok(path)

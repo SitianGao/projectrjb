@@ -6,10 +6,12 @@ import logging
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from utils.logger import setup_logging
-from database import init_db
+from database import SessionLocal, init_db
+from api.openapi_examples import json_responses
 from api.response import (
     ApiError,
     api_error_handler,
@@ -76,6 +78,24 @@ async def root():
     """健康检查"""
     logger.info("健康检查请求")
     return ok({"status": "ok", "service": "EduAgent Backend"})
+
+
+@app.get("/api/health", responses=json_responses("DATABASE_UNAVAILABLE"))
+async def api_health():
+    """后端健康检查，供前端联调和 E2E 验收使用。"""
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise ApiError("DATABASE_UNAVAILABLE") from exc
+    finally:
+        db.close()
+
+    return ok({
+        "status": "ok",
+        "service": "EduAgent Backend",
+        "database": "ok",
+    })
 
 
 logger.info("EduAgent Backend 路由注册完成")

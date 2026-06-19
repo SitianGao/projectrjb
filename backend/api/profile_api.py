@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from api.openapi_examples import json_responses, sse_responses
 from api.response import ApiError, ok, sse_done, sse_error
 from database import SessionLocal, get_db
 from deps import profile_service
@@ -44,16 +45,13 @@ class ProfileMessageRequest(BaseModel):
 
 # ── 端点实现 ─────────────────────────────────
 
-@router.post("/chat")
+@router.post("/chat", responses=sse_responses("PROFILE_CHAT_FAILED"))
 async def profile_chat(request: ProfileChatRequest):
     """对话式画像构建，SSE 流式返回"""
 
     async def event_generator():
         db = SessionLocal()
         try:
-            # 确保学生存在
-            profile_service.get_or_create_student(db, request.student_id)
-
             async for event in profile_service.chat_stream(
                 db=db,
                 student_id=request.student_id,
@@ -79,7 +77,7 @@ async def profile_chat(request: ProfileChatRequest):
     )
 
 
-@router.post("/{student_id}/chat/stream")
+@router.post("/{student_id}/chat/stream", responses=sse_responses("PROFILE_CHAT_FAILED"))
 async def profile_chat_stream_by_student(
     student_id: str,
     request: ProfileMessageRequest,
@@ -89,8 +87,6 @@ async def profile_chat_stream_by_student(
     async def event_generator():
         db = SessionLocal()
         try:
-            profile_service.get_or_create_student(db, student_id)
-
             async for event in profile_service.chat_stream(
                 db=db,
                 student_id=student_id,
@@ -116,7 +112,7 @@ async def profile_chat_stream_by_student(
     )
 
 
-@router.post("/{student_id}/chat")
+@router.post("/{student_id}/chat", responses=sse_responses("PROFILE_CHAT_FAILED"))
 async def profile_chat_by_student(
     student_id: str,
     request: ProfileMessageRequest,
@@ -132,16 +128,16 @@ async def profile_chat_by_student(
     )
 
 
-@router.get("/{student_id}")
+@router.get("/{student_id}", responses=json_responses("PROFILE_NOT_FOUND"))
 async def get_profile(student_id: str, db: Session = Depends(get_db)):
     """获取学生画像"""
     profile = profile_service.get_profile(db, student_id)
     if not profile:
-        raise ApiError("PROFILE_NOT_FOUND", "学生画像未找到", 404)
+        raise ApiError("PROFILE_NOT_FOUND")
     return ok(profile)
 
 
-@router.put("/{student_id}")
+@router.put("/{student_id}", responses=json_responses("PROFILE_UPDATE_EMPTY"))
 async def update_profile(
     student_id: str,
     request: ProfileUpdateRequest,
@@ -154,7 +150,7 @@ async def update_profile(
     # 只更新提供的字段
     update_data = request.model_dump(exclude_none=True)
     if not update_data:
-        raise ApiError("PROFILE_UPDATE_EMPTY", "没有提供需要更新的字段", 400)
+        raise ApiError("PROFILE_UPDATE_EMPTY")
 
     # 保存画像
     profile_service.save_profile(db, student_id, update_data, increment_version=True)

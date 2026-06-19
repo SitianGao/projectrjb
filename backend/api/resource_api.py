@@ -13,7 +13,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from api.response import ApiError, ok
+from api.openapi_examples import TASK_SUCCESS_EXAMPLE, json_responses, sse_responses
+from api.response import ApiError, ok, sse_done, sse_error
 from database import SessionLocal, get_db
 from deps import resource_service, task_service
 
@@ -29,7 +30,13 @@ class ResourceGenerateRequest(BaseModel):
     path_id: Optional[str] = None
 
 
-@router.post("/generate")
+@router.post(
+    "/generate",
+    responses=json_responses(
+        "RESOURCE_GENERATE_FAILED",
+        success_example=TASK_SUCCESS_EXAMPLE,
+    ),
+)
 async def generate_resource(
     request: ResourceGenerateRequest,
     background_tasks: BackgroundTasks,
@@ -40,7 +47,16 @@ async def generate_resource(
     async def run_task():
         db = SessionLocal()
         try:
-            task_service.update(task["task_id"], status="running", progress=20, message="正在生成学习资源")
+            def update_progress(progress: int, phase: str, message: str):
+                task_service.update(
+                    task["task_id"],
+                    status="running",
+                    progress=progress,
+                    phase=phase,
+                    message=message,
+                )
+
+            update_progress(5, "started", "资源生成任务已开始")
             result = await resource_service.generate_resources(
                 db=db,
                 student_id=request.student_id,
@@ -49,11 +65,13 @@ async def generate_resource(
                 difficulty=request.difficulty,
                 count=request.count,
                 path_id=request.path_id,
+                on_progress=update_progress,
             )
             task_service.update(
                 task["task_id"],
                 status="done",
                 progress=100,
+                phase="completed",
                 message="资源生成完成",
                 result=result,
             )
@@ -62,6 +80,7 @@ async def generate_resource(
                 task["task_id"],
                 status="failed",
                 progress=100,
+                phase="failed",
                 message="资源生成失败",
                 error={"code": "RESOURCE_GENERATE_FAILED", "message": str(exc)},
             )
@@ -72,7 +91,7 @@ async def generate_resource(
     return ok(task, "资源生成任务已创建")
 
 
-@router.post("/generate/stream")
+@router.post("/generate/stream", responses=sse_responses("RESOURCE_GENERATE_FAILED"))
 async def generate_resource_stream(request: ResourceGenerateRequest):
     """生成学习资源，SSE 流式返回。"""
 
@@ -88,9 +107,9 @@ async def generate_resource_stream(request: ResourceGenerateRequest):
                 count=request.count,
             ):
                 yield event
-        except Exception as exc:
-            yield f'data: {{"type":"error","code":"RESOURCE_GENERATE_FAILED","message":"资源生成失败: {str(exc)}"}}\n\n'
-            yield f'data: {{"type":"done"}}\n\n'
+        except Exception:
+            yield sse_error("RESOURCE_GENERATE_FAILED", "资源生成失败，请稍后重试")
+            yield sse_done()
         finally:
             db.close()
 
@@ -105,7 +124,7 @@ async def generate_resource_stream(request: ResourceGenerateRequest):
     )
 
 
-@router.get("/list")
+@router.get("/list", responses=json_responses())
 async def list_resources(
     student_id: Optional[str] = None,
     page: int = Query(default=1, ge=1),
@@ -127,7 +146,7 @@ async def list_resources(
     )
 
 
-@router.get("/types")
+@router.get("/types", responses=json_responses())
 async def get_resource_types():
     """获取支持的资源类型"""
     return ok({
@@ -141,19 +160,19 @@ async def get_resource_types():
     })
 
 
-@router.post("/{resource_id}/bookmark")
+@router.post("/{resource_id}/bookmark", responses=json_responses("RESOURCE_NOT_FOUND"))
 async def bookmark_resource(resource_id: str, db: Session = Depends(get_db)):
     """收藏资源（前端兼容）"""
     resource = resource_service.get_resource(db, resource_id)
     if not resource:
-        raise ApiError("RESOURCE_NOT_FOUND", "学习资源不存在", 404)
+        raise ApiError("RESOURCE_NOT_FOUND")
     return ok({"resource_id": resource_id, "bookmarked": True})
 
 
-@router.get("/{resource_id}")
+@router.get("/{resource_id}", responses=json_responses("RESOURCE_NOT_FOUND"))
 async def get_resource(resource_id: str, db: Session = Depends(get_db)):
     """获取资源详情"""
     resource = resource_service.get_resource(db, resource_id)
     if not resource:
-        raise ApiError("RESOURCE_NOT_FOUND", "学习资源不存在", 404)
+        raise ApiError("RESOURCE_NOT_FOUND")
     return ok(resource)

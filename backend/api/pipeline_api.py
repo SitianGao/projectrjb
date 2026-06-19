@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from api.openapi_examples import sse_responses
 from api.response import sse_done, sse_error
 from database import SessionLocal
 from deps import orchestrator, profile_service, planner_service
@@ -26,7 +27,7 @@ class PipelineRequest(BaseModel):
 
 # ── 端点实现 ─────────────────────────────────
 
-@router.post("/generate")
+@router.post("/generate", responses=sse_responses("PIPELINE_GENERATE_FAILED"))
 async def pipeline_generate(request: PipelineRequest):
     """
     端到端流水线：画像分析 → 学习路径生成（SSE 流式）。

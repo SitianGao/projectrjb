@@ -10,6 +10,7 @@ import json
 import logging
 from typing import Any, Optional
 
+from api.error_codes import code_for_status, default_message_for, default_status_for
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -32,17 +33,24 @@ def ok(data: Any = None, message: str = "ok") -> dict:
     return response
 
 
-def error_payload(code: str, message: str) -> dict:
+def error_payload(code: str, message: str | None = None) -> dict:
     return {
         "success": False,
         "error": True,
         "code": code,
-        "message": message,
+        "message": message or default_message_for(code),
     }
 
 
-def fail(code: str, message: str, status_code: int = 400) -> JSONResponse:
-    return JSONResponse(status_code=status_code, content=error_payload(code, message))
+def fail(
+    code: str,
+    message: str | None = None,
+    status_code: int | None = None,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code or default_status_for(code),
+        content=error_payload(code, message),
+    )
 
 
 def sse_error(code: str, message: str) -> str:
@@ -61,24 +69,16 @@ def sse_done() -> str:
 class ApiError(Exception):
     """Application error that maps directly to the unified error contract."""
 
-    def __init__(self, code: str, message: str, status_code: int = 400):
+    def __init__(
+        self,
+        code: str,
+        message: str | None = None,
+        status_code: int | None = None,
+    ):
         self.code = code
-        self.message = message
-        self.status_code = status_code
-        super().__init__(message)
-
-
-def code_for_status(status_code: int) -> str:
-    mapping = {
-        400: "BAD_REQUEST",
-        401: "UNAUTHORIZED",
-        403: "FORBIDDEN",
-        404: "NOT_FOUND",
-        409: "CONFLICT",
-        422: "VALIDATION_ERROR",
-        500: "INTERNAL_SERVER_ERROR",
-    }
-    return mapping.get(status_code, "HTTP_ERROR")
+        self.message = message or default_message_for(code)
+        self.status_code = status_code or default_status_for(code)
+        super().__init__(self.message)
 
 
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:

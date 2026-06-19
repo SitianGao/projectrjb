@@ -15,7 +15,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from api.response import ok
+from api.openapi_examples import json_responses, sse_responses
+from api.response import ok, sse_done, sse_error
 from database import SessionLocal, get_db
 from deps import evaluate_service
 
@@ -41,7 +42,7 @@ class LearningRecordRequest(BaseModel):
     time_spent: Optional[int] = Field(default=None, ge=0)
 
 
-@router.post("/start")
+@router.post("/start", responses=json_responses())
 async def start_evaluation(
     request: EvaluationStartRequest,
     db: Session = Depends(get_db),
@@ -50,7 +51,7 @@ async def start_evaluation(
     return ok(evaluate_service.start_evaluation(db, request.student_id))
 
 
-@router.post("/generate")
+@router.post("/generate", responses=json_responses())
 async def generate_evaluation(
     request: EvaluationStartRequest,
     db: Session = Depends(get_db),
@@ -59,7 +60,7 @@ async def generate_evaluation(
     return ok(evaluate_service.start_evaluation(db, request.student_id))
 
 
-@router.post("/generate/stream")
+@router.post("/generate/stream", responses=sse_responses("EVALUATE_FAILED"))
 async def generate_evaluation_stream(request: EvaluationStartRequest):
     """流式生成评估 (SSE) —— Day 9 升级：异步 AI 增强评估"""
 
@@ -103,10 +104,9 @@ async def generate_evaluation_stream(request: EvaluationStartRequest):
             yield f"data: {{\"type\":\"data\",\"data\":{payload}}}\n\n"
             yield f'data: {{"type":"done","session_id":"{request.student_id}"}}\n\n'
 
-        except Exception as exc:
-            message = json.dumps(str(exc), ensure_ascii=False)
-            yield f'data: {{"type":"error","code":"EVALUATE_FAILED","message":{message}}}\n\n'
-            yield 'data: {"type":"done"}\n\n'
+        except Exception:
+            yield sse_error("EVALUATE_FAILED", "学习评估失败，请稍后重试")
+            yield sse_done()
         finally:
             db.close()
 
@@ -121,19 +121,19 @@ async def generate_evaluation_stream(request: EvaluationStartRequest):
     )
 
 
-@router.get("/report/{student_id}")
+@router.get("/report/{student_id}", responses=json_responses())
 async def get_report(student_id: str, db: Session = Depends(get_db)):
     """获取评估报告"""
     return ok(evaluate_service.build_report(db, student_id))
 
 
-@router.get("/progress/{student_id}")
+@router.get("/progress/{student_id}", responses=json_responses())
 async def get_progress(student_id: str, db: Session = Depends(get_db)):
     """获取学习进度统计。"""
     return ok(evaluate_service.get_progress_stats(db, student_id))
 
 
-@router.get("/record")
+@router.get("/record", responses=json_responses())
 async def list_learning_records(
     student_id: str,
     limit: int = 50,
@@ -143,25 +143,25 @@ async def list_learning_records(
     return ok(evaluate_service.list_records(db, student_id, limit))
 
 
-@router.get("/{student_id}")
+@router.get("/{student_id}", responses=json_responses())
 async def get_evaluation(student_id: str, db: Session = Depends(get_db)):
     """获取学生评估（前端兼容）"""
     return ok(evaluate_service.build_report(db, student_id))
 
 
-@router.get("/{student_id}/history")
+@router.get("/{student_id}/history", responses=json_responses())
 async def get_evaluation_history(student_id: str, db: Session = Depends(get_db)):
     """获取评估历史"""
     return ok(evaluate_service.build_report(db, student_id).get("history", []))
 
 
-@router.get("/{student_id}/progress")
+@router.get("/{student_id}/progress", responses=json_responses())
 async def get_progress_stats(student_id: str, db: Session = Depends(get_db)):
     """获取学习进度统计（前端兼容）"""
     return ok(evaluate_service.get_progress_stats(db, student_id))
 
 
-@router.post("/record")
+@router.post("/record", responses=json_responses())
 async def record_learning(
     request: LearningRecordRequest,
     db: Session = Depends(get_db),
@@ -181,7 +181,7 @@ async def record_learning(
     )
 
 
-@router.post("/self")
+@router.post("/self", responses=json_responses())
 async def submit_self_eval(
     request: LearningRecordRequest,
     db: Session = Depends(get_db),

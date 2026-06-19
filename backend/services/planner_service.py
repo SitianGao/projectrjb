@@ -13,6 +13,7 @@ from typing import AsyncIterator, Dict, Optional
 
 from sqlalchemy.orm import Session
 
+from api.response import sse_done, sse_error
 from models.learning_path import LearningPath
 
 logger = logging.getLogger(__name__)
@@ -121,14 +122,16 @@ class PlannerService:
             data: {"type":"error","code":"...","message":"..."}
             data: {"type":"done"}
         """
+        yield f'data: {{"type":"start","message":"开始检查学生画像和学习目标"}}\n\n'
+
         # 1. 获取学生画像
         profile = self.profile_service.get_profile(db, student_id)
         if not profile:
-            yield f'data: {{"type":"error","code":"PROFILE_NOT_FOUND","message":"请先完成学生画像构建"}}\n\n'
-            yield f'data: {{"type":"done"}}\n\n'
+            yield sse_error("PROFILE_NOT_FOUND", "请先完成学生画像构建")
+            yield sse_done()
             return
 
-        yield f'data: {{"type":"start","message":"开始生成个性化学习路径"}}\n\n'
+        yield f'data: {{"type":"progress","progress":20,"message":"画像读取完成，开始生成个性化学习路径"}}\n\n'
 
         # 2. 调用 PlannerAgent.chat() 流式生成
         async for event in self.agent.chat(

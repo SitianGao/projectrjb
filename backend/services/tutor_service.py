@@ -68,12 +68,14 @@ class TutorService:
         top_k: int = 3,
     ):
         """Stream tutor answers as unified SSE events with RAG references."""
-        self.profile_service.get_or_create_student(db, student_id)
-        profile = self.profile_service.get_profile(db, student_id)
-
         if not session_id or session_id not in self._sessions:
             session = self.create_session(student_id, title=message[:24] or "辅导会话")
             session_id = session["session_id"]
+
+        yield _sse_event("start", session_id=session_id, message="开始生成辅导回复")
+
+        self.profile_service.get_or_create_student(db, student_id)
+        profile = self.profile_service.get_profile(db, student_id)
 
         now = _now_iso()
         self._messages.setdefault(session_id, []).append({
@@ -82,8 +84,6 @@ class TutorService:
             "created_at": now,
         })
         self._touch_session(session_id)
-
-        yield _sse_event("start", session_id=session_id, message="开始生成辅导回复")
 
         references = self._retrieve_references(message, top_k=top_k)
         context = _references_to_context(references)

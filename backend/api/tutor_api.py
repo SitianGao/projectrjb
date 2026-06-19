@@ -11,41 +11,14 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from api.openapi_examples import json_responses, sse_responses
 from api.response import ok, sse_done, sse_error
 from database import SessionLocal
 from deps import tutor_service
 
 router = APIRouter()
 
-TUTOR_SSE_RESPONSES = {
-    200: {
-        "description": "SSE stream: start/delta/data/error/done",
-        "content": {
-            "text/event-stream": {
-                "example": (
-                    'data: {"type":"start","session_id":"...","message":"开始生成辅导回复"}\n\n'
-                    'data: {"type":"delta","content":"...","delta":"..."}\n\n'
-                    'data: {"type":"data","data":{"answer":"...","explanation_style":"analogy",'
-                    '"references":[],"diagrams":[],"session_id":"..."}}\n\n'
-                    'data: {"type":"done","session_id":"..."}\n\n'
-                )
-            }
-        },
-    },
-    422: {
-        "description": "统一参数错误",
-        "content": {
-            "application/json": {
-                "example": {
-                    "success": False,
-                    "error": True,
-                    "code": "VALIDATION_ERROR",
-                    "message": "Field required",
-                }
-            }
-        },
-    },
-}
+TUTOR_SSE_RESPONSES = sse_responses("TUTOR_CHAT_FAILED")
 
 
 class TutorChatRequest(BaseModel):
@@ -129,25 +102,25 @@ async def tutor_ask_stream(request: TutorChatRequest):
     return await _stream_tutor_response(request)
 
 
-@router.get("/history/{session_id}")
+@router.get("/history/{session_id}", responses=json_responses())
 async def get_tutor_history(session_id: str):
     """获取对话历史"""
     return ok({"session_id": session_id, "messages": []})
 
 
-@router.get("/sessions")
+@router.get("/sessions", responses=json_responses())
 async def list_tutor_sessions(student_id: str):
     """获取辅导会话列表。"""
     return ok(tutor_service.list_sessions(student_id))
 
 
-@router.post("/sessions")
+@router.post("/sessions", responses=json_responses())
 async def create_tutor_session(request: TutorSessionRequest):
     """创建辅导会话。"""
     return ok(tutor_service.create_session(request.student_id, request.title), "会话已创建")
 
 
-@router.post("/check")
+@router.post("/check", responses=json_responses())
 async def submit_answer():
     """提交答案供检查（前端兼容）"""
     return ok({"status": "ok", "correct": None, "feedback": "答案检查功能待 EvaluateAgent 接入。"})
