@@ -33,14 +33,15 @@ class ResourceService:
         profile = self.profile_service.get_profile(db, student_id)
 
         if self.resource_agent:
-            result = await self.resource_agent.generate_resources(
+            result = await self.resource_agent.generate(
                 topic=topic,
-                resource_types=types,
+                types=types,
                 difficulty=difficulty,
-                profile=profile,
+                student_profile=profile,
+                count=count,
             )
         else:
-            result = _template_resources(topic, types, difficulty)
+            result = _template_resources(topic, types, difficulty, count)
 
         saved = []
         for item in result.get("resources", []):
@@ -82,22 +83,22 @@ class ResourceService:
         difficulty: str = "中级",
         count: int = 1,
     ):
-        """SSE 流式生成资源。内部调用 generate_resources()，以 SSE 事件输出。"""
+        """Proxy the resource agent SSE stream."""
         self.profile_service.get_or_create_student(db, student_id)
         profile = self.profile_service.get_profile(db, student_id)
+        if self.resource_agent:
+            async for event in self.resource_agent.generate_stream(
+                topic=topic,
+                types=types,
+                difficulty=difficulty,
+                student_profile=profile,
+                count=count,
+            ):
+                yield event
+            return
 
         yield f'data: {{"type":"start","message":"开始生成{topic}学习资源"}}\n\n'
-
-        if self.resource_agent:
-            result = await self.resource_agent.generate_resources(
-                topic=topic,
-                resource_types=types,
-                difficulty=difficulty,
-                profile=profile,
-            )
-        else:
-            result = _template_resources(topic, types, difficulty)
-
+        result = _template_resources(topic, types, difficulty, count)
         yield f'data: {{"type":"data","data":{_json_dumps(result)}}}\n\n'
         yield f'data: {{"type":"done"}}\n\n'
 
@@ -186,7 +187,7 @@ def _template_resources(
     topic: str,
     types: Optional[List[str]],
     difficulty: str,
-    count: int = 1,
+    count: int,
 ) -> Dict:
     allowed = {"document", "exercise", "code", "mindmap", "reading"}
     normalized_types = [item for item in (types or ["document", "exercise", "code"]) if item in allowed]
