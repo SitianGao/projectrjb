@@ -177,14 +177,12 @@ data/
 │   └── exercises.json          # 题库（JSON 格式）
 │
 └── sql/                         # 数据库脚本
-    ├── schema.sql              # 建表语句（5 张表）
-    └── seed.sql                # 初始测试数据（可选）
+    └── schema.sql              # 建表语句（5 张表）
 
 test/                            # 测试文件
 ├── test_profile_agent.py
 ├── test_planner_agent.py
 ├── test_resource_agent.py
-├── test_rag.py
 └── test_safety.py
 ```
 

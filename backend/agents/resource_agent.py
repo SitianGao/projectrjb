@@ -3,18 +3,17 @@ ResourceAgent —— 学习资源生成智能体
 
 根据学习路径、学生画像和知识库，生成个性化多模态学习资源。
 
-输出结构（对齐 docs/design.md §10.4.3）:
-    resources: list[dict]
-        type: str        — document | mindmap | exercise | code | reading | ppt
-        title: str       — 资源标题
-        topic: str       — 知识点主题
-        difficulty: str  — 初级 | 中级 | 高级
-        content: str     — Markdown / JSON / 代码内容
+合同（对齐 docs/design.md §10.4.3）:
+    主入口: generate_resources(topic, resource_types, difficulty, profile, knowledge_context)
+    返回:   {"resources": [{"type", "title", "topic", "difficulty", "content"}, ...]}
 """
 import json
+import logging
 from typing import Optional, List, Dict
 
 from .base_agent import BaseAgent
+
+logger = logging.getLogger(__name__)
 
 
 class ResourceAgent(BaseAgent):
@@ -23,7 +22,7 @@ class ResourceAgent(BaseAgent):
     def __init__(self, llm_client=None):
         super().__init__(llm_client)
 
-    # 各资源类型的详细 Prompt 模板（Day 7: reading/mindmap/ppt 强化）
+    # 各资源类型的详细 Prompt 模板
     TYPE_PROMPTS = {
         "document": (
             "生成一份结构化 Markdown 讲解文档，要求：\n"
@@ -94,10 +93,12 @@ class ResourceAgent(BaseAgent):
             "- 高级: 深入理论推导、性能优化、前沿扩展。\n"
             "- 视觉型学习者 (cognitive_style=图解/案例): 多给图示思路和案例。\n\n"
             "## 防幻觉约束\n"
-            "- 公式、定理务必核实，不编造。\n"
-            "- 代码确保语法正确、逻辑合理。\n"
-            "- 不确定内容标注「建议核实」。\n"
-            "- 附带 sources 字段标注知识来源。\n\n"
+            "1. 公式、定理务必核实，不编造——不确定的标注『建议核实』。\n"
+            "2. 代码确保语法正确、逻辑合理、可直接运行。\n"
+            "3. 练习题必须有正确答案——干扰项要有迷惑性但必须是错的，不能给模糊或双关的选项。\n"
+            "4. 超出知识范围请诚实告知，不编造内容。\n"
+            "5. 附带 sources 字段标注知识来源；无可靠来源时标注『建议核实』。\n"
+            "6. 不生成违规、敏感或不安全的内容。\n\n"
             "## 输出格式\n"
             "严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}\n"
             "content 字段为 Markdown 字符串（exercise 类型为 JSON 字符串）。"
@@ -132,7 +133,7 @@ class ResourceAgent(BaseAgent):
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
-    # 主入口
+    # 主入口（合同方法）
     # ------------------------------------------------------------------
     async def generate_resources(
         self,
@@ -141,21 +142,23 @@ class ResourceAgent(BaseAgent):
         difficulty: str = "中级",
         profile: Optional[dict] = None,
         knowledge_context: Optional[List[str]] = None,
-    ) -> str:
+    ) -> Dict:
         """
-        生成学习资源 JSON。
+        生成学习资源。
 
         Args:
             topic: 知识点主题
-            resource_types: 要生成的资源类型列表
+            resource_types: 要生成的资源类型列表，默认 ["document"]
             difficulty: 难度等级（初级/中级/高级）
             profile: 学生画像
             knowledge_context: RAG 检索到的知识库上下文
+
         Returns:
-            JSON 字符串，含 resources 数组
+            {"resources": [{"type", "title", "topic", "difficulty", "content"}, ...]}
         """
         resource_types = resource_types or ["document"]
-        profile_json = json.dumps(profile or {}, ensure_ascii=False, indent=2)
+        profile = profile or {}
+        profile_json = json.dumps(profile, ensure_ascii=False, indent=2)
         context_text = "\n".join(knowledge_context or [])
 
         if self.llm:
@@ -170,11 +173,73 @@ class ResourceAgent(BaseAgent):
                 chunks = []
                 async for chunk in self.call_llm(user_prompt):
                     chunks.append(chunk)
-                return "".join(chunks)
-            except Exception:
-                pass
+                raw = "".join(chunks)
+                result = self._parse_and_validate(raw, topic, resource_types, difficulty, profile)
+                if result is not None:
+                    return result
+            except Exception as exc:
+                logger.warning("ResourceAgent LLM 调用失败，回退规则化: %s", exc)
 
-        return self._rule_based_resources(topic, resource_types, difficulty, profile or {})
+        return self._rule_based_resources(topic, resource_types, difficulty, profile)
+
+    # ------------------------------------------------------------------
+    # LLM 输出校验
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _parse_and_validate(
+        raw: str,
+        topic: str,
+        resource_types: List[str],
+        difficulty: str,
+        profile: dict,
+    ) -> Optional[Dict]:
+        """
+        校验 LLM 输出。
+
+        合法条件:
+        1. 能够解析为合法 JSON
+        2. 包含 "resources" 键
+        3. "resources" 是 list
+
+        Returns:
+            合法的 dict，或 None（表示需要回退）
+        """
+        # 1. 解析 JSON
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("ResourceAgent: LLM 输出非合法 JSON，回退规则化")
+            return None
+
+        # 2. 检查 resources 键
+        if "resources" not in data:
+            logger.warning("ResourceAgent: LLM 输出缺少 resources 键，回退规则化")
+            return None
+
+        # 3. 检查 resources 是 list
+        resources = data["resources"]
+        if not isinstance(resources, list):
+            logger.warning("ResourceAgent: resources 不是 list，回退规则化")
+            return None
+
+        # 4. 规范化每个资源项，确保 5 个必有字段
+        normalized = []
+        for i, item in enumerate(resources):
+            if not isinstance(item, dict):
+                continue
+            normalized.append({
+                "type": item.get("type", resource_types[0] if resource_types else "document"),
+                "title": item.get("title", f"{topic} 学习资源"),
+                "topic": item.get("topic", topic),
+                "difficulty": item.get("difficulty", difficulty),
+                "content": item.get("content", ""),
+            })
+
+        if not normalized:
+            logger.warning("ResourceAgent: resources 为空，回退规则化")
+            return None
+
+        return {"resources": normalized}
 
     # ------------------------------------------------------------------
     # 规则化兜底（无需 LLM）
@@ -185,7 +250,7 @@ class ResourceAgent(BaseAgent):
         resource_types: List[str],
         difficulty: str,
         profile: dict,
-    ) -> str:
+    ) -> Dict:
         """开发期无 API Key 时使用的规则化资源生成"""
         resources = []
         profile_inner = profile.get("profile", profile)
@@ -210,7 +275,7 @@ class ResourceAgent(BaseAgent):
                 "content": content,
             })
 
-        return json.dumps({"resources": resources}, ensure_ascii=False, indent=2)
+        return {"resources": resources}
 
     def _build_content(
         self, rtype: str, topic: str, difficulty: str, cognitive: str
