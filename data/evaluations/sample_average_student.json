@@ -1,0 +1,64 @@
+{
+  "student_id": "demo-average-002",
+  "evaluation_time": "2026-06-18T10:30:00+08:00",
+  "overall_score": 67.5,
+  "dimensions": [
+    {
+      "name": "knowledge_mastery",
+      "score": 68.0,
+      "comment": "存在知识盲区，建议针对性复习。基础概念基本理解，但在综合应用和公式推导方面仍有欠缺。"
+    },
+    {
+      "name": "progress",
+      "score": 72.0,
+      "comment": "进度正常，按计划推进。已完成数据预处理和监督学习基础，正在学习决策树和集成方法。"
+    },
+    {
+      "name": "efficiency",
+      "score": 58.0,
+      "comment": "效率偏低，建议优化学习方法。单位时间掌握知识点数量较少，可能存在注意力分散或方法不当的问题。"
+    },
+    {
+      "name": "weakness_analysis",
+      "score": 70.0,
+      "comment": "检测到 3 个薄弱知识点，主要集中在模型评估指标、特征工程和超参数调优方面。"
+    }
+  ],
+  "weak_topics": [
+    "交叉验证与模型评估指标",
+    "特征选择与降维（PCA）",
+    "超参数调优（GridSearch）"
+  ],
+  "suggestions": [
+    "建议回顾课堂笔记和教材相关章节，重点理解模型评估指标的计算和适用场景",
+    "尝试用思维导图整理特征工程的知识体系（缺失值→编码→标准化→特征选择→降维）",
+    "针对超参数调优，建议先用一个小数据集手动调参理解每个参数的影响，再学习 GridSearchCV 自动化方法",
+    "每天固定 1-2 小时学习时间，使用番茄钟保持专注"
+  ],
+  "review_plan": [
+    {
+      "topic": "交叉验证与模型评估指标",
+      "urgency": "high",
+      "reason": "距上次学习已过 7 天，记忆保留率约 28%，远低于阈值 60%，需立即复习。",
+      "recommended_resources": ["document", "exercise"]
+    },
+    {
+      "topic": "特征选择与降维（PCA）",
+      "urgency": "high",
+      "reason": "练习正确率偏低（45%），属于薄弱知识点，且距上次学习已过 5 天。",
+      "recommended_resources": ["exercise", "document"]
+    },
+    {
+      "topic": "超参数调优（GridSearch）",
+      "urgency": "medium",
+      "reason": "练习正确率偏低（52%），属于薄弱知识点，建议通过代码实践加深理解。",
+      "recommended_resources": ["exercise", "code"]
+    },
+    {
+      "topic": "决策树与随机森林",
+      "urgency": "medium",
+      "reason": "距上次学习已过 4 天，记忆保留率约 48%，建议近期复习以保持掌握度。",
+      "recommended_resources": ["document"]
+    }
+  ]
+}

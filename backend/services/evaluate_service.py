@@ -1,31 +1,52 @@
-"""Learning evaluation service."""
+"""Learning evaluation service —— 集成 EvaluateAgent（Day 9）
+
+队长重构（main）：DB 持久化 + 统计维度 + 辅助函数
+队员B增强（feature/ai-core）：EvaluateAgent LLM 增强 + 异步 SSE 入口
+"""
 
 from __future__ import annotations
 
 import datetime
 import json
+import logging
 import math
 import uuid
 from collections import defaultdict
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
 from models.evaluation import EvaluationReport, LearningRecord
 
+logger = logging.getLogger(__name__)
+
 
 class EvaluateService:
-    """Stores learning records and persists Day 9 evaluation reports."""
+    """学习记录管理 + 多维度评估报告（DB 持久化 + EvaluateAgent 增强）"""
 
-    def __init__(self, profile_service):
+    def __init__(self, profile_service, evaluate_agent=None):
         self.profile_service = profile_service
+        self.evaluate_agent = evaluate_agent
+
+    # ── 评估入口 ──────────────────────────────────────────
 
     def start_evaluation(self, db: Session, student_id: str) -> Dict:
-        """Generate a fresh report from learning records and save it."""
+        """生成评估报告、保存到 DB（同步，纯统计）"""
         self.profile_service.get_or_create_student(db, student_id)
         report = self._compute_report(db, student_id)
         saved = self._save_report(db, student_id, report)
         return self._report_to_dict(saved)
+
+    async def start_evaluation_async(self, db: Session, student_id: str) -> Dict:
+        """异步评估入口（SSE 端点使用，含 EvaluateAgent LLM 增强）"""
+        self.profile_service.get_or_create_student(db, student_id)
+        report = self._compute_report(db, student_id)
+        # EvaluateAgent 增强：用 LLM 优化 dimensions/suggestions/review_plan
+        report = await self._enhance_with_agent(student_id, db, report)
+        saved = self._save_report(db, student_id, report)
+        return self._report_to_dict(saved)
+
+    # ── 学习记录 ──────────────────────────────────────────
 
     def record_learning(
         self,
@@ -53,7 +74,7 @@ class EvaluateService:
         return self._record_to_dict(record)
 
     def build_report(self, db: Session, student_id: str) -> Dict:
-        """Return the latest saved report, creating one on first request."""
+        """返回最新保存的报告，无报告时新建"""
         self.profile_service.get_or_create_student(db, student_id)
         latest = (
             db.query(EvaluationReport)
@@ -79,7 +100,10 @@ class EvaluateService:
         )
         return [self._record_to_dict(record) for record in records]
 
+    # ── 核心：计算报告（队长统计） ──────────────────────────
+
     def _compute_report(self, db: Session, student_id: str) -> Dict:
+        """统计 + 规则化评估：dimensions / weak_topics / suggestions / review_plan"""
         records = (
             db.query(LearningRecord)
             .filter(LearningRecord.student_id == student_id)
@@ -213,6 +237,69 @@ class EvaluateService:
             },
         }
 
+    # ── EvaluateAgent 增强（队员B Day 9）───────────────────
+
+    async def _enhance_with_agent(self, student_id: str, db: Session, report: Dict) -> Dict:
+        """用 EvaluateAgent LLM 增强报告中的 AI 字段（dimensions/weak_topics/suggestions/review_plan）"""
+        if not self.evaluate_agent:
+            return report
+
+        try:
+            records = (
+                db.query(LearningRecord)
+                .filter(LearningRecord.student_id == student_id)
+                .order_by(LearningRecord.created_at.asc())
+                .all()
+            )
+            record_dicts = [self._record_to_dict(r) for r in records]
+            profile = self._get_profile(db, student_id)
+
+            raw = await self.evaluate_agent.evaluate(
+                student_id=student_id,
+                profile=profile,
+                records=record_dicts,
+                path=None,
+            )
+            ai_fields = self._parse_agent_result(raw)
+
+            # 用 Agent 的 AI 增强结果覆盖统计结果（更个性化）
+            if ai_fields.get("dimensions"):
+                report["dimensions"] = ai_fields["dimensions"]
+            if ai_fields.get("weak_topics"):
+                report["weak_topics"] = ai_fields["weak_topics"]
+            if ai_fields.get("suggestions"):
+                report["suggestions"] = ai_fields["suggestions"]
+            if ai_fields.get("review_plan"):
+                report["review_plan"] = ai_fields["review_plan"]
+        except Exception as exc:
+            logger.warning("EvaluateAgent 增强失败，保留统计结果: %s", exc)
+
+        return report
+
+    @staticmethod
+    def _parse_agent_result(raw: str) -> Dict:
+        """解析 Agent JSON，提取 AI 增强字段"""
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else raw
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return {
+            "dimensions": data.get("dimensions", []),
+            "weak_topics": data.get("weak_topics", []),
+            "suggestions": data.get("suggestions", []),
+            "review_plan": data.get("review_plan", []),
+        }
+
+    def _get_profile(self, db: Session, student_id: str) -> Dict:
+        """获取学生画像 dict（供 Agent 使用）"""
+        try:
+            profile = self.profile_service.get_profile(db, student_id)
+            return profile if isinstance(profile, dict) else {}
+        except Exception:
+            return {}
+
+    # ── 持久化 ────────────────────────────────────────────
+
     def _save_report(self, db: Session, student_id: str, report: Dict) -> EvaluationReport:
         record = EvaluationReport(
             id=str(uuid.uuid4()),
@@ -293,6 +380,10 @@ class EvaluateService:
             "updated_at": report.updated_at.isoformat() if report.updated_at else None,
         }
 
+
+# ══════════════════════════════════════════════════════════════
+# 模块级辅助函数（队长）
+# ══════════════════════════════════════════════════════════════
 
 def _score_to_percent(score: float) -> float:
     score = float(score)
