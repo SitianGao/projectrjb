@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Typography, Button, Space, Card, Row, Col, Statistic, Tag, message, Modal, Progress } from 'antd'
+import { Typography, Button, Space, Card, Row, Col, Statistic, Tag, message, Modal, Progress, Alert, Result } from 'antd'
 import {
   PlusOutlined,
   ReloadOutlined,
@@ -16,10 +16,6 @@ import ProgressBar from '../components/ProgressBar'
 import ForgettingCurve from '../components/ForgettingCurve'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { getLearningPath, generateLearningPath } from '../api/planner'
-import { mockPath, mockStats } from '../mock/learningPathData'
-import { shouldUseMock } from '../utils/useMock'
-
-const USE_MOCK = shouldUseMock()
 
 /**
  * SSE 事件类型：start | delta | data | error | done
@@ -63,6 +59,7 @@ function stagesToNodes(stages, currentStage) {
 export default function LearningPathPage() {
   const [pathData, setPathData] = useState(null)   // { student_id, title, stages, ... }
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [detailType, setDetailType] = useState(null) // 'stages' | 'tasks' | 'time' | 'streak' | null
 
@@ -71,19 +68,15 @@ export default function LearningPathPage() {
   }, [])
 
   async function loadPath() {
+    setError(null)
     setLoading(true)
     try {
       const data = await getLearningPath('demo-student-01')
       setPathData(data)
-    } catch {
-      // 后端不可用时使用 Mock 数据（仅在 VITE_USE_MOCK=true 时）
-      if (USE_MOCK) {
-        setTimeout(() => {
-          setPathData(mockPath)
-          setLoading(false)
-        }, 600)
-        return
-      }
+    } catch (err) {
+      setError(err.message || '获取学习路径失败')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -152,13 +145,29 @@ export default function LearningPathPage() {
       }
     } catch (err) {
       message.error('生成失败: ' + err.message)
-      if (USE_MOCK) setPathData(mockPath)
     } finally {
       setGenerating(false)
     }
   }
 
   if (loading) return <LoadingSkeleton type="detail" />
+
+  if (error) {
+    return (
+      <div style={{ maxWidth: 600, margin: '60px auto', padding: 24 }}>
+        <Result
+          status="error"
+          title="加载失败"
+          subTitle={error}
+          extra={
+            <Button type="primary" icon={<ReloadOutlined />} onClick={loadPath}>
+              重新加载
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   const stages = pathData?.stages || []
   const totalTasks = stages.reduce((sum, s) => sum + (s.tasks?.length || 0), 0)
@@ -238,7 +247,7 @@ export default function LearningPathPage() {
           >
             <Statistic
               title="学习时长"
-              value={mockStats.totalStudyTime}
+              value="--"
               prefix={<ClockCircleOutlined style={{ color: '#fa8c16' }} />}
             />
           </Card>
@@ -253,8 +262,7 @@ export default function LearningPathPage() {
           >
             <Statistic
               title="连续学习"
-              value={mockStats.streak}
-              suffix="天"
+              value="--"
               prefix={<FireOutlined style={{ color: '#eb2f96' }} />}
             />
           </Card>
@@ -297,7 +305,7 @@ export default function LearningPathPage() {
         stages={stages}
         totalTasks={totalTasks}
         completedTasks={completedTasks}
-        stats={mockStats}
+        stats={null}
         onClose={() => setDetailType(null)}
       />}
     </div>
@@ -321,7 +329,7 @@ function DetailModalContent({ type, stages, totalTasks, completedTasks, stats, o
   const mockWeek = labelMap.map((label, i) => {
     const offset = i - (todayIdx || 7) // 周一=0
     const d = new Date(); d.setDate(d.getDate() + offset)
-    const studied = offset <= 0 && offset > -(stats.streak || 0)
+    const studied = offset <= 0 && offset > -(stats?.streak || 0)
     return { label, date: `${d.getMonth() + 1}/${d.getDate()}`, studied }
   })
 
@@ -396,9 +404,9 @@ function DetailModalContent({ type, stages, totalTasks, completedTasks, stats, o
     case 'time':
       body = <>
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-          <Col span={8}><Card size="small" style={{ textAlign: 'center', background: '#f6ffed' }}><Statistic title="总学习时长" value={stats.totalStudyTime} prefix={<ClockCircleOutlined style={{ color: '#52c41a' }} />} /></Card></Col>
-          <Col span={8}><Card size="small" style={{ textAlign: 'center', background: '#e6f4ff' }}><Statistic title="日均学习" value="1.3h" prefix={<RiseOutlined style={{ color: '#1677ff' }} />} /></Card></Col>
-          <Col span={8}><Card size="small" style={{ textAlign: 'center', background: '#fff7e6' }}><Statistic title="本周目标" value={`${stats.weeklyGoal?.completed || 0}/${stats.weeklyGoal?.total || 5}`} prefix={<TrophyOutlined style={{ color: '#fa8c16' }} />} suffix="项" /></Card></Col>
+          <Col span={8}><Card size="small" style={{ textAlign: 'center', background: '#f6ffed' }}><Statistic title="总学习时长" value={stats?.totalStudyTime || '--'} prefix={<ClockCircleOutlined style={{ color: '#52c41a' }} />} /></Card></Col>
+          <Col span={8}><Card size="small" style={{ textAlign: 'center', background: '#e6f4ff' }}><Statistic title="日均学习" value="--" prefix={<RiseOutlined style={{ color: '#1677ff' }} />} /></Card></Col>
+          <Col span={8}><Card size="small" style={{ textAlign: 'center', background: '#fff7e6' }}><Statistic title="本周目标" value={`${stats?.weeklyGoal?.completed || 0}/${stats?.weeklyGoal?.total || 0}`} prefix={<TrophyOutlined style={{ color: '#fa8c16' }} />} suffix="项" /></Card></Col>
         </Row>
         <Text strong style={{ display: 'block', marginBottom: 12 }}>📊 各阶段学习时间分布</Text>
         {stages.length === 0 ? <Text type="secondary">暂无阶段数据</Text>
@@ -420,7 +428,7 @@ function DetailModalContent({ type, stages, totalTasks, completedTasks, stats, o
     case 'streak':
       body = <>
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-          <Col span={12}><Card size="small" style={{ textAlign: 'center', background: '#fff0f6' }}><Statistic title="🔥 当前连续学习" value={stats.streak} suffix="天" valueStyle={{ color: '#eb2f96', fontSize: 36 }} /></Card></Col>
+          <Col span={12}><Card size="small" style={{ textAlign: 'center', background: '#fff0f6' }}><Statistic title="🔥 当前连续学习" value={stats?.streak || '--'} suffix="天" valueStyle={{ color: '#eb2f96', fontSize: 36 }} /></Card></Col>
           <Col span={12}><Card size="small" style={{ textAlign: 'center', background: '#f9f0ff' }}><Statistic title="🏆 最长连续记录" value={12} suffix="天" valueStyle={{ color: '#722ed1', fontSize: 36 }} /></Card></Col>
         </Row>
         <Text strong style={{ display: 'block', marginBottom: 12 }}>📅 本周学习日历</Text>

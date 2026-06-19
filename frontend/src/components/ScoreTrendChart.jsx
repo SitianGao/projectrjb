@@ -17,10 +17,24 @@ const HEIGHT = 280
  * @param {Array<{date: string, score: number}>} props.data - 评分数据
  * @param {number} props.height - SVG 高度（默认 280）
  */
-export default function ScoreTrendChart({ data = [], height = HEIGHT }) {
+export default function ScoreTrendChart({ data = [], height = HEIGHT, loading = false }) {
   const [tooltip, setTooltip] = useState(null)
   const gradientId = useId()
   const clipId = useId()
+
+  if (loading) {
+    return (
+      <div style={{
+        width: '100%', height, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'linear-gradient(90deg, rgba(0,0,0,0.02) 25%, rgba(0,0,0,0.06) 50%, rgba(0,0,0,0.02) 75%)',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 1.5s infinite',
+        borderRadius: 8,
+      }}>
+        <span style={{ color: '#ccc', fontSize: 14 }}>加载中...</span>
+      </div>
+    )
+  }
 
   if (!data.length) {
     return (

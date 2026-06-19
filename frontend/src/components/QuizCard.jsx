@@ -23,6 +23,7 @@ export default function QuizCard({
   quiz,
   onAnswered,
   showResult = false,
+  loading = false,
 }) {
   const [selected, setSelected] = useState(null)
   const [submitted, setSubmitted] = useState(false)
@@ -45,6 +46,10 @@ export default function QuizCard({
     setSelected(null)
     setSubmitted(false)
   }, [])
+
+  if (loading) {
+    return <Card loading style={{ maxWidth: 800, margin: '0 auto', minHeight: 200 }} />
+  }
 
   if (!quiz) {
     return (

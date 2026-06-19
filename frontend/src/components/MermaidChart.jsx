@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Spin, Typography } from 'antd'
+import { Spin, Typography, Button } from 'antd'
+import { ReloadOutlined } from '@ant-design/icons'
 import { useTheme } from '../contexts/ThemeContext'
 
 const { Text } = Typography
@@ -79,8 +80,12 @@ export default function MermaidChart({ chart = '', loading = false, theme = 'def
 
   if (errorText) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
-        <Text type="danger">图表渲染错误: {errorText}</Text>
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center', minHeight: 200, gap: 12,
+      }}>
+        <Text type="danger">⚠️ 图表渲染错误: {errorText}</Text>
+        <Button icon={<ReloadOutlined />} onClick={doRender} size="small">重新渲染</Button>
       </div>
     )
   }

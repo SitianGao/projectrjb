@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
-import { Spin, Typography } from 'antd'
+import { useEffect, useRef, useState } from 'react'
+import { Spin, Typography, Button } from 'antd'
+import { ReloadOutlined } from '@ant-design/icons'
 import { Transformer } from 'markmap-lib'
 import { Markmap } from 'markmap-view'
 
@@ -18,9 +19,13 @@ const { Text } = Typography
 export default function MindMapViewer({ content = '', options = {}, loading = false }) {
   const containerRef = useRef(null)
   const markmapRef = useRef(null)
+  const [error, setError] = useState(null)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     if (!content || !containerRef.current) return
+
+    setError(null)
 
     ;(async () => {
       try {
@@ -42,18 +47,33 @@ export default function MindMapViewer({ content = '', options = {}, loading = fa
         }
       } catch (err) {
         console.error('MindMap rendering error:', err)
+        setError(err.message || '思维导图渲染失败')
       }
     })()
 
     return () => {
       // markmap 实例不主动销毁，便于复用
     }
-  }, [content, options])
+  }, [content, options, retryKey])
+
+  const handleRetry = () => setRetryKey((k) => k + 1)
 
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
         <Spin tip="加载思维导图..." />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center', minHeight: 200, gap: 12,
+      }}>
+        <Text type="danger">⚠️ {error}</Text>
+        <Button icon={<ReloadOutlined />} onClick={handleRetry} size="small">重新渲染</Button>
       </div>
     )
   }

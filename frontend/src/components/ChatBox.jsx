@@ -6,6 +6,7 @@ import {
   RobotOutlined,
   StopOutlined,
   ArrowDownOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import MarkdownRenderer from './MarkdownRenderer'
 import { useTheme } from '../contexts/ThemeContext'
@@ -84,6 +85,7 @@ export default function ChatBox({
   isLoading = false,
   onSend,
   onAbort,
+  onRetry,
   placeholder = '输入你的问题...',
   showEmpty = true,
   emptyText = '开始一段对话吧',
@@ -254,7 +256,19 @@ export default function ChatBox({
                       ) : (
                         msg.error ? (
                           <div>
-                            <Text type="danger" style={{ fontSize: 13 }}>⚠️ {msg.error}</Text>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <Text type="danger" style={{ fontSize: 13 }}>⚠️ {msg.error}</Text>
+                              {onRetry && (
+                                <Tooltip title="重新发送">
+                                  <Button
+                                    type="text" size="small" danger
+                                    icon={<ReloadOutlined />}
+                                    onClick={() => onRetry(msg)}
+                                    style={{ padding: '0 4px', minWidth: 24, height: 24 }}
+                                  />
+                                </Tooltip>
+                              )}
+                            </div>
                             {msg.content && <div style={{ marginTop: 8, opacity: 0.5 }}><MarkdownRenderer content={msg.content} compact /></div>}
                           </div>
                         ) : (

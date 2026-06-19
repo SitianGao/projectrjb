@@ -1,17 +1,17 @@
 import { useState, useId } from 'react'
-import { Card, Typography, Tag, Switch, Space, Tooltip } from 'antd'
+import { Card, Typography, Tag, Switch, Space, Tooltip, Spin } from 'antd'
 import { QuestionCircleOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { useTheme } from '../contexts/ThemeContext'
 
 const { Text, Title } = Typography
 
 // ─── 布局常量 ──────────────────────────────────────
-const PAD_LEFT = 52
-const PAD_RIGHT = 20
-const PAD_TOP = 16
-const PAD_BOTTOM = 36
+const PAD_LEFT = 56
+const PAD_RIGHT = 24
+const PAD_TOP = 30
+const PAD_BOTTOM = 42
 const WIDTH = 640
-const HEIGHT = 260
+const HEIGHT = 290
 
 const CHART_W = WIDTH - PAD_LEFT - PAD_RIGHT
 const CHART_H = HEIGHT - PAD_TOP - PAD_BOTTOM
@@ -85,7 +85,7 @@ function buildCurvePath(points, getX, getY) {
  * @param {boolean} props.showReview  - 是否默认显示复习曲线（默认 true）
  * @param {boolean} props.compact     - 紧凑模式（隐藏说明文字）
  */
-export default function ForgettingCurve({ style, showReview = true, compact = false }) {
+export default function ForgettingCurve({ style, showReview = true, compact = false, loading = false }) {
   const [showSpaced, setShowSpaced] = useState(showReview)
   const [tooltip, setTooltip] = useState(null)
   const gradientId = useId().replace(/:/g, '')
@@ -93,19 +93,35 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
   const { resolved } = useTheme()
   const isDark = resolved === 'dark'
 
+  if (loading) {
+    return (
+      <Card
+        loading
+        style={{
+          borderRadius: 14,
+          border: '1px solid var(--border)',
+          background: 'var(--bg-card)',
+          minHeight: 260,
+          ...style,
+        }}
+      />
+    )
+  }
+
   // ── 主题色彩 ────────────────────────────
   const colors = {
-    forgettingLine: '#f59e0b',       // 遗忘曲线 — 琥珀
+    forgettingLine: '#f59e0b',
     forgettingFill: isDark ? 'rgba(245,158,11,0.08)' : 'rgba(245,158,11,0.1)',
-    spacedLine: '#22c55e',           // 复习曲线 — 绿色
+    spacedLine: '#22c55e',
     spacedFill: isDark ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.1)',
-    reviewDot: '#1677ff',            // 复习点 — 蓝色
+    reviewDot: '#1677ff',
     reviewGlow: 'rgba(22,119,255,0.3)',
     gridLine: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
     axisText: isDark ? 'rgba(255,255,255,0.45)' : '#999',
     axisLine: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
     titleText: isDark ? 'rgba(255,255,255,0.85)' : '#1a1a2e',
     subtitleText: isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c',
+    legendBg: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
   }
 
   // Y 轴刻度
@@ -135,6 +151,15 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
 
   // 复习点（包含回升后的点）
   const reviewMarkers = SPACED_POINTS.filter(p => p.review)
+
+  // 判断复习标签是否接近图表顶部 —— 若接近则改为右偏移，避免裁切
+  function getReviewLabelStyle(time, afterRate) {
+    const labelY = yPos(afterRate) - 12
+    if (labelY < PAD_TOP) {
+      return { dx: 14, labelDy: 2, anchor: 'start', pctDy: 2, pctAnchor: 'start' }
+    }
+    return { dx: 0, labelDy: -10, anchor: 'middle', pctDy: 16, pctAnchor: 'middle' }
+  }
 
   // ── 遗忘曲线面积闭合 ───────────────────
   const firstFP = FORGETTING_POINTS[0]
@@ -166,8 +191,8 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
       }}
       styles={{ body: { padding: compact ? '16px 20px' : '20px 24px' } }}
     >
-      {/* 标题栏 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: compact ? 8 : 12 }}>
+      {/* ── 标题栏 ──────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: compact ? 8 : 14 }}>
         <Space size={8}>
           <div style={{
             width: 32, height: 32, borderRadius: 10,
@@ -201,7 +226,7 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
         </Tooltip>
       </div>
 
-      {/* 图表 */}
+      {/* ── SVG 图表 ────────────────────────── */}
       <div style={{ position: 'relative', width: '100%', overflowX: 'auto' }}>
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -243,7 +268,7 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
                   stroke={colors.gridLine} strokeWidth={1}
                 />
                 <text
-                  x={PAD_LEFT - 8} y={y + 4}
+                  x={PAD_LEFT - 10} y={y + 4}
                   textAnchor="end" fill={colors.axisText}
                   fontSize={11} fontFamily="ui-monospace, monospace"
                 >
@@ -255,14 +280,14 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
 
           {/* Y 轴标题 */}
           <text
-            x={10} y={HEIGHT / 2}
+            x={8} y={HEIGHT / 2}
             textAnchor="middle" fill={colors.axisText}
-            fontSize={11} transform={`rotate(-90, 10, ${HEIGHT / 2})`}
+            fontSize={11} transform={`rotate(-90, 8, ${HEIGHT / 2})`}
           >
             记忆保留 (%)
           </text>
 
-          {/* X 轴标签 */}
+          {/* X 轴刻度线 + 标签 */}
           {xTicks.map((t) => {
             const x = xPos(t.day)
             return (
@@ -272,7 +297,7 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
                   stroke={colors.axisLine} strokeWidth={1}
                 />
                 <text
-                  x={x} y={HEIGHT - 8}
+                  x={x} y={HEIGHT - 10}
                   textAnchor="middle" fill={colors.axisText}
                   fontSize={11}
                 >
@@ -282,11 +307,18 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
             )
           })}
 
-          {/* X 轴 */}
+          {/* X 轴基线 */}
           <line
             x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT}
             y1={yPos(0)} y2={yPos(0)}
             stroke={colors.axisLine} strokeWidth={1}
+          />
+
+          {/* 100% 参考线 */}
+          <line
+            x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT}
+            y1={yPos(100)} y2={yPos(100)}
+            stroke={colors.gridLine} strokeWidth={1} strokeDasharray="4,4"
           />
 
           {/* 遗忘曲线面积 */}
@@ -304,13 +336,6 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
               clipPath={`url(#${clipId})`}
             />
           )}
-
-          {/* 100% 参考线 */}
-          <line
-            x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT}
-            y1={yPos(100)} y2={yPos(100)}
-            stroke={colors.gridLine} strokeWidth={1} strokeDasharray="4,4"
-          />
 
           {/* 遗忘曲线 — 虚线 */}
           <path
@@ -337,7 +362,7 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
             />
           )}
 
-          {/* 遗忘曲线数据点 */}
+          {/* ── 遗忘曲线数据点（悬停区微偏移，避免与复习曲线热区完全重叠）── */}
           {FORGETTING_POINTS.map((p, i) => {
             const x = xPos(p.time)
             const y = yPos(p.rate)
@@ -353,13 +378,15 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
                 onMouseLeave={() => setTooltip(null)}
                 style={{ cursor: 'pointer' }}
               >
-                <circle cx={x} cy={y} r={12} fill="transparent" />
+                {/* 透明热区 — 向下偏移 3px 与复习曲线热区错开 */}
+                <circle cx={x} cy={y + 3} r={10} fill="transparent" />
+                {/* 外圈 + 内点 */}
                 <circle cx={x} cy={y} r={4} fill={i === 0 ? colors.spacedLine : colors.forgettingLine} stroke="#fff" strokeWidth={1.5} />
               </g>
             )
           })}
 
-          {/* 复习曲线数据点 */}
+          {/* ── 复习曲线数据点 ────────────────── */}
           {showSpaced && SPACED_POINTS.map((p, i) => {
             const x = xPos(p.time)
             const y = yPos(p.rate)
@@ -368,14 +395,14 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
                 onMouseEnter={(e) => setTooltip({
                   cx: x, cy: y,
                   x: e.clientX, y: e.clientY,
-                  label: `${p.time} 天`,
+                  label: FORGETTING_POINTS[i]?.label || `${p.time} 天`,
                   rate: p.rate,
                   type: p.review ? 'review' : 'spaced',
                 })}
                 onMouseLeave={() => setTooltip(null)}
                 style={{ cursor: 'pointer' }}
               >
-                <circle cx={x} cy={y} r={12} fill="transparent" />
+                <circle cx={x} cy={y} r={10} fill="transparent" />
                 <circle
                   cx={x} cy={y}
                   r={p.review ? 5 : 3}
@@ -388,66 +415,55 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
             )
           })}
 
-          {/* 复习回升箭头 + after 点 */}
-          {showSpaced && reviewMarkers.map((m, i) => (
-            <g key={`rv-${i}`}>
-              {/* 回升指示线 */}
-              <line
-                x1={xPos(m.time)} y1={yPos(m.rate)}
-                x2={xPos(m.time)} y2={yPos(m.afterRate)}
-                stroke={colors.reviewDot}
-                strokeWidth={1.5}
-                strokeDasharray="3,3"
-              />
-              {/* 回升后圆点 */}
-              <circle
-                cx={xPos(m.time)} cy={yPos(m.afterRate)}
-                r={5}
-                fill={colors.spacedLine}
-                stroke="#fff"
-                strokeWidth={2}
-                filter={`url(#${gradientId}-glow)`}
-              />
-              {/* 复习标签 */}
-              <text
-                x={xPos(m.time)} y={yPos(m.afterRate) - 10}
-                textAnchor="middle" fill={colors.reviewDot}
-                fontSize={10} fontWeight={600}
-              >
-                {m.reviewLabel}
-              </text>
-              {/* 回升百分比 */}
-              <text
-                x={xPos(m.time)} y={yPos(m.afterRate) + 4}
-                textAnchor="middle" fill={colors.reviewDot}
-                fontSize={10} fontWeight={700}
-              >
-                ↑{m.afterRate}%
-              </text>
-            </g>
-          ))}
+          {/* ── 复习回升标记 ──────────────────── */}
+          {showSpaced && reviewMarkers.map((m, i) => {
+            const sx = xPos(m.time)
+            const sy = yPos(m.rate)
+            const ex = xPos(m.time)
+            const ey = yPos(m.afterRate)
+            const { dx, labelDy, anchor, pctDy, pctAnchor } = getReviewLabelStyle(m.time, m.afterRate)
 
-          {/* 图例 */}
-          <g transform={`translate(${WIDTH - PAD_RIGHT - 260}, ${PAD_TOP - 4})`}>
-            {/* 自然遗忘 */}
-            <line x1={0} y1={0} x2={22} y2={0}
-              stroke={colors.forgettingLine} strokeWidth={2} strokeDasharray="6,3" />
-            <text x={28} y={4} fill={colors.axisText} fontSize={11}>自然遗忘</text>
-            {/* 间隔复习 */}
-            {showSpaced && (
-              <>
-                <line x1={82} y1={0} x2={104} y2={0}
-                  stroke={colors.spacedLine} strokeWidth={2} />
-                <text x={110} y={4} fill={colors.axisText} fontSize={11}>间隔复习</text>
-
-                <circle cx={182} cy={0} r={4} fill={colors.reviewDot} stroke="#fff" strokeWidth={1.5} />
-                <text x={192} y={4} fill={colors.axisText} fontSize={11}>复习点</text>
-              </>
-            )}
-          </g>
+            return (
+              <g key={`rv-${i}`}>
+                {/* 回升虚线 */}
+                <line
+                  x1={sx} y1={sy}
+                  x2={ex} y2={ey}
+                  stroke={colors.reviewDot}
+                  strokeWidth={1.5}
+                  strokeDasharray="3,3"
+                />
+                {/* 回升后圆点（绿色） */}
+                <circle
+                  cx={ex} cy={ey}
+                  r={5}
+                  fill={colors.spacedLine}
+                  stroke="#fff"
+                  strokeWidth={2}
+                  filter={`url(#${gradientId}-glow)`}
+                />
+                {/* 复习标签 */}
+                <text
+                  x={ex + dx} y={ey + labelDy}
+                  textAnchor={anchor} fill={colors.reviewDot}
+                  fontSize={11} fontWeight={600}
+                >
+                  {m.reviewLabel}
+                </text>
+                {/* 回升百分比 */}
+                <text
+                  x={ex + dx} y={ey + pctDy}
+                  textAnchor={pctAnchor} fill={colors.reviewDot}
+                  fontSize={11} fontWeight={700}
+                >
+                  ↑{m.afterRate}%
+                </text>
+              </g>
+            )
+          })}
         </svg>
 
-        {/* 悬浮提示 */}
+        {/* ── 悬浮提示 ──────────────────────── */}
         {tooltip && (
           <div
             style={{
@@ -475,16 +491,58 @@ export default function ForgettingCurve({ style, showReview = true, compact = fa
         )}
       </div>
 
-      {/* 底部提示 */}
+      {/* ── 图例（图表下方，避免与数据区重叠）─── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 24, marginTop: 8, padding: '6px 0',
+        flexWrap: 'wrap',
+      }}>
+        {/* 自然遗忘 */}
+        <Space size={6}>
+          <span style={{
+            display: 'inline-block', width: 24, height: 2,
+            background: colors.forgettingLine,
+            borderRadius: 1,
+          }} />
+          <Text style={{ fontSize: 12, color: colors.axisText }}>自然遗忘</Text>
+        </Space>
+        {/* 间隔复习 */}
+        {showSpaced && (
+          <>
+            <Space size={6}>
+              <span style={{
+                display: 'inline-block', width: 18, height: 3,
+                background: colors.spacedLine,
+                borderRadius: 2,
+              }} />
+              <Text style={{ fontSize: 12, color: colors.axisText }}>间隔复习</Text>
+            </Space>
+            <Space size={6}>
+              <span style={{
+                display: 'inline-block', width: 8, height: 8,
+                borderRadius: '50%',
+                background: colors.reviewDot,
+                boxShadow: `0 0 4px ${colors.reviewDot}66`,
+              }} />
+              <Text style={{ fontSize: 12, color: colors.axisText }}>复习点</Text>
+            </Space>
+          </>
+        )}
+      </div>
+
+      {/* ── 底部提示 ────────────────────────── */}
       {!compact && showSpaced && (
         <div style={{
-          marginTop: 10, padding: '8px 12px', borderRadius: 8,
+          marginTop: 10, padding: '10px 14px', borderRadius: 8,
           background: 'var(--surface-secondary)',
           display: 'flex', alignItems: 'flex-start', gap: 8,
         }}>
           <ThunderboltOutlined style={{ color: '#8b5cf6', marginTop: 2, fontSize: 13 }} />
           <Text style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            <strong>间隔复习</strong>：学习后 1 天、3 天、7 天、30 天分别复习，可将长期记忆保留率从 <Text style={{ color: '#f59e0b', fontWeight: 600 }}>21%</Text> 提升至 <Text style={{ color: '#22c55e', fontWeight: 600 }}>85%+</Text>
+            <strong>间隔复习</strong>：学习后 1 天、3 天、7 天、30 天分别复习，可将长期记忆保留率从{' '}
+            <Text style={{ color: '#f59e0b', fontWeight: 600 }}>21%</Text>{' '}
+            提升至{' '}
+            <Text style={{ color: '#22c55e', fontWeight: 600 }}>85%+</Text>
           </Text>
         </div>
       )}
