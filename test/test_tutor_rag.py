@@ -207,3 +207,180 @@ def test_format_references_content():
     assert refs[0]["source"] == "source_a.md"
     assert len(refs[0]["content"]) <= 200  # content 截断在 200 字符
     assert refs[0]["similarity"] == 0.88
+
+
+# ==========================================================================
+# Day 12 扩展测试: TC-R09 ~ TC-R15
+# ==========================================================================
+
+# ── TC-R09: RetrieverConfig 预置场景加载正确 ──────────────────────
+def test_retriever_config_presets():
+    """TC-R09: 四种场景预设配置加载正确"""
+    from backend.rag.retriever_config import get_config, PRESETS
+
+    assert "tutor" in PRESETS
+    assert "resource" in PRESETS
+    assert "evaluate" in PRESETS
+    assert "default" in PRESETS
+
+    # 辅导场景：高召回
+    tutor_cfg = get_config("tutor")
+    assert tutor_cfg.min_similarity == 0.30
+    assert tutor_cfg.top_k == 3
+
+    # 资源匹配：高精确率
+    resource_cfg = get_config("resource")
+    assert resource_cfg.min_similarity == 0.40
+    assert resource_cfg.top_k == 5
+
+    # 评估回顾：最高召回
+    evaluate_cfg = get_config("evaluate")
+    assert evaluate_cfg.min_similarity == 0.25
+
+    # 未知场景退回 default
+    unknown_cfg = get_config("nonexistent")
+    assert unknown_cfg.min_similarity == PRESETS["default"].min_similarity
+
+
+# ── TC-R10: 推荐分块参数按内容类型返回 ──────────────────────────
+def test_recommend_chunk_params():
+    """TC-R10: 不同内容类型返回合理的分块参数"""
+    from backend.rag.retriever_config import recommend_chunk_params
+
+    # article 类型
+    article = recommend_chunk_params("article")
+    assert article["max_chars"] == 800
+    assert article["overlap_chars"] == 100
+
+    # 公式密集
+    formula = recommend_chunk_params("formula_heavy")
+    assert formula["max_chars"] <= article["max_chars"], "公式密集应更小块"
+
+    # 术语表
+    glossary = recommend_chunk_params("glossary")
+    assert glossary["max_chars"] <= formula["max_chars"], "术语表应最小块"
+
+    # 未知类型返回默认
+    unknown = recommend_chunk_params("unknown_type")
+    assert unknown["max_chars"] == 800
+
+
+# ── TC-R11: Retriever.search() 返回格式化上下文 ──────────────────
+def test_retriever_search_returns_formatted_context():
+    """TC-R11: search() 返回含标题/来源/相似度的 LLM 上下文"""
+    from backend.rag.retriever import Retriever
+
+    class FakeEmbedding:
+        def embed(self, text):
+            return [0.1] * 384
+
+    class FakeStore:
+        def count(self):
+            return 1
+
+        def query(self, embedding, n_results=3):
+            return [
+                {
+                    "id": "chunk_x",
+                    "document": "训练集和测试集应保持相同的分布特征，否则模型评估结果不可靠。",
+                    "distance": 0.15,
+                    "metadata": {
+                        "source": "ml_basics.md",
+                        "title": "数据集划分原则",
+                    },
+                }
+            ]
+
+    retriever = Retriever(embedding=FakeEmbedding(), vector_store=FakeStore())
+    context = retriever.search("训练集和测试集", top_k=1)
+    assert "数据集划分原则" in context
+    assert "ml_basics.md" in context
+    assert "85" in context  # similarity = 1 - 0.15 = 85%
+
+
+# ── TC-R12: 空知识库返回友好降级文案 ───────────────────────────
+def test_retriever_empty_store_graceful():
+    """TC-R12: 知识库为空时 search() 返回「未找到可靠依据」"""
+    from backend.rag.retriever import Retriever
+
+    class EmptyStore:
+        def count(self):
+            return 0
+
+    retriever = Retriever(embedding=None, vector_store=EmptyStore())
+    context = retriever.search("机器学习", top_k=3)
+    assert "未找到可靠依据" in context
+
+
+# ── TC-R13: 低相似度结果被 min_similarity 过滤 ──────────────────
+def test_retriever_low_similarity_filtered():
+    """TC-R13: 低于阈值的检索结果被过滤"""
+    from backend.rag.retriever import Retriever
+
+    class FakeEmbedding:
+        def embed(self, text):
+            return [0.1] * 384
+
+    class LowSimStore:
+        def count(self):
+            return 1
+
+        def query(self, embedding, n_results=5):
+            return [
+                {"id": "c1", "document": "高相关", "distance": 0.2,
+                 "metadata": {"source": "s1.md", "title": "T1"}},
+                {"id": "c2", "document": "低相关", "distance": 0.8,
+                 "metadata": {"source": "s2.md", "title": "T2"}},
+            ]
+
+    retriever = Retriever(embedding=FakeEmbedding(), vector_store=LowSimStore())
+    results = retriever.retrieve("查询", top_k=5, min_similarity=0.5)
+    # distance 0.8 = similarity 0.2 → 应被过滤
+    # distance 0.2 = similarity 0.8 → 保留
+    assert len(results) == 1, f"预期过滤低相似度，实际返回 {len(results)} 条"
+    assert results[0]["title"] == "T1"
+
+
+# ── TC-R14: 按 scenario 调整检索参数 ────────────────────────────
+@pytest.mark.asyncio
+async def test_rag_with_different_scenarios(agent, mock_retriever):
+    """TC-R14: tutor/resource/evaluate 场景使用不同的相似度阈值"""
+    from backend.rag.retriever_config import get_config
+
+    # 辅导场景 top_k=3
+    tutor_cfg = get_config("tutor")
+    result_tutor = await agent.tutor_with_rag(
+        question="梯度下降是什么？",
+        retriever=mock_retriever,
+        explanation_style="auto",
+        top_k=tutor_cfg.top_k,
+    )
+    assert len(result_tutor["references"]) >= 1
+
+    # 资源匹配场景应返回更多引用 (top_k=5)
+    resource_cfg = get_config("resource")
+    result_resource = await agent.tutor_with_rag(
+        question="深度学习优化器的选择",
+        retriever=mock_retriever,
+        explanation_style="auto",
+        top_k=resource_cfg.top_k,
+    )
+    # mock_retriever 固定返回 3 条，所以这里的 3 <= top_k=5
+    assert len(result_resource["references"]) >= 1
+
+
+# ── TC-R15: 相似度值在合法范围内 ────────────────────────────────
+@pytest.mark.asyncio
+async def test_rag_similarity_in_valid_range(agent, mock_retriever):
+    """TC-R15: 所有 reference 的 similarity 值在 [0.0, 1.0] 范围内"""
+    result = await agent.tutor_with_rag(
+        question="神经网络如何训练？",
+        retriever=mock_retriever,
+        explanation_style="analogy",
+    )
+
+    for ref in result["references"]:
+        sim = ref["similarity"]
+        assert 0.0 <= sim <= 1.0, f"similarity={sim} 超出 [0, 1] 范围"
+        # 应该是合理的数值（不是 NaN 或 Inf）
+        assert isinstance(sim, (int, float))

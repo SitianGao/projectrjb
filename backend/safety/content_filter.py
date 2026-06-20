@@ -41,6 +41,12 @@ SENSITIVE_PATTERNS: Dict[str, list] = {
         r"(暴力.*革命)",
         r"(伤[人了人害])",
         r"(枪[击杀毙])",
+        # 英文暴力关键词
+        r"\b(kill|murder|slaughter|massacre|genocide)\b",
+        r"\b(bomb|explosive|detonat\w*)\b",
+        r"\b(shoot|gun|firearm|weapon)\b.*\b(make|build|create|buy)\b",
+        r"\b(make|build|create)\b.*\b(bomb|weapon|gun|explosive)\b",
+        r"\b(how\s+to\s+(kill|murder|shoot|stab))\b",
     ],
     "hate_speech": [
         r"(种族.*歧视)",
@@ -64,6 +70,19 @@ SENSITIVE_PATTERNS: Dict[str, list] = {
         r"(盗版.*软件.*破解)",
         r"(洗钱|非法.*集资)",
     ],
+    "academic_misconduct": [
+        # 学术不端行为
+        r"(代[写做].*[论文作业考试])",
+        r"(帮.*[写做].*[论文作业考试])",
+        r"([写做].*[论文作业].*[代帮])",
+        r"(作弊.*[方法技巧]|如何.*作弊)",
+        r"(代[考课])",
+        r"(买.*[论文作业答案])",
+        r"(卖.*[论文作业答案])",
+        r"(查重.*[绕过避])",
+        r"(降重.*[服务技巧])",
+        r"(答案.*[贩卖出售])",
+    ],
 }
 
 # 编译为正则
@@ -82,6 +101,7 @@ PROMPT_INJECTION_PATTERNS = [
     r"(ignore\s+(all\s+)?(previous|prior|above)?\s*(instructions?|prompts?|conversation|rules?|constraints?))",
     r"(disregard\s+(all\s+)?(previous|prior)?\s*(instructions?|prompts?))",
     r"(forget\s+(all\s+)?(previous|prior)?\s*(instructions?|rules?|constraints?))",
+    r"(forget\s+(all\s+)?(the\s+)?(your\s+)?(previous|prior|safety|security)?\s*(instructions?|rules?|constraints?|restrictions?|guidelines?))",
     r"(override\s+(all\s+)?(previous|prior)?\s*(instructions?|prompts?))",
     r"(do\s+not\s+(follow|obey|listen\s+to)\s+(previous|prior|above)\s+(instructions?|prompts?))",
     # 角色切换攻击
@@ -170,12 +190,23 @@ class ContentFilter:
         if not text or not text.strip():
             return {"safe": True, "reason": "", "category": "", "flagged": ""}
 
-        # ---- Step 1: 学习主题白名单快速放行 ----
-        if WHITELIST_REGEX.search(text):
-            logger.debug(f"白名单放行: '{text[:80]}...'")
-            return {"safe": True, "reason": "", "category": "", "flagged": ""}
+        # ---- Step 1: Prompt 注入检测（最高优先级，无论白名单） ----
+        injection_match = INJECTION_REGEX.search(text)
+        if injection_match:
+            self._blocked_count += 1
+            flagged = injection_match.group(0)
+            logger.warning(
+                f"[ContentFilter] 拦截注入攻击: '{flagged}' "
+                f"in '{text[:100]}...' (context={context})"
+            )
+            return {
+                "safe": False,
+                "reason": "检测到潜在注入攻击，请求已被拒绝。请使用正常方式提问。",
+                "category": "prompt_injection",
+                "flagged": flagged,
+            }
 
-        # ---- Step 2: 敏感内容检测 ----
+        # ---- Step 2: 敏感内容检测（含学术不端） ----
         for category, pattern in COMPILED_SENSITIVE.items():
             match = pattern.search(text)
             if match:
@@ -192,21 +223,10 @@ class ContentFilter:
                     "flagged": flagged,
                 }
 
-        # ---- Step 3: Prompt 注入检测 ----
-        injection_match = INJECTION_REGEX.search(text)
-        if injection_match:
-            self._blocked_count += 1
-            flagged = injection_match.group(0)
-            logger.warning(
-                f"[ContentFilter] 拦截注入攻击: '{flagged}' "
-                f"in '{text[:100]}...' (context={context})"
-            )
-            return {
-                "safe": False,
-                "reason": "检测到潜在注入攻击，请求已被拒绝。请使用正常方式提问。",
-                "category": "prompt_injection",
-                "flagged": flagged,
-            }
+        # ---- Step 3: 学习主题白名单快速放行 ----
+        if WHITELIST_REGEX.search(text):
+            logger.debug(f"白名单放行: '{text[:80]}...'")
+            return {"safe": True, "reason": "", "category": "", "flagged": ""}
 
         return {"safe": True, "reason": "", "category": "", "flagged": ""}
 
