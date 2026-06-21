@@ -105,6 +105,19 @@ class TutorAgent(BaseAgent):
         Returns:
             JSON 字符串: {answer, explanation_style, references, diagrams}
         """
+        # ---- Day 10: 安全过滤 ----
+        from backend.safety.content_filter import check_safety
+        filter_result = check_safety(question, context="tutor_question")
+        if not filter_result["safe"]:
+            return json.dumps({
+                "answer": f"⚠️ {filter_result['reason']}",
+                "explanation_style": "auto",
+                "references": [],
+                "diagrams": [],
+                "blocked": True,
+                "block_reason": filter_result["category"],
+            }, ensure_ascii=False)
+
         profile_inner = (profile or {}).get("profile", profile or {})
         knowledge = profile_inner.get("knowledge_level", "中级")
 

@@ -97,6 +97,13 @@ class ProfileAgent(BaseAgent):
             "当 completeness < 0.7 时，next_questions 中列出 2~3 个结构化追问，\n"
             "优先询问当前最缺的维度（薄弱点 > 学习目标 > 认知风格 > 兴趣 > 节奏）。\n"
             "当 completeness ≥ 0.85 时，next_questions 可以为空数组。\n"
+            "\n"
+            "## 防幻觉约束\n"
+            "1. 仅基于学生实际表述提取画像，不猜测未提及的信息。\n"
+            "2. 置信度诚实反映信息充分程度——信息不足时必须降低 confidence。\n"
+            "3. 不编造学生的学习历史、成绩或弱点。\n"
+            "4. 不生成违规、敏感或不安全的内容。\n"
+            "5. 若学生输入超出学习范围（如闲聊、攻击性言论），礼貌引导回画像构建。\n"
         )
 
     # ---- 非流式：供编排器 pipeline 使用 ----
@@ -127,6 +134,12 @@ class ProfileAgent(BaseAgent):
                 "next_questions": [...]
             }
         """
+        # ---- Day 10: 安全过滤 ----
+        from backend.safety.content_filter import check_safety
+        filter_result = check_safety(message, context="profile_message")
+        if not filter_result["safe"]:
+            return self._keyword_fallback(student_id, "请介绍你的学习情况", history or [])
+
         user_prompt = self._build_user_prompt(message, history, current_profile)
 
         # 尝试 LLM 调用
