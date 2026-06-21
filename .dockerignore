@@ -1,0 +1,17 @@
+.git
+.idea
+.vscode
+__pycache__
+*.pyc
+.pytest_cache
+pytest-cache-files-*
+venv
+.env
+*.db
+logs
+
+frontend/node_modules
+frontend/dist
+backend/__pycache__
+backend/**/__pycache__
+test/__pycache__

@@ -9,8 +9,13 @@ from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
+try:
+    from config import CHROMA_PERSIST_DIR
+except Exception:
+    CHROMA_PERSIST_DIR = ""
+
 # 默认持久化目录
-DEFAULT_PERSIST_DIR = os.path.join(
+DEFAULT_PERSIST_DIR = CHROMA_PERSIST_DIR or os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "data", "chroma_db"
 )

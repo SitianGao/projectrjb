@@ -16,17 +16,24 @@
 
 ## 快速启动
 
-```bash
-# 后端
-cd backend
-pip install -r requirements.txt
-uvicorn app:app --reload
-
-# 前端
-cd frontend
-npm install
-npm run dev
+```powershell
+Copy-Item .env.example .env
+powershell -ExecutionPolicy Bypass -File scripts/start-all.ps1
 ```
+
+默认地址：
+
+- 前端：`http://localhost:5173`
+- 后端 Swagger：`http://localhost:8000/docs`
+- 健康检查：`http://localhost:8000/api/health`
+
+Docker Compose：
+
+```powershell
+docker compose up --build
+```
+
+Compose 前端地址为 `http://localhost:3000`，后端仍为 `http://localhost:8000`。
 
 ## 项目文档
 

@@ -15,6 +15,7 @@
 | 异步任务进度 | 资源任务增加 `phase`、`progress_history`、`started_at`、`finished_at`、`duration_ms` | `test_day12_performance.py::test_resource_task_reports_stage_progress` |
 | 并发资源生成 | `TaskService` 增加线程锁，任务读写返回副本，避免并发状态串扰 | `test_day12_performance.py::test_concurrent_resource_generation_tasks_do_not_interfere` |
 | LLM 超时重试 | Spark HTTP 非 2xx 会触发重试；重试失败后切 DeepSeek；HTTP 连接/读写/连接池超时明确化 | `test_day12_performance.py::test_llm_client_retries_spark_and_falls_back_to_deepseek` |
+| 资源 Agent 接口契约 | `ResourceService` 对齐 `ResourceAgent.generate_resources`，并补充非法 JSON/异常结果降级到模板资源 | `test_resource_service_contract.py` |
 
 ## 性能测试记录
 
@@ -46,6 +47,7 @@ pytest test/test_api_contract.py test/test_api_errors.py test/test_day11_e2e.py 
 | BE-P0-001 | P0 | 接口失败缺少 `code/message` | 已关闭 | Day10 `test_api_errors.py` |
 | BE-P0-002 | P0 | 固定学生主流程不能连续跑通 | 已关闭 | Day11 `test_day11_e2e.py` |
 | BE-P0-003 | P0 | 资源并发生成可能串任务状态 | 已关闭 | Day12 并发测试 + `TaskService` 加锁 |
+| BE-P0-004 | P0 | 资源生成调用不存在的 `ResourceAgent.generate`，导致所有生成请求失败 | 已关闭 | `ResourceService` 对齐 `generate_resources` + 契约测试 |
 | BE-P1-001 | P1 | 资源生成任务进度只有 20 -> 100，页面进度跳变明显 | 已关闭 | `phase` + `progress_history` |
 | BE-P1-002 | P1 | SSE 入口可能在慢操作后才首帧反馈 | 已关闭 | `start` 事件前移 |
 | BE-P1-003 | P1 | LLM HTTP 错误未明确进入重试路径 | 已关闭 | `response.raise_for_status()` + 重试测试 |
@@ -53,8 +55,10 @@ pytest test/test_api_contract.py test/test_api_errors.py test/test_day11_e2e.py 
 ## 对接记录
 
 - 队长 -> 队员A：资源任务状态可读取 `phase` 和 `progress_history`，页面可按阶段显示“准备/生成/保存/整理/完成”。
+- 队长 -> 队员A：资源生成后端固定端口仍为 `8000`，如本地端口被占用可以临时换端口，但提交配置应保持 `5173 -> 8000` 的默认代理。
 - 队长 -> 队员A：SSE 第一条事件稳定为 `start`，页面收到后应立刻进入加载/流式状态。
 - 队长 -> 队员B：LLM Spark 超时或 HTTP 错误会重试，全部失败后切 DeepSeek；Agent 层不需要自己重复实现重试。
+- 队长 -> 队员B：Agent 对外方法名统一使用 `generate_resources`，返回 dict 或合法 JSON；非法 JSON 必须触发兜底资源，不能让接口整体失败。
 - 全员确认：截至 Day12，后端 P0 清零；剩余前端截图、页面兼容性和 RAG 质量问题由对应负责人继续记录。
 
 ## 手工补充验收

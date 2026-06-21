@@ -1,11 +1,16 @@
 """Database connection helpers for the backend."""
 
-from sqlalchemy import create_engine
+import logging
+from pathlib import Path
+
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from config import DATABASE_URL
+from config import DATABASE_URL, SEED_DEMO_DATA
 from models import Base
 
+
+logger = logging.getLogger(__name__)
 
 connect_args = {}
 if DATABASE_URL.startswith("sqlite"):
@@ -25,5 +30,38 @@ def get_db():
 
 
 def init_db():
-    """Create all SQLAlchemy tables registered on Base."""
+    """Create all SQLAlchemy tables registered on Base and seed demo data."""
     Base.metadata.create_all(bind=engine)
+    seed_demo_data()
+
+
+def seed_demo_data():
+    """Import the fixed demo student into an empty SQLite database."""
+    if not SEED_DEMO_DATA:
+        logger.info("跳过演示数据导入：SEED_DEMO_DATA=false")
+        return
+
+    if not DATABASE_URL.startswith("sqlite"):
+        logger.info("跳过演示数据导入：当前数据库不是 SQLite")
+        return
+
+    seed_path = Path(__file__).resolve().parents[1] / "data" / "sql" / "seed.sql"
+    if not seed_path.exists():
+        logger.warning("演示数据文件不存在：%s", seed_path)
+        return
+
+    with engine.begin() as conn:
+        demo_count = conn.execute(
+            text("SELECT COUNT(*) FROM students WHERE id = :student_id"),
+            {"student_id": "demo-student-01"},
+        ).scalar() or 0
+        if demo_count > 0:
+            logger.info("数据库已有固定演示学生，跳过演示数据导入")
+            return
+
+        dbapi_conn = getattr(conn.connection, "driver_connection", None)
+        if dbapi_conn is None:
+            dbapi_conn = conn.connection.connection
+
+        dbapi_conn.executescript(seed_path.read_text(encoding="utf-8"))
+        logger.info("演示数据导入完成：%s", seed_path)

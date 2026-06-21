@@ -4,13 +4,21 @@ EduAgent 配置文件
 import os
 from pathlib import Path
 
-# 自动加载项目根目录的 .env 文件
-try:
-    from dotenv import load_dotenv
-    env_path = Path(__file__).resolve().parent / ".env"
-    load_dotenv(env_path)
-except ImportError:
-    pass
+
+def _load_env_files():
+    """Load shared project env first, then backend-local overrides."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+
+    backend_dir = Path(__file__).resolve().parent
+    project_root = backend_dir.parent
+    load_dotenv(project_root / ".env")
+    load_dotenv(backend_dir / ".env", override=True)
+
+
+_load_env_files()
 
 # 数据库配置
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./eduagent.db")
@@ -40,3 +48,11 @@ EMBEDDING_MODEL = os.getenv(
     "EMBEDDING_MODEL",
     "paraphrase-multilingual-MiniLM-L12-v2"
 )
+
+# 启动时是否给空库导入固定演示数据
+SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", "true").lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
