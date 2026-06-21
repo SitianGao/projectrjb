@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Form, Input, Button, Typography, Divider } from 'antd'
+import { Form, Input, Button, Typography, Divider, Alert } from 'antd'
 import { UserOutlined, LockOutlined, MailOutlined, IdcardOutlined } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 import CharacterGroup from '../components/AnimatedCharacter'
@@ -9,16 +9,23 @@ const { Title, Text } = Typography
 
 export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [userNameFocused, setUserNameFocused] = useState(false)
   const [pwFocused, setPwFocused] = useState(false)
   const { register } = useAuth()
   const navigate = useNavigate()
 
   const onFinish = async (values) => {
+    setError(null)
     setLoading(true)
-    const ok = await register(values.username, values.password, values.name, values.email)
-    setLoading(false)
-    if (ok) navigate('/', { replace: true })
+    try {
+      const ok = await register(values.username, values.password, values.name, values.email)
+      if (ok) { navigate('/', { replace: true }) }
+    } catch (err) {
+      setError(err.message || '注册失败，请重试')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,6 +52,17 @@ export default function RegisterPage() {
             <Title level={3}>📚 创建账号</Title>
             <Text type="secondary">加入智能学习平台，开启学习之旅</Text>
           </div>
+
+          {error && (
+            <Alert
+              message={error}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setError(null)}
+              style={{ marginBottom: 16, borderRadius: 8 }}
+            />
+          )}
 
           <Form name="register" onFinish={onFinish} size="large" autoComplete="off">
             <Form.Item

@@ -1,4 +1,4 @@
-import { Tag, List, Typography, Empty, Collapse } from 'antd'
+import { Tag, List, Typography, Empty, Collapse, Spin } from 'antd'
 import {
   BookOutlined,
   NodeIndexOutlined,
@@ -135,9 +135,10 @@ export default function KnowledgePanel({
 
             {/* 生成中提示 */}
             {loading && (
-              <Text type="secondary" style={{ fontSize: 13, display: 'block', textAlign: 'center', marginTop: 16 }}>
-                正在分析知识点...
-              </Text>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 24 }}>
+                <Spin size="default" />
+                <Text type="secondary" style={{ fontSize: 13 }}>正在分析知识点...</Text>
+              </div>
             )}
           </>
         )}

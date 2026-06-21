@@ -14,31 +14,6 @@ import RadarChart, { DIMENSIONS } from './RadarChart'
 
 const { Text, Title } = Typography
 
-// ========== Mock 画像数据 ==========
-const MOCK_PROFILE = {
-  name: '张小明',
-  strengths: ['数学', '物理', '化学'],
-  weaknesses: ['英语', '语文'],
-  style: '实践型',
-  level: '中级',
-  progress: 68,
-  dimensions: {
-    knowledge: 82,
-    ability: 70,
-    thinking: 75,
-    style: 72,
-    progress: 68,
-    goalClarity: 85,
-  },
-  topics: [
-    { name: '二次函数', accuracy: 0.92 },
-    { name: '力学基础', accuracy: 0.85 },
-    { name: '电路分析', accuracy: 0.78 },
-    { name: '英语语法', accuracy: 0.55 },
-    { name: '三角函数', accuracy: 0.88 },
-  ],
-}
-
 // ========== 样式常量 ==========
 const CARD_STYLE = {
   borderRadius: 12,
@@ -155,8 +130,8 @@ function DimensionBars({ dimensions }) {
  * @param {boolean} props.loading           - 加载中
  */
 export default function ProfileCard({ profile, loading = false }) {
-  // 使用 ?? 处理 null 和 undefined，确保开发时能看到 mock 数据
-  const effectiveProfile = profile ?? MOCK_PROFILE
+  // 直接使用传入的画像数据，无数据时展示空状态
+  const effectiveProfile = profile
   const dimensions = useMemo(() => deriveDimensions(effectiveProfile), [effectiveProfile])
 
   // 雷达图是否开启动画（首次有数据时动画）

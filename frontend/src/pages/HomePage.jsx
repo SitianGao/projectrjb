@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Row, Col, Card, Statistic, Typography, Space, Tag, Avatar, Progress, Table, Button } from 'antd'
+import { Row, Col, Card, Statistic, Typography, Space, Tag, Avatar, Progress, Table, Button, Result } from 'antd'
 import {
   UserOutlined,
   BookOutlined,
@@ -71,6 +71,7 @@ export default function HomePage() {
   const [evaluation, setEvaluation] = useState(null)
   const [progressStats, setProgressStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [genProgress, setGenProgress] = useState(0)
 
@@ -78,6 +79,7 @@ export default function HomePage() {
     let cancelled = false
 
     async function load() {
+      setError(null)
       setLoading(true)
       try {
         const [profileData, evalData, statsData] = await Promise.all([
@@ -135,6 +137,11 @@ export default function HomePage() {
           learningTopics: 4,
           notStartedTopics: 3,
         } : null))
+
+        // 如果所有数据都为空且非 Mock，显示错误
+        if (!profileData && !evalData && !statsData && !USE_MOCK) {
+          setError('无法连接到后端服务，请检查网络连接后重试')
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -200,6 +207,28 @@ export default function HomePage() {
   }
 
   if (loading) return <LoadingSkeleton type="detail" />
+
+  if (error) {
+    return (
+      <div style={{ maxWidth: 600, margin: '60px auto', padding: 24 }}>
+        <Result
+          status="error"
+          title="加载失败"
+          subTitle={error}
+          extra={
+            <Space>
+              <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>
+                重新加载
+              </Button>
+              <Button icon={<DownloadOutlined />} onClick={handleGenerate}>
+                生成新评估
+              </Button>
+            </Space>
+          }
+        />
+      </div>
+    )
+  }
 
   const trendArrow = evaluation?.recentTrend === 'up'
     ? <CaretUpOutlined style={{ color: '#52c41a', fontSize: 14 }} />

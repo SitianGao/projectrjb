@@ -2,62 +2,13 @@ import { useState } from 'react'
 import { Modal, List, Typography, Tag, Badge, Button, Empty } from 'antd'
 import {
   BellOutlined,
-  TrophyOutlined,
-  BookOutlined,
-  RobotOutlined,
-  ThunderboltOutlined,
-  CheckCircleOutlined,
 } from '@ant-design/icons'
 
 const { Text } = Typography
 
-// Mock 通知数据
-const MOCK_NOTIFICATIONS = [
-  {
-    id: 1,
-    icon: <TrophyOutlined style={{ color: '#fa8c16' }} />,
-    title: '学习评估已生成',
-    desc: '你的最新六维学习画像评估报告已生成，综合评分 78 分，持续进步中。',
-    time: '10 分钟前',
-    tag: { text: '新', color: 'red' },
-  },
-  {
-    id: 2,
-    icon: <BookOutlined style={{ color: '#1677ff' }} />,
-    title: '新资源推荐',
-    desc: '根据你的薄弱环节，AI 为你推荐了 3 份英语语法专项练习资源。',
-    time: '1 小时前',
-    tag: null,
-  },
-  {
-    id: 3,
-    icon: <RobotOutlined style={{ color: '#8b5cf6' }} />,
-    title: 'AI 辅导建议',
-    desc: '你的辅导老师建议本周重点攻克二次函数压轴题，已更新学习路径。',
-    time: '3 小时前',
-    tag: null,
-  },
-  {
-    id: 4,
-    icon: <ThunderboltOutlined style={{ color: '#52c41a' }} />,
-    title: '学习路径已更新',
-    desc: '基于最近的评估数据，AI 已自动优化你的学习路径第二阶段任务安排。',
-    time: '昨天',
-    tag: null,
-  },
-  {
-    id: 5,
-    icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
-    title: '任务完成提醒',
-    desc: '你已完成本周所有学习任务，继续保持！',
-    time: '2 天前',
-    tag: null,
-  },
-]
-
 export default function NotificationCenter({ children }) {
   const [open, setOpen] = useState(false)
-  const [notifications] = useState(MOCK_NOTIFICATIONS)
+  const [notifications] = useState([])
   const unreadCount = notifications.filter((n) => n.tag?.text === '新').length
 
   return (

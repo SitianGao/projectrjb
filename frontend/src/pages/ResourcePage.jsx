@@ -360,18 +360,13 @@ LIMIT 10;
  * - 失败时显示重试按钮
  */
 export default function ResourcePage() {
-  const defaultTopic = '二次函数'
-  const [topic, setTopic] = useState(defaultTopic)
+  const [topic, setTopic] = useState('')
   const [difficulty, setDifficulty] = useState('intermediate')
   const [selectedTypes, setSelectedTypes] = useState(['document', 'exercise', 'code'])
   const [detailResource, setDetailResource] = useState(null)
 
-  // 页面初始 Mock 展示（仅在 VITE_USE_MOCK=true 时启用）
-  const [initialResources] = useState(() =>
-    USE_MOCK
-      ? generateMockResources(defaultTopic, 'intermediate', ['document', 'exercise', 'code'])
-      : [],
-  )
+  // 页面初始不展示 Mock 数据，由用户输入后主动生成
+  const [initialResources] = useState([])
 
   // Mock 轮询计数器：模拟渐进式任务进度
   const mockPollRef = useRef(0)

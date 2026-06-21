@@ -126,7 +126,7 @@ const DOC_SECTIONS = [
         <Divider style={{ margin: '16px 0' }} />
         <Paragraph style={{ fontSize: 14, lineHeight: 2 }}>
           <strong>Q：数据是真实的吗？</strong><br />
-          当前为演示版本，使用 Mock 数据模拟。后续接入真实 API 后将展示实际学习数据。
+          平台连接真实 AI 后端，学习画像、辅导对话和评估数据均由大模型实时生成。部分统计数据需完成学习任务后才会展示。
         </Paragraph>
         <Divider style={{ margin: '16px 0' }} />
         <Paragraph style={{ fontSize: 14, lineHeight: 2 }}>

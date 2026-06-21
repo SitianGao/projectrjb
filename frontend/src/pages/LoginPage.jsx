@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Form, Input, Button, Typography, Divider } from 'antd'
+import { Form, Input, Button, Typography, Divider, Alert } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 import CharacterGroup from '../components/AnimatedCharacter'
@@ -9,16 +9,23 @@ const { Title, Text } = Typography
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const [userNameFocused, setUserNameFocused] = useState(false)
   const [pwFocused, setPwFocused] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
 
   const onFinish = async (values) => {
+    setError(null)
     setLoading(true)
-    const ok = await login(values.username, values.password)
-    setLoading(false)
-    if (ok) navigate('/', { replace: true })
+    try {
+      const ok = await login(values.username, values.password)
+      if (ok) { navigate('/', { replace: true }) }
+    } catch (err) {
+      setError(err.message || '登录失败，请重试')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,6 +52,17 @@ export default function LoginPage() {
             <Title level={3}>📚 智能学习平台</Title>
             <Text type="secondary">欢迎回来，请登录您的账号</Text>
           </div>
+
+          {error && (
+            <Alert
+              message={error}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setError(null)}
+              style={{ marginBottom: 16, borderRadius: 8 }}
+            />
+          )}
 
           <Form name="login" onFinish={onFinish} size="large" autoComplete="off">
             <Form.Item

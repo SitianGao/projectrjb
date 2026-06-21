@@ -31,13 +31,25 @@ function buildPolygon(dimensions, angles = RADAR_ANGLES) {
     .join(' ')
 }
 
-export default function RadarChart({ dimensions = {}, animated = true, size = 320 }) {
+export default function RadarChart({ dimensions = {}, animated = true, size = 320, loading = false }) {
   const uid = useId().replace(/:/g, '')
   const gradientId = `radarGradient-${uid}`
   const glowId = `radarGlow-${uid}`
 
   const [animProgress, setAnimProgress] = useState(0)
   const rafRef = useRef(null)
+
+  if (loading) {
+    return (
+      <div style={{ width: '100%', maxWidth: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+        <div style={{
+          width: size * 0.6, height: size * 0.6, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(0,0,0,0.04) 0%, transparent 70%)',
+          animation: 'pulse 1.5s ease-in-out infinite',
+        }} />
+      </div>
+    )
+  }
 
   // 当 dimensions 或 animated 变化时(重)启动画
   useEffect(() => {

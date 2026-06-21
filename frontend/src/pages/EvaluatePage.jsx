@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Row, Col, Typography, Card, Statistic, Progress, Table, Tag, Space, Button } from 'antd'
+import { Row, Col, Typography, Card, Statistic, Progress, Table, Tag, Space, Button, Result } from 'antd'
 import {
   TrophyOutlined,
   RiseOutlined,
@@ -26,6 +26,7 @@ export default function EvaluatePage() {
   const [evaluation, setEvaluation] = useState(null)
   const [progressStats, setProgressStats] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [genProgress, setGenProgress] = useState(0)
 
@@ -36,6 +37,7 @@ export default function EvaluatePage() {
   }, [])
 
   async function loadData() {
+    setError(null)
     setLoading(true)
     try {
       const [evalData, statsData] = await Promise.all([
@@ -69,6 +71,10 @@ export default function EvaluatePage() {
         learningTopics: 4,
         notStartedTopics: 3,
       } : null))
+
+      if (!evalData && !statsData && !USE_MOCK) {
+        setError('无法连接到后端服务，请检查网络连接后重试')
+      }
     } finally {
       setLoading(false)
     }
@@ -141,6 +147,28 @@ export default function EvaluatePage() {
   ]
 
   if (loading) return <LoadingSkeleton type="detail" />
+
+  if (error) {
+    return (
+      <div style={{ maxWidth: 600, margin: '60px auto', padding: 24 }}>
+        <Result
+          status="error"
+          title="加载失败"
+          subTitle={error}
+          extra={
+            <Space>
+              <Button type="primary" icon={<ReloadOutlined />} onClick={loadData}>
+                重新加载
+              </Button>
+              <Button icon={<DownloadOutlined />} onClick={handleGenerate}>
+                生成新评估
+              </Button>
+            </Space>
+          }
+        />
+      </div>
+    )
+  }
 
   // 构造趋势图
   const trendChart = evaluation?.history?.length
