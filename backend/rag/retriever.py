@@ -50,15 +50,29 @@ class Retriever:
                 ...
             ]
         """
-        if self.vector_store.count() == 0:
+        # ---- Day 13: 知识库为空 → 降级返回空结果 ----
+        try:
+            doc_count = self.vector_store.count()
+        except Exception as e:
+            logger.warning(f"无法获取知识库文档数（向量库不可用）: {e}")
+            doc_count = 0
+        if doc_count == 0:
             logger.warning("知识库为空，检索返回空结果")
             return []
 
         # 查询向量化
-        query_embedding = self.embedding.embed(query)
+        try:
+            query_embedding = self.embedding.embed(query)
+        except Exception as e:
+            logger.error(f"查询向量化失败: {e}")
+            return []
 
-        # ChromaDB 检索
-        results = self.vector_store.query(query_embedding, n_results=top_k)
+        # ChromaDB 检索（Day 13: 异常降级，不阻断请求）
+        try:
+            results = self.vector_store.query(query_embedding, n_results=top_k)
+        except Exception as e:
+            logger.error(f"向量检索异常，已降级返回空结果: {e}")
+            return []
 
         # 格式化 + 过滤
         formatted = []

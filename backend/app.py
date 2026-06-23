@@ -68,9 +68,43 @@ app.include_router(task_router, prefix="/api/task", tags=["任务"])
 # ---- 启动事件 ----
 @app.on_event("startup")
 async def startup():
-    """应用启动时自动初始化数据库表"""
+    """应用启动时自动初始化数据库表 + RAG 组件状态检查"""
+    # 1. 数据库初始化
     init_db()
     logger.info("数据库表初始化完成")
+
+    # 2. RAG 组件状态检查（Day 13: 确保知识库可连通）
+    try:
+        from rag.vector_store import default_store
+        count = default_store.count()
+        logger.info(f"RAG 向量库就绪: collection='{default_store.collection_name}', 文档数={count}")
+    except Exception as e:
+        logger.warning(f"RAG 向量库未就绪（首次请求时将自动初始化）: {e}")
+
+    try:
+        from rag.embedding import default_embedding
+        logger.info(f"RAG 嵌入模型已配置: {default_embedding.model_name}（首次使用时加载）")
+    except Exception as e:
+        logger.warning(f"RAG 嵌入模型配置异常: {e}")
+
+    try:
+        from rag.knowledge_loader import DEFAULT_KNOWLEDGE_DIR
+        import os
+        if os.path.isdir(DEFAULT_KNOWLEDGE_DIR):
+            files = [f for f in os.listdir(DEFAULT_KNOWLEDGE_DIR)
+                     if f.endswith(('.md', '.json'))]
+            logger.info(f"知识库目录就绪: {DEFAULT_KNOWLEDGE_DIR}（{len(files)} 个文件）")
+        else:
+            logger.warning(f"知识库目录不存在: {DEFAULT_KNOWLEDGE_DIR}")
+    except Exception as e:
+        logger.warning(f"知识库目录检查失败: {e}")
+
+    # 3. 安全过滤模块状态
+    try:
+        from safety.content_filter import default_filter
+        logger.info("内容安全过滤模块已加载")
+    except Exception as e:
+        logger.error(f"内容安全过滤模块加载失败: {e}")
 
 
 @app.get("/")
