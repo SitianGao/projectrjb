@@ -110,6 +110,10 @@ PROMPT_INJECTION_PATTERNS = [
     r"(act\s+as\s+(if\s+you\s+are\s+)?((a|an)\s+)?(unrestricted|unfiltered|without\s+restrictions|evil|different\s+AI))",
     r"(you\s+are\s+no\s+longer\s+(an?\s+)?(AI|assistant|Claude|language\s+model))",
     r"(switch\s+to\s+(developer|admin|god|unrestricted|unfiltered)\s*mode)",
+    # DAN 变体攻击（Day 15 回归修复）
+    r"\bDAN\b.*(mode|activate|enable|jailbreak|bypass|unrestricted)",
+    r"(activate|enable|enter)\s+(DAN|developer\s*mode|jailbreak\s*mode)",
+    r"(do\s+anything\s+now|DAN\s+prompt)",
     # 中文注入
     r"(忽略.*(以上|之前|前面|所有).*(指令|提示|限制|约束|规则))",
     r"(忘记.*(身份|限制|规则|约束|之前|所有))",
