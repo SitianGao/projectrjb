@@ -17,6 +17,11 @@ dist/
 .vscode/
 .idea/
 
+# ChromaDB (local vector store)
+chroma_data/
+chroma_db/
+*.sqlite3
+
 # OS
 .DS_Store
 Thumbs.db
