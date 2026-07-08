@@ -41,18 +41,21 @@ class ResourceAgent(BaseAgent):
             "- 不使用序号，纯 Markdown 列表，缩进用 2 个空格"
         ),
         "exercise": (
-            "生成 JSON 格式练习题，要求：\n"
+            "生成 Markdown 格式练习题，要求：\n"
             "- 3-5 道题，覆盖概念理解、公式应用、场景判断\n"
-            "- 每道题含 question/options/answer/explanation\n"
+            "- 使用 Markdown 标题（### 题目 N）、列表、加粗等排版\n"
+            "- 每题包含：题目描述、选项（A/B/C/D）、正确答案、详细解析\n"
             "- 初级难度以单选和判断为主，中高级加入简答和代码补全\n"
-            "- 正确答案需逻辑正确，干扰项需有迷惑性"
+            "- 正确答案需逻辑正确并用 **加粗** 标注，干扰项需有迷惑性\n"
+            "- 用 --- 分隔各题"
         ),
         "code": (
-            "生成完整可运行的 Python 代码示例，要求：\n"
+            "生成完整可运行的 Python 代码示例，用 Markdown 代码块（```python...```）包裹，要求：\n"
             "- 包含必要的 import 和 main 入口\n"
             "- 关键步骤用中文注释解释 WHY 而不仅仅是 WHAT\n"
             "- 如有多个实现方式，提供对比并标注适用场景\n"
-            "- 代码风格遵循 PEP 8"
+            "- 代码风格遵循 PEP 8\n"
+            "- 代码块前后可加简短说明文字"
         ),
         "reading": (
             "生成一份拓展阅读推荐材料，要求：\n"
@@ -83,8 +86,8 @@ class ResourceAgent(BaseAgent):
             "## 资源类型\n"
             "- document: 结构化 Markdown 讲解文档，含标题、定义、原理、示例。\n"
             "- mindmap: 嵌套 Markdown 列表（用 - 和缩进表示层级），前端用 markmap 渲染。\n"
-            "- exercise: JSON 格式练习题，每道题含 question / options / answer / explanation。\n"
-            "- code: 完整可运行的 Python 代码 + 详细注释。\n"
+            "- exercise: Markdown 格式练习题，用标题、列表、加粗等排版，每题含题目、选项、答案和解析。\n"
+            "- code: 完整可运行的 Python 代码，用 Markdown 代码块（```python）包裹。\n"
             "- reading: 拓展阅读材料，含分级推荐文献、阅读顺序、拓展思考题。\n"
             "- ppt: 12-slide 讲稿大纲，每 slide 含标题、bullets、讲师备注。\n\n"
             "## 个性化要求\n"
@@ -101,7 +104,7 @@ class ResourceAgent(BaseAgent):
             "6. 不生成违规、敏感或不安全的内容。\n\n"
             "## 输出格式\n"
             "严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}\n"
-            "content 字段为 Markdown 字符串（exercise 类型为 JSON 字符串）。"
+            "content 字段为 Markdown 字符串（exercise 和 code 类型也使用 Markdown 格式排版）。"
         )
 
     def _build_generate_prompt(
@@ -334,35 +337,31 @@ class ResourceAgent(BaseAgent):
                 f"    - 误区2\n"
             )
         elif rtype == "exercise":
-            questions = [
-                {
-                    "question": f"关于{topic}，以下说法正确的是？（单选）",
-                    "options": {
-                        "A": f"{topic}是AI领域的基础概念之一",
-                        "B": f"{topic}完全不实用",
-                        "C": f"学习{topic}不需要任何前置知识",
-                        "D": "以上都不对",
-                    },
-                    "answer": "A",
-                    "explanation": f"{topic}是重要基础概念，学习前建议具备相关前置知识。",
-                },
-                {
-                    "question": f"请简述{topic}的核心思想。（简答）",
-                    "options": {},
-                    "answer": "（开放式答案，围绕核心概念展开）",
-                    "explanation": "重点考察对核心原理的理解深度。",
-                },
-                {
-                    "question": f"{topic}在实际项目中如何应用？请举例说明。（简答）",
-                    "options": {},
-                    "answer": "（结合实际场景作答）",
-                    "explanation": "考察理论联系实际的能力。",
-                },
-            ]
-            return json.dumps(questions, ensure_ascii=False, indent=2)
+            return (
+                f"# {topic} 练习题（{level}）\n\n"
+                f"### 题目 1（单选）\n\n"
+                f"关于 {topic}，以下说法正确的是？\n\n"
+                f"A. {topic} 是 AI 领域的基础概念之一\n\n"
+                f"B. {topic} 完全不实用\n\n"
+                f"C. 学习 {topic} 不需要任何前置知识\n\n"
+                f"D. 以上都不对\n\n"
+                f"> **✅ 正确答案：A**\n>\n"
+                f"> **📖 解析：** {topic} 是重要基础概念，学习前建议具备相关前置知识。B 过于绝对，C 不符合实际。\n\n"
+                f"---\n\n"
+                f"### 题目 2（简答）\n\n"
+                f"请简述 {topic} 的核心思想。\n\n"
+                f"> **📝 参考答案：** （围绕核心概念展开，重点考察对核心原理的理解深度）\n\n"
+                f"---\n\n"
+                f"### 题目 3（应用）\n\n"
+                f"{topic} 在实际项目中如何应用？请举例说明。\n\n"
+                f"> **📝 参考答案：** （结合实际场景作答，考察理论联系实际的能力）\n"
+            )
         elif rtype == "code":
             func_name = topic.lower().replace(" ", "_").replace("-", "_")
             return (
+                f"# {topic} — 代码示例（{level}）\n\n"
+                f"本代码演示 {topic} 的典型实现方式，包含数据准备、模型构建、训练和评估四个阶段。\n\n"
+                f"```python\n"
                 f'"""\n'
                 f'{topic} — 代码示例（{level}）\n'
                 f'本代码演示 {topic} 的典型实现方式，包含数据准备、模型构建、训练和评估四个阶段。\n'
@@ -431,6 +430,7 @@ class ResourceAgent(BaseAgent):
                 f'    final_mse = np.mean((y_final_pred - y) ** 2)\n'
                 f'    print(f"\\n训练完成！最终 MSE: {{final_mse:.6f}}")\n'
                 f'    print(f"学习到的权重: {{np.round(learned_weights, 4)}}")\n'
+                f'```\n'
             )
         elif rtype == "reading":
             return (

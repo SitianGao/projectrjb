@@ -43,3 +43,5 @@
 python backend/rag/knowledge_loader.py
 ```
 可将 Markdown 文件向量化存入 ChromaDB，供 TutorAgent 和 ResourceAgent 检索使用。
+
+> **⚠️ 重要提示**：`knowledge_loader.py` 当前仅索引 `.md` 和 `.json` 文件。本目录中的 5 个 PDF 原始讲义（QLearning、AC、PPO、Reward、IRL）**不会被向量化**，仅作为参考资料供人工查阅。如需在 RAG 中使用 PDF 内容，需先将 PDF 转换为 Markdown 格式或扩展 `knowledge_loader.py` 的 PDF 解析能力（如集成 PyMuPDF/pdfplumber）。
