@@ -13,8 +13,26 @@ import {
   TagsOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { SKILL_TAGS, RESOURCE_TYPES } from '../mock/learningPathData'
 import { useTheme } from '../contexts/ThemeContext'
+
+// 知识点标签显示映射
+const SKILL_TAGS = {
+  algebra: { label: '代数', color: '#1677ff' },
+  geometry: { label: '几何', color: '#52c41a' },
+  function: { label: '函数', color: '#722ed1' },
+  statistics: { label: '统计', color: '#fa8c16' },
+  calculus: { label: '微积分', color: '#eb2f96' },
+  trig: { label: '三角', color: '#13c2c2' },
+}
+
+// 资源类型显示映射
+const RESOURCE_TYPES = {
+  video: { label: '视频', icon: '📺' },
+  article: { label: '文章', icon: '📄' },
+  exercise: { label: '练习', icon: '✏️' },
+  quiz: { label: '测验', icon: '📝' },
+  project: { label: '项目', icon: '🔨' },
+}
 
 const { Text, Title, Paragraph } = Typography
 

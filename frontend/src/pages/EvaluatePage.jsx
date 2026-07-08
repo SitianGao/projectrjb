@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Row, Col, Typography, Card, Statistic, Progress, Table, Tag, Space, Button } from 'antd'
+import { Row, Col, Typography, Card, Statistic, Progress, Table, Tag, Space, Button, Result } from 'antd'
 import {
   TrophyOutlined,
   RiseOutlined,
@@ -13,9 +13,6 @@ import ProgressBar from '../components/ProgressBar'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { getEvaluation, getProgressStats } from '../api/evaluate'
 import { formatPercent, formatDuration, formatDate } from '../utils/format'
-import { shouldUseMock } from '../utils/useMock'
-
-const USE_MOCK = shouldUseMock()
 
 const { Title, Text } = Typography
 
@@ -26,9 +23,7 @@ export default function EvaluatePage() {
   const [evaluation, setEvaluation] = useState(null)
   const [progressStats, setProgressStats] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
-  const [genProgress, setGenProgress] = useState(0)
-
+  const [error, setError] = useState(null)
   const studentId = 'demo-student-01'
 
   useEffect(() => {
@@ -36,72 +31,34 @@ export default function EvaluatePage() {
   }, [])
 
   async function loadData() {
+    setError(null)
     setLoading(true)
     try {
       const [evalData, statsData] = await Promise.all([
         getEvaluation(studentId).catch(() => null),
         getProgressStats(studentId).catch(() => null),
       ])
-      setEvaluation(evalData || (USE_MOCK ? {
-        overallScore: 78,
-        recentTrend: 'up',
-        completedTasks: 24,
-        totalTime: 129600,
-        topicScores: [
-          { topic: '二次函数', score: 85, level: '优秀' },
-          { topic: '力学基础', score: 72, level: '良好' },
-          { topic: '电路分析', score: 60, level: '需提升' },
-          { topic: '英语语法', score: 68, level: '良好' },
-        ],
-        history: [
-          { date: '2026-06-01', score: 72, tasks: 3 },
-          { date: '2026-06-02', score: 74, tasks: 2 },
-          { date: '2026-06-03', score: 73, tasks: 4 },
-          { date: '2026-06-04', score: 76, tasks: 3 },
-          { date: '2026-06-05', score: 75, tasks: 5 },
-          { date: '2026-06-06', score: 77, tasks: 4 },
-          { date: '2026-06-07', score: 78, tasks: 3 },
-        ],
-      } : null))
-      setProgressStats(statsData || (USE_MOCK ? {
-        totalTopics: 12,
-        masteredTopics: 5,
-        learningTopics: 4,
-        notStartedTopics: 3,
-      } : null))
+      setEvaluation(evalData || null)
+      setProgressStats(statsData || null)
+
+      if (!evalData && !statsData) {
+        setError('无法连接到后端服务，请检查网络连接后重试')
+      }
     } finally {
       setLoading(false)
     }
   }
 
   async function handleGenerate() {
-    if (!USE_MOCK) {
-      try {
-        const data = await getEvaluation(studentId)
-        if (data) setEvaluation(data)
-        const stats = await getProgressStats(studentId)
-        if (stats) setProgressStats(stats)
-        message.success('评估已刷新')
-      } catch (err) {
-        message.error('获取评估失败: ' + (err.message || '未知错误'))
-      }
-      return
+    try {
+      const data = await getEvaluation(studentId)
+      if (data) setEvaluation(data)
+      const stats = await getProgressStats(studentId)
+      if (stats) setProgressStats(stats)
+      message.success('评估已刷新')
+    } catch (err) {
+      message.error('获取评估失败: ' + (err.message || '未知错误'))
     }
-
-    // Mock 模式：模拟生成进度
-    setGenerating(true)
-    setGenProgress(0)
-    const timer = setInterval(() => {
-      setGenProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(timer)
-          setGenerating(false)
-          loadData()
-          return 100
-        }
-        return prev + Math.random() * 15
-      })
-    }, 500)
   }
 
   const levelColorMap = {
@@ -142,6 +99,28 @@ export default function EvaluatePage() {
 
   if (loading) return <LoadingSkeleton type="detail" />
 
+  if (error) {
+    return (
+      <div style={{ maxWidth: 600, margin: '60px auto', padding: 24 }}>
+        <Result
+          status="error"
+          title="加载失败"
+          subTitle={error}
+          extra={
+            <Space>
+              <Button type="primary" icon={<ReloadOutlined />} onClick={loadData}>
+                重新加载
+              </Button>
+              <Button icon={<DownloadOutlined />} onClick={handleGenerate}>
+                生成新评估
+              </Button>
+            </Space>
+          }
+        />
+      </div>
+    )
+  }
+
   // 构造趋势图
   const trendChart = evaluation?.history?.length
     ? `graph LR\n${evaluation.history.map((h, i) => {
@@ -161,23 +140,11 @@ export default function EvaluatePage() {
             type="primary"
             icon={<DownloadOutlined />}
             onClick={handleGenerate}
-            loading={generating}
           >
             生成新评估
           </Button>
         </Space>
       </div>
-
-      {/* 生成进度 */}
-      {generating && (
-        <Card style={{ marginTop: 16 }}>
-          <ProgressBar
-            status="running"
-            percent={Math.min(genProgress, 100)}
-            message="AI 正在评估你的学习情况..."
-          />
-        </Card>
-      )}
 
       {/* 统计卡片 */}
       <Row gutter={[16, 16]} style={{ marginTop: 24 }}>

@@ -4,12 +4,6 @@ import client from '../api/client'
 
 const AuthContext = createContext(null)
 
-// 模拟用户数据（后续替换为真实 API）
-const MOCK_USERS = [
-  { id: 1, username: 'admin', password: 'admin123', name: '管理员', email: 'admin@example.com', avatar: null },
-  { id: 2, username: 'student', password: 'student123', name: '张同学', email: 'student@example.com', avatar: null },
-]
-
 const STORAGE_KEY = 'auth_user'
 
 export function AuthProvider({ children }) {
@@ -31,32 +25,31 @@ export function AuthProvider({ children }) {
   }, [user])
 
   const login = useCallback(async (username, password) => {
-    // 模拟登录 —— 后续替换为 client.post('/auth/login', { username, password })
-    const found = MOCK_USERS.find(
-      (u) => u.username === username && u.password === password,
-    )
-    if (!found) {
-      message.error('用户名或密码错误')
+    try {
+      const data = await client.post('/auth/login', { username, password })
+      const { token, ...userInfo } = data
+      if (token) localStorage.setItem('auth_token', token)
+      setUser(userInfo)
+      message.success(`欢迎回来，${userInfo.name || username}`)
+      return true
+    } catch (err) {
+      message.error(err.message || '登录失败')
       return false
     }
-    const { password: _, ...userInfo } = found
-    setUser(userInfo)
-    message.success(`欢迎回来，${userInfo.name}`)
-    return true
   }, [])
 
   const register = useCallback(async (username, password, name, email) => {
-    // 模拟注册 —— 后续替换为 client.post('/auth/register', { username, password, name, email })
-    const exists = MOCK_USERS.find((u) => u.username === username)
-    if (exists) {
-      message.error('用户名已存在')
+    try {
+      const data = await client.post('/auth/register', { username, password, name, email })
+      const { token, ...userInfo } = data
+      if (token) localStorage.setItem('auth_token', token)
+      setUser(userInfo)
+      message.success('注册成功')
+      return true
+    } catch (err) {
+      message.error(err.message || '注册失败')
       return false
     }
-    const newUser = { id: MOCK_USERS.length + 1, username, name, email, avatar: null }
-    MOCK_USERS.push({ ...newUser, password })
-    setUser(newUser)
-    message.success('注册成功')
-    return true
   }, [])
 
   const logout = useCallback(() => {
