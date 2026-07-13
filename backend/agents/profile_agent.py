@@ -135,7 +135,7 @@ class ProfileAgent(BaseAgent):
             }
         """
         # ---- Day 10: 安全过滤 ----
-        from backend.safety.content_filter import check_safety
+        from safety.content_filter import check_safety
         filter_result = check_safety(message, context="profile_message")
         if not filter_result["safe"]:
             return self._keyword_fallback(student_id, "请介绍你的学习情况", history or [])
