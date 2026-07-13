@@ -12,6 +12,24 @@ import { useTheme } from '../contexts/ThemeContext'
 
 const { Text } = Typography
 
+// ========== Mock ==========
+const MOCK_MESSAGES = [
+  {
+    id: 'm1', role: 'assistant',
+    content: '你好！我是你的学习助手，让我们来聊聊你的学习情况吧。\n\n你可以告诉我：\n- 你的年级\n- 你擅长或不擅长的科目\n- 你的学习目标\n- 你喜欢的的学习方式',
+  },
+  { id: 'm2', role: 'user', content: '你好！我是初三的学生，我数学还不错，但英语比较吃力。我希望能考上重点高中。' },
+  {
+    id: 'm3', role: 'assistant',
+    content: '了解了！你的情况很清楚：\n\n**优势**：数学基础扎实 👍\n**薄弱**：英语需要加强 📖\n**目标**：冲刺重点高中 🎯\n\n我建议先从这几个方向入手：\n\n1. **数学**：挑战压轴题，争取拿满分\n2. **英语**：每天坚持单词背诵 + 阅读训练',
+  },
+  { id: 'm4', role: 'user', content: '我更喜欢通过做题来学习，不太喜欢看视频。' },
+  {
+    id: 'm5', role: 'assistant',
+    content: '明白了！你属于**实践型学习者**。\n\n基于你的情况，我制定了以下策略：\n\n| 维度 | 策略 |\n|------|------|\n| 数学 | 每日 3-5 道压轴题 + 错题复盘 |\n| 英语 | 每日 30 个单词 + 1 篇阅读理解 |\n| 综合 | 每周一次模拟测试 |\n\n这个方案你觉得怎么样？😊',
+  },
+]
+
 // ========== 动画注入 ==========
 let keyframesInjected = false
 function injectKeyframes() {
@@ -62,7 +80,7 @@ const STYLE_OPTIONS = [
 
 // ========== 主组件 ==========
 export default function ChatBox({
-  messages = [],
+  messages = MOCK_MESSAGES,
   isLoading = false,
   onSend,
   onAbort,

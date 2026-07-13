@@ -16,7 +16,6 @@ import {
   MenuUnfoldOutlined,
   PushpinOutlined,
   PushpinFilled,
-  ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import ChatBox from '../components/ChatBox'
 import ResourceCard from '../components/ResourceCard'
@@ -33,7 +32,11 @@ import { getResources } from '../api/resource'
 import { getLearningPath, generateLearningPath } from '../api/planner'
 import { getTutorSessions, createTutorSession } from '../api/tutor'
 import ResourcePage from '../pages/ResourcePage'
+import { mockPath, mockStats } from '../mock/learningPathData'
 import { formatRelativeTime } from '../utils/format'
+import { shouldUseMock } from '../utils/useMock'
+
+const USE_MOCK = shouldUseMock()
 
 const { Title, Text, Paragraph } = Typography
 
@@ -66,7 +69,6 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
   const [sessions, setSessions] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [loadingSessions, setLoadingSessions] = useState(false)
-  const [error, setError] = useState(null)
   const [newModal, setNewModal] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const studentId = 'demo-student-01'
@@ -74,13 +76,17 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
   useEffect(() => { loadSessions() }, [])
 
   async function loadSessions() {
-    setError(null)
     setLoadingSessions(true)
     try {
       const data = await getTutorSessions(studentId)
       setSessions(Array.isArray(data) ? data : data?.sessions || [])
     } catch {
-      setError('加载会话失败')
+      if (USE_MOCK) {
+        setSessions([
+          { id: 's1', title: '二次函数答疑', updatedAt: new Date(), messageCount: 12 },
+          { id: 's2', title: '英语语法解惑', updatedAt: new Date(Date.now() - 86400000), messageCount: 8 },
+        ])
+      }
     } finally { setLoadingSessions(false) }
   }
 
@@ -140,13 +146,7 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {loadingSessions ? <LoadingSkeleton type="card" count={2} /> : error ? (
-            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-              <ExclamationCircleOutlined style={{ fontSize: 28, color: '#ff4d4f', marginBottom: 12 }} />
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>{error}</div>
-              <Button size="small" icon={<ReloadOutlined />} onClick={loadSessions}>重试</Button>
-            </div>
-          ) : sessions.length === 0 ? (
+          {loadingSessions ? <LoadingSkeleton type="card" count={2} /> : sessions.length === 0 ? (
             <Empty description="暂无会话" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ marginTop: 32 }} />
           ) : (
             <List size="small" dataSource={sessions} renderItem={(s) => (
@@ -177,7 +177,6 @@ function TutorPanel({ collapsed, onToggle, locked, onLock }) {
 function ResourcePanel() {
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [keyword, setKeyword] = useState('')
   const [type, setType] = useState('')
   const [page, setPage] = useState(1)
@@ -186,13 +185,19 @@ function ResourcePanel() {
   useEffect(() => { loadResources() }, [page, type])
 
   async function loadResources() {
-    setError(null)
     setLoading(true)
     try {
       const data = await getResources({ page, page_size: 12, keyword, type: type || undefined })
       setResources(Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [])
     } catch {
-      setError('加载资源失败')
+      if (USE_MOCK) {
+        setResources([
+          { id: '1', type: 'document', title: '二次函数知识点总结', description: '核心概念与常见题型', tags: ['数学', '函数'], createdAt: new Date() },
+          { id: '2', type: 'quiz', title: '力学基础练习题', description: '牛顿三大定律、受力分析', tags: ['物理', '力学'], createdAt: new Date() },
+          { id: '3', type: 'mindmap', title: '英语语法体系', description: '时态、语态、从句框架', tags: ['英语', '语法'], createdAt: new Date() },
+          { id: '4', type: 'document', title: '电路分析方法', description: '基尔霍夫定律核心方法', tags: ['物理', '电学'], createdAt: new Date() },
+        ])
+      }
     } finally { setLoading(false) }
   }
 
@@ -205,13 +210,7 @@ function ResourcePanel() {
         <Select value={type} onChange={setType} options={TYPE_OPTIONS} style={{ width: 120 }} />
         <Button type="primary" icon={<FilterOutlined />} onClick={() => { setPage(1); loadResources() }}>筛选</Button>
       </Space>
-      {loading ? <LoadingSkeleton type="card" count={4} /> : error ? (
-        <div style={{ textAlign: 'center', padding: 48 }}>
-          <ExclamationCircleOutlined style={{ fontSize: 32, color: '#ff4d4f', marginBottom: 16 }} />
-          <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16 }}>{error}</div>
-          <Button icon={<ReloadOutlined />} onClick={() => { setPage(1); loadResources() }}>重试</Button>
-        </div>
-      ) : resources.length === 0 ? (
+      {loading ? <LoadingSkeleton type="card" count={4} /> : resources.length === 0 ? (
         <Empty description="没有找到符合条件的资源" />
       ) : (
         <>
@@ -243,22 +242,15 @@ function ResourcePanel() {
 function LearningPathPanel() {
   const [pathData, setPathData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(false)
 
   useEffect(() => { loadPath() }, [])
 
   async function loadPath() {
-    setError(null)
     setLoading(true)
-    try {
-      const data = await getLearningPath('demo-student-01')
-      setPathData(data)
-    } catch {
-      setError('加载学习路径失败')
-    } finally {
-      setLoading(false)
-    }
+    try { const data = await getLearningPath('demo-student-01'); setPathData(data) }
+    catch { if (USE_MOCK) { setTimeout(() => { setPathData(mockPath); setLoading(false) }, 600); return } }
+    setLoading(false)
   }
 
   async function handleGenerate() {
@@ -278,25 +270,11 @@ function LearningPathPanel() {
           }
         }
       }
-    } catch (err) { message.error('生成失败') }
+    } catch (err) { message.error('生成失败'); if (USE_MOCK) setPathData(mockPath) }
     finally { setGenerating(false) }
   }
 
   if (loading) return <LoadingSkeleton type="detail" />
-
-  if (error) {
-    return (
-      <div style={{ textAlign: 'center', padding: 48 }}>
-        <ExclamationCircleOutlined style={{ fontSize: 36, color: '#ff4d4f', marginBottom: 16 }} />
-        <div style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 16 }}>{error}</div>
-        <Space>
-          <Button type="primary" icon={<ReloadOutlined />} onClick={loadPath}>重新加载</Button>
-          <Button icon={<ThunderboltOutlined />} onClick={handleGenerate} loading={generating}>AI 生成</Button>
-        </Space>
-      </div>
-    )
-  }
-
   const stages = pathData?.stages || []
   const totalTasks = stages.reduce((s, st) => s + (st.tasks?.length || 0), 0)
   const completedTasks = stages.reduce((s, st) => s + (st.tasks?.filter(t => t.status === 'completed')?.length || 0), 0)
@@ -314,8 +292,8 @@ function LearningPathPanel() {
       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}><Card size="small"><Statistic title="学习阶段" value={stages.length} suffix="个" prefix={<BookOutlined style={{ color: '#1677ff' }} />} /></Card></Col>
         <Col xs={12} sm={6}><Card size="small"><Statistic title="已完成任务" value={completedTasks} suffix={<Text type="secondary">/ {totalTasks}</Text>} prefix={<TrophyOutlined style={{ color: '#52c41a' }} />} /></Card></Col>
-        <Col xs={12} sm={6}><Card size="small"><Statistic title="学习时长" value="--" prefix={<ClockCircleOutlined style={{ color: '#fa8c16' }} />} /></Card></Col>
-        <Col xs={12} sm={6}><Card size="small"><Statistic title="连续学习" value="--" prefix={<FireOutlined style={{ color: '#eb2f96' }} />} /></Card></Col>
+        <Col xs={12} sm={6}><Card size="small"><Statistic title="学习时长" value={mockStats.totalStudyTime} prefix={<ClockCircleOutlined style={{ color: '#fa8c16' }} />} /></Card></Col>
+        <Col xs={12} sm={6}><Card size="small"><Statistic title="连续学习" value={mockStats.streak} suffix="天" prefix={<FireOutlined style={{ color: '#eb2f96' }} />} /></Card></Col>
       </Row>
       <ForgettingCurve compact style={{ marginBottom: 16 }} />
       {pathData ? (

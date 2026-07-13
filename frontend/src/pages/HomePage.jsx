@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Row, Col, Card, Statistic, Typography, Space, Tag, Avatar, Progress, Table, Button, Result } from 'antd'
+import { Row, Col, Card, Statistic, Typography, Space, Tag, Avatar, Progress, Table, Button } from 'antd'
 import {
   UserOutlined,
   BookOutlined,
@@ -20,7 +20,11 @@ import RadarChart from '../components/RadarChart'
 import ScoreTrendChart from '../components/ScoreTrendChart'
 import ProgressBar from '../components/ProgressBar'
 import { deriveDimensions } from '../components/ProfileCard'
+import { shouldUseMock } from '../utils/useMock'
+
 const { Title, Text } = Typography
+
+const USE_MOCK = shouldUseMock()
 
 const STUDENT_ID = 'demo-student-01'
 
@@ -67,13 +71,13 @@ export default function HomePage() {
   const [evaluation, setEvaluation] = useState(null)
   const [progressStats, setProgressStats] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [generating, setGenerating] = useState(false)
+  const [genProgress, setGenProgress] = useState(0)
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
-      setError(null)
       setLoading(true)
       try {
         const [profileData, evalData, statsData] = await Promise.all([
@@ -83,19 +87,54 @@ export default function HomePage() {
         ])
         if (cancelled) return
 
-        // 画像
-        setProfile(profileData || null)
+        // 画像降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setProfile(profileData || (USE_MOCK ? {
+          name: '张同学',
+          level: '中级',
+          progress: 68,
+          strengths: ['数学', '物理', '化学'],
+          weaknesses: ['英语'],
+          style: '实践型',
+          dimensions: { knowledge: 82, ability: 70, thinking: 75, style: 72, progress: 68, goalClarity: 85 },
+          topics: [
+            { name: '二次函数', accuracy: 0.92 },
+            { name: '力学基础', accuracy: 0.85 },
+            { name: '电路分析', accuracy: 0.78 },
+            { name: '英语语法', accuracy: 0.55 },
+            { name: '三角函数', accuracy: 0.88 },
+          ],
+        } : null))
 
-        // 评估
-        setEvaluation(evalData || null)
+        // 评估降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setEvaluation(evalData || (USE_MOCK ? {
+          overallScore: 78,
+          recentTrend: 'up',
+          completedTasks: 24,
+          totalTime: 129600,
+          topicScores: [
+            { topic: '二次函数', score: 85, level: '优秀' },
+            { topic: '力学基础', score: 72, level: '良好' },
+            { topic: '电路分析', score: 60, level: '需提升' },
+            { topic: '英语语法', score: 68, level: '良好' },
+          ],
+          history: [
+            { date: '2026-06-01', score: 72, tasks: 3 },
+            { date: '2026-06-02', score: 74, tasks: 2 },
+            { date: '2026-06-03', score: 73, tasks: 4 },
+            { date: '2026-06-04', score: 76, tasks: 3 },
+            { date: '2026-06-05', score: 75, tasks: 5 },
+            { date: '2026-06-06', score: 77, tasks: 4 },
+            { date: '2026-06-07', score: 78, tasks: 3 },
+          ],
+        } : null))
 
-        // 学习进度
-        setProgressStats(statsData || null)
-
-        // 如果所有数据都为空，显示错误
-        if (!profileData && !evalData && !statsData) {
-          setError('无法连接到后端服务，请检查网络连接后重试')
-        }
+        // 学习进度降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
+        setProgressStats(statsData || (USE_MOCK ? {
+          totalTopics: 12,
+          masteredTopics: 5,
+          learningTopics: 4,
+          notStartedTopics: 3,
+        } : null))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -105,17 +144,43 @@ export default function HomePage() {
     return () => { cancelled = true }
   }, [])
 
-  // 生成评估
+  // 生成评估（Mock 模式下模拟进度，正式模式直接调接口）
   async function handleGenerate() {
-    try {
-      const data = await getEvaluation(STUDENT_ID)
-      setEvaluation(data)
-      const stats = await getProgressStats(STUDENT_ID)
-      if (stats) setProgressStats(stats)
-      message.success('评估已刷新')
-    } catch (err) {
-      message.error('获取评估失败: ' + (err.message || '未知错误'))
+    if (!USE_MOCK) {
+      // 正式模式：直接调接口 + 轮询
+      try {
+        const data = await getEvaluation(STUDENT_ID)
+        setEvaluation(data)
+        const stats = await getProgressStats(STUDENT_ID)
+        if (stats) setProgressStats(stats)
+        message.success('评估已刷新')
+      } catch (err) {
+        message.error('获取评估失败: ' + (err.message || '未知错误'))
+      }
+      return
     }
+
+    // Mock 模式：模拟生成进度
+    setGenerating(true)
+    setGenProgress(0)
+    const timer = setInterval(() => {
+      setGenProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(timer)
+          setGenerating(false)
+          // 重新加载数据
+          Promise.all([
+            getEvaluation(STUDENT_ID).catch(() => null),
+            getProgressStats(STUDENT_ID).catch(() => null),
+          ]).then(([evalData, statsData]) => {
+            if (evalData) setEvaluation(evalData)
+            if (statsData) setProgressStats(statsData)
+          })
+          return 100
+        }
+        return Math.min(prev + Math.random() * 15, 100)
+      })
+    }, 500)
   }
 
   async function handleRefresh() {
@@ -135,28 +200,6 @@ export default function HomePage() {
   }
 
   if (loading) return <LoadingSkeleton type="detail" />
-
-  if (error) {
-    return (
-      <div style={{ maxWidth: 600, margin: '60px auto', padding: 24 }}>
-        <Result
-          status="error"
-          title="加载失败"
-          subTitle={error}
-          extra={
-            <Space>
-              <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>
-                重新加载
-              </Button>
-              <Button icon={<DownloadOutlined />} onClick={handleGenerate}>
-                生成新评估
-              </Button>
-            </Space>
-          }
-        />
-      </div>
-    )
-  }
 
   const trendArrow = evaluation?.recentTrend === 'up'
     ? <CaretUpOutlined style={{ color: '#52c41a', fontSize: 14 }} />
@@ -211,14 +254,21 @@ export default function HomePage() {
           <Col>
             <Space>
               <Button ghost icon={<ReloadOutlined />} onClick={handleRefresh}>刷新</Button>
-              <Button ghost icon={<DownloadOutlined />} onClick={handleGenerate}
+              <Button ghost icon={<DownloadOutlined />} onClick={handleGenerate} loading={generating}
                 style={{ borderColor: 'rgba(139, 92, 246, 0.6)', color: '#c4b5fd' }}>
-                生成新评估
+                {generating ? '生成中...' : '生成新评估'}
               </Button>
             </Space>
           </Col>
         </Row>
       </div>
+
+      {/* 生成进度 */}
+      {generating && (
+        <Card style={{ marginBottom: 24 }}>
+          <ProgressBar status="running" percent={Math.min(genProgress, 100)} message="AI 正在评估你的学习情况..." />
+        </Card>
+      )}
 
       {/* ========== 统计卡片行（5 列均分占满） ========== */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
