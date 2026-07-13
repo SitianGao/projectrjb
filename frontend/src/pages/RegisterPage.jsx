@@ -1,25 +1,65 @@
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Form, Input, Button, Typography, Divider, Alert } from 'antd'
-import { UserOutlined, LockOutlined, MailOutlined, IdcardOutlined } from '@ant-design/icons'
+import { Form, Input, Button, Typography, Divider, Alert, message } from 'antd'
+import { UserOutlined, LockOutlined, PhoneOutlined, MessageOutlined } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 import CharacterGroup from '../components/AnimatedCharacter'
 
 const { Title, Text } = Typography
+const MOCK_CODE = '123456'
+const CODE_EXPIRE_SEC = 600 // 10分钟
 
 export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [userNameFocused, setUserNameFocused] = useState(false)
   const [pwFocused, setPwFocused] = useState(false)
+  const [codeExpiry, setCodeExpiry] = useState(0) // 剩余秒数
+  const timerRef = useRef(null)
   const { register } = useAuth()
   const navigate = useNavigate()
+  const [form] = Form.useForm()
+
+  const startCodeTimer = useCallback(() => {
+    clearInterval(timerRef.current)
+    setCodeExpiry(CODE_EXPIRE_SEC)
+    timerRef.current = setInterval(() => {
+      setCodeExpiry((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current)
+          form.setFieldsValue({ code: '' })
+          message.warning('验证码已过期，请重新输入手机号获取')
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [form])
+
+  const handlePhoneChange = useCallback((e) => {
+    const phone = e.target.value
+    if (/^1[3-9]\d{9}$/.test(phone)) {
+      form.setFieldsValue({ code: MOCK_CODE })
+      startCodeTimer()
+    } else {
+      // 手机号不满足时清除验证码
+      clearInterval(timerRef.current)
+      setCodeExpiry(0)
+      form.setFieldsValue({ code: '' })
+    }
+  }, [form, startCodeTimer])
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
 
   const onFinish = async (values) => {
     setError(null)
     setLoading(true)
     try {
-      const ok = await register(values.username, values.password, values.name, values.email)
+      const ok = await register(values.username, values.password, values.phone)
       if (ok) { navigate('/', { replace: true }) }
     } catch (err) {
       setError(err.message || '注册失败，请重试')
@@ -64,7 +104,7 @@ export default function RegisterPage() {
             />
           )}
 
-          <Form name="register" onFinish={onFinish} size="large" autoComplete="off">
+          <Form form={form} name="register" onFinish={onFinish} size="large" autoComplete="off">
             <Form.Item
               name="username"
               rules={[
@@ -80,21 +120,37 @@ export default function RegisterPage() {
               />
             </Form.Item>
 
+            {/* 手机号 */}
             <Form.Item
-              name="name"
-              rules={[{ required: true, message: '请输入姓名' }]}
-            >
-              <Input prefix={<IdcardOutlined />} placeholder="姓名" />
-            </Form.Item>
-
-            <Form.Item
-              name="email"
+              name="phone"
               rules={[
-                { required: true, message: '请输入邮箱' },
-                { type: 'email', message: '邮箱格式不正确' },
+                { required: true, message: '请输入手机号' },
+                { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' },
               ]}
             >
-              <Input prefix={<MailOutlined />} placeholder="邮箱" />
+              <Input
+                prefix={<PhoneOutlined />}
+                placeholder="手机号"
+                onChange={handlePhoneChange}
+              />
+            </Form.Item>
+
+            {/* 验证码（10分钟内有效） */}
+            <Form.Item
+              name="code"
+              rules={[{ required: true, message: '请输入验证码' }]}
+            >
+              <Input
+                prefix={<MessageOutlined />}
+                placeholder="请输入您的验证码"
+                suffix={
+                  codeExpiry > 0 ? (
+                    <Text style={{ fontSize: 12, color: '#8b5cf6', whiteSpace: 'nowrap' }}>
+                      您的验证码将在 {formatTime(codeExpiry)} 后失效
+                    </Text>
+                  ) : null
+                }
+              />
             </Form.Item>
 
             <Form.Item
@@ -102,11 +158,21 @@ export default function RegisterPage() {
               rules={[
                 { required: true, message: '请输入密码' },
                 { min: 6, message: '密码至少 6 位' },
+                {
+                  validator(_, value) {
+                    if (!value) return Promise.resolve()
+                    if (!/[a-z]/.test(value)) return Promise.reject(new Error('密码需包含小写字母'))
+                    if (!/[A-Z]/.test(value)) return Promise.reject(new Error('密码需包含大写字母'))
+                    if (!/[0-9]/.test(value)) return Promise.reject(new Error('密码需包含数字'))
+                    if (!/[\p{P}\p{S}]/u.test(value)) return Promise.reject(new Error('密码需包含标点符号'))
+                    return Promise.resolve()
+                  },
+                },
               ]}
             >
               <Input.Password
                 prefix={<LockOutlined />}
-                placeholder="密码"
+                placeholder="需包含大小写字母、数字和符号，至少6位"
                 onFocus={() => setPwFocused(true)}
                 onBlur={() => setPwFocused(false)}
               />

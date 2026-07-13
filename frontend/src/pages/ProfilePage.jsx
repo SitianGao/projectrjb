@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Typography, Space, Tabs, Row, Col, Card, Statistic, Input, Select, Button, Empty, Tag, List, Modal, message } from 'antd'
+import { Typography, Space, Tabs, Row, Col, Card, Statistic, Input, Select, Button, Empty, Tag, message } from 'antd'
 import {
   PlusOutlined,
   ReloadOutlined,
@@ -12,10 +12,6 @@ import {
   FireOutlined,
   MessageOutlined,
   DeleteOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  PushpinOutlined,
-  PushpinFilled,
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import ChatBox from '../components/ChatBox'
@@ -31,9 +27,7 @@ import { useChat } from '../hooks/useChat'
 import { startProfileChat } from '../api/profile'
 import { getResources } from '../api/resource'
 import { getLearningPath, generateLearningPath } from '../api/planner'
-import { getTutorSessions, createTutorSession } from '../api/tutor'
 import ResourcePage from '../pages/ResourcePage'
-import { formatRelativeTime } from '../utils/format'
 import { shouldUseMock } from '../utils/useMock'
 
 const USE_MOCK = shouldUseMock()
@@ -63,125 +57,6 @@ const TYPE_OPTIONS = [
 ]
 
 function parseSSEEvent(t) { try { return JSON.parse(t) } catch { return null } }
-
-// ==================== 辅导面板 ====================
-function TutorPanel({ collapsed, onToggle, locked, onLock }) {
-  const [sessions, setSessions] = useState([])
-  const [activeId, setActiveId] = useState(null)
-  const [loadingSessions, setLoadingSessions] = useState(false)
-  const [error, setError] = useState(null)
-  const [newModal, setNewModal] = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const studentId = 'demo-student-01'
-
-  useEffect(() => { loadSessions() }, [])
-
-  async function loadSessions() {
-    setError(null)
-    setLoadingSessions(true)
-    try {
-      const data = await getTutorSessions(studentId)
-      setSessions(Array.isArray(data) ? data : data?.sessions || [])
-    } catch {
-      if (USE_MOCK) {
-        setSessions([
-          { id: 's1', title: '二次函数答疑', updatedAt: new Date(), messageCount: 12 },
-          { id: 's2', title: '英语语法解惑', updatedAt: new Date(Date.now() - 86400000), messageCount: 8 },
-        ])
-      } else {
-        setError('加载会话失败')
-      }
-    } finally { setLoadingSessions(false) }
-  }
-
-  async function handleNew() {
-    if (!newTitle.trim()) return
-    try {
-      const data = await createTutorSession({ student_id: studentId, title: newTitle })
-      setActiveId(data?.id || data?.session_id)
-      setNewModal(false); setNewTitle('')
-      loadSessions()
-    } catch { setNewModal(false); setNewTitle('') }
-  }
-
-  return (
-    <div style={{
-      width: collapsed ? 44 : 260,
-      flexShrink: 0,
-      display: 'flex',
-      borderRight: '1px solid var(--sidebar-border)',
-      background: 'var(--sidebar-bg)',
-      transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      overflow: 'hidden',
-      height: '100%',
-    }}>
-      {/* 收起态按钮 */}
-      <div style={{
-        width: 44, flexShrink: 0,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12,
-        opacity: collapsed ? 1 : 0,
-        transition: 'opacity 0.15s',
-      }}>
-        <Button type="text" icon={<MenuUnfoldOutlined />} onClick={onToggle} size="small" />
-      </div>
-
-      {/* 展开内容 */}
-      <div style={{
-        width: 216, flexShrink: 0,
-        display: 'flex', flexDirection: 'column',
-        opacity: collapsed ? 0 : 1,
-        transition: 'opacity 0.15s',
-      }}>
-        <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--sidebar-border, rgba(255,255,255,0.06))' }}>
-          <Space size={4}>
-            <MessageOutlined style={{ color: '#8b5cf6' }} />
-            <Text strong style={{ fontSize: 13 }}>辅导会话</Text>
-          </Space>
-          <Space size={4}>
-            <Button type="text" size="small" icon={<PlusOutlined />} onClick={() => setNewModal(true)} />
-            <Button type="text" size="small"
-              icon={locked ? <PushpinFilled /> : <PushpinOutlined />}
-              onClick={onLock}
-              style={locked ? { color: '#8b5cf6' } : {}}
-              title={locked ? '取消锁定' : '锁定面板'}
-            />
-            <Button type="text" size="small" icon={<MenuFoldOutlined />} onClick={onToggle} />
-          </Space>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {loadingSessions ? <LoadingSkeleton type="card" count={2} /> : error ? (
-            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-              <ExclamationCircleOutlined style={{ fontSize: 28, color: '#ff4d4f', marginBottom: 12 }} />
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>{error}</div>
-              <Button size="small" icon={<ReloadOutlined />} onClick={loadSessions}>重试</Button>
-            </div>
-          ) : sessions.length === 0 ? (
-            <Empty description="暂无会话" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ marginTop: 32 }} />
-          ) : (
-            <List size="small" dataSource={sessions} renderItem={(s) => (
-              <List.Item onClick={() => setActiveId(s.id)}
-                style={{
-                  cursor: 'pointer', padding: '8px 12px',
-                  background: s.id === activeId ? 'var(--session-highlight)' : 'transparent',
-                  borderBottom: '1px solid var(--sidebar-border)',
-                }}>
-                <List.Item.Meta
-                  title={<Text style={{ fontSize: 13 }}>{s.title}</Text>}
-                  description={<Text type="secondary" style={{ fontSize: 11 }}>{s.messageCount || 0} 条 · {formatRelativeTime(s.updatedAt)}</Text>}
-                />
-              </List.Item>
-            )} />
-          )}
-        </div>
-
-        <Modal title="新建辅导会话" open={newModal} onOk={handleNew} onCancel={() => setNewModal(false)} okText="创建" cancelText="取消">
-          <Input placeholder="输入会话标题" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} onPressEnter={handleNew} />
-        </Modal>
-      </div>
-    </div>
-  )
-}
 
 // ==================== 学习资源面板 ====================
 function ResourcePanel() {
@@ -354,8 +229,6 @@ function LearningPathPanel() {
 // ==================== 主页面 ====================
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('resource')
-  const [tutorHover, setTutorHover] = useState(false)
-  const [tutorLocked, setTutorLocked] = useState(false)
   const [profile, setProfile] = useState(null)
 
   const handleProfileUpdate = useCallback((updatedProfile) => {
@@ -384,24 +257,8 @@ export default function ProfilePage() {
   const handleSuggestion = useCallback((t, opts) => sendMessage(t, opts), [sendMessage])
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--bg-page)' }}>
-      {/* ===== 左侧：辅导面板 ===== */}
-      <div
-        onMouseEnter={() => { if (!tutorLocked) setTutorHover(true) }}
-        onMouseLeave={() => { if (!tutorLocked) setTutorHover(false) }}
-        style={{ flexShrink: 0 }}
-      >
-        <TutorPanel
-          collapsed={!tutorHover && !tutorLocked}
-          locked={tutorLocked}
-          onToggle={() => setTutorHover(!tutorHover)}
-          onLock={() => { setTutorLocked(!tutorLocked); if (!tutorLocked) setTutorHover(true) }}
-        />
-      </div>
-
-      {/* ===== 右侧：主内容区 ===== */}
-      <div style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
-        {/* 对话区 */}
+    <div style={{ height: '100%', overflow: 'auto', background: 'var(--bg-page)' }}>
+      {/* 对话区 */}
         <div style={{
           display: 'flex', flexDirection: 'column',
           padding: '20px 24px 0',
@@ -434,6 +291,8 @@ export default function ProfilePage() {
               emptyText="和 AI 助手聊聊你的学习情况"
               suggestions={SUGGESTIONS}
               onSuggestionClick={handleSuggestion}
+              showStyleSelector={false}
+              headerHint="介绍一下自己，AI 老师会根据你的背景个性化教学"
             />
           </div>
 
@@ -455,7 +314,6 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-      </div>
 
       {/* 右下角悬浮对话 */}
       <FloatingChat />

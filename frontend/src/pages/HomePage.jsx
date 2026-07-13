@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Row, Col, Card, Statistic, Typography, Space, Tag, Avatar, Progress, Table, Button, Result } from 'antd'
+import { useState, useEffect, useMemo } from 'react'
+import { Card, Typography, Space, Tag, Avatar, Button, Result, Popover, Empty } from 'antd'
 import {
   UserOutlined,
   BookOutlined,
@@ -7,139 +7,173 @@ import {
   RiseOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
-  CaretUpOutlined,
-  CaretDownOutlined,
   ReloadOutlined,
   DownloadOutlined,
+  ThunderboltOutlined,
+  FieldTimeOutlined,
+  EditOutlined,
+  CloseCircleOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons'
 import { getProfile } from '../api/profile'
+import { useAuth } from '../contexts/AuthContext'
 import { getEvaluation, getProgressStats } from '../api/evaluate'
-import { formatDuration, formatDate } from '../utils/format'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import RadarChart from '../components/RadarChart'
-import ScoreTrendChart from '../components/ScoreTrendChart'
-import ProgressBar from '../components/ProgressBar'
-import { deriveDimensions } from '../components/ProfileCard'
-import { shouldUseMock } from '../utils/useMock'
+import MultiLineChart from '../components/MultiLineChart'
+import DonutChart from '../components/DonutChart'
 
 const { Title, Text } = Typography
 
-const USE_MOCK = shouldUseMock()
+// ==================== 常量 ====================
 
-const STUDENT_ID = 'demo-student-01'
+const SUBJECT_COLORS = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de']
 
-// 知识点得分表格列定义
-const topicColumns = [
-  { title: '知识点', dataIndex: 'topic', key: 'topic' },
-  {
-    title: '得分',
-    dataIndex: 'score',
-    key: 'score',
-    render: (v) => <Text strong>{v}</Text>,
-    sorter: (a, b) => a.score - b.score,
-  },
-  {
-    title: '掌握程度',
-    dataIndex: 'level',
-    key: 'level',
-    render: (v) => {
-      const colorMap = { '优秀': 'success', '良好': 'processing', '需提升': 'warning', '薄弱': 'error' }
-      return <Tag color={colorMap[v] || 'default'}>{v}</Tag>
-    },
-  },
-  {
-    title: '进度',
-    dataIndex: 'score',
-    key: 'progress',
-    render: (v) => (
-      <Progress
-        percent={v}
-        size="small"
-        strokeColor={v >= 80 ? '#52c41a' : v >= 60 ? '#faad14' : '#ff4d4f'}
-      />
-    ),
-  },
+const ABILITY_DIMS = [
+  { key: 'memory',     label: '记忆能力',   icon: '🧠', color: '#5470c6' },
+  { key: 'understand', label: '理解能力',   icon: '💡', color: '#91cc75' },
+  { key: 'apply',      label: '应用能力',   icon: '🔧', color: '#fac858' },
+  { key: 'analyze',    label: '分析能力',   icon: '🔍', color: '#ee6666' },
+  { key: 'evaluate',   label: '评价能力',   icon: '⚖️', color: '#73c0de' },
+  { key: 'create',     label: '创造能力',   icon: '✨', color: '#8b5cf6' },
 ]
 
-/**
- * 首页 / 个人中心 — 融合学习评估
- *
- * 包含：欢迎横幅 | 统计卡片 | 六维画像雷达图 | 知识点得分表 | 评分趋势 | 评估历史
- */
+// ==================== 子组件 ====================
+
+function StatCard({ title, value, icon, color, suffix }) {
+  return (
+    <Card
+      hoverable
+      style={{
+        flex: '1 1 160px', minWidth: 0, borderRadius: 10,
+        border: '1px solid var(--border)', background: 'var(--bg-card)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'hidden', position: 'relative',
+        transition: 'transform 0.25s, box-shadow 0.25s, border-color 0.25s',
+      }}
+    >
+      <div style={{
+        position: 'absolute', left: 0, top: '15%', height: '70%', width: 3,
+        borderRadius: '0 3px 3px 0', background: color, opacity: 0.8,
+      }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <Text style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{title}</Text>
+          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+            {value}{suffix && <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-secondary)' }}>{suffix}</span>}
+          </div>
+        </div>
+        <div style={{
+          width: 44, height: 44, borderRadius: 10,
+          background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {icon}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function CognitiveBar({ name, score, color }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <Text style={{ fontSize: 13, color: 'var(--text-primary)' }}>{name}</Text>
+        <Text strong style={{ fontSize: 13, color }}>{score}</Text>
+      </div>
+      <div style={{ height: 8, borderRadius: 4, background: 'var(--surface-secondary)', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', width: `${Math.min(score, 100)}%`, borderRadius: 4,
+          background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+          transition: 'width 0.8s cubic-bezier(0.25, 0.8, 0.25, 1.2)',
+        }} />
+      </div>
+    </div>
+  )
+}
+
+// ==================== 数据转换工具 ====================
+
+/** 从 topics 数组构建知识趋势折线数据 */
+function buildKnowledgeTrend(topics) {
+  if (!topics || topics.length === 0) return { xLabels: [], series: [] }
+  return {
+    xLabels: topics[0]?.history?.map((_, i) => `第${i + 1}次`) || [],
+    series: topics.map((t, i) => ({
+      name: t.name,
+      color: SUBJECT_COLORS[i % SUBJECT_COLORS.length],
+      data: t.history || [t.accuracy ? Math.round(t.accuracy * 100) : 0],
+    })),
+  }
+}
+
+/** 从 topics 构建认知能力数据 */
+function buildCognitiveData(topics) {
+  if (!topics || topics.length === 0) return []
+  return topics.map((t, i) => ({
+    name: t.name,
+    score: t.accuracy ? Math.round(t.accuracy * 100) : 0,
+    color: SUBJECT_COLORS[i % SUBJECT_COLORS.length],
+  }))
+}
+
+/** 从 topics 构建学习时长分布 */
+function buildTimeDist(topics) {
+  if (!topics || topics.length === 0) return []
+  const maxHours = Math.max(...topics.map((t) => t.studyHours || 0), 1)
+  return topics.map((t, i) => ({
+    label: t.name,
+    hours: t.studyHours || 0,
+    maxHours,
+    color: SUBJECT_COLORS[i % SUBJECT_COLORS.length],
+  }))
+}
+
+/** 从 evaluation 构建答题情况 */
+function buildAnswerStats(evaluation) {
+  if (!evaluation) return []
+  const correct = evaluation.correctRate != null ? Math.round(evaluation.correctRate * 100) : 0
+  return [
+    { label: '正确', value: correct, color: '#00b894' },
+    { label: '错误', value: 100 - correct, color: '#fab1a0' },
+  ]
+}
+
+// ==================== 主组件 ====================
+
 export default function HomePage() {
+  const { user } = useAuth()
   const [profile, setProfile] = useState(null)
   const [evaluation, setEvaluation] = useState(null)
   const [progressStats, setProgressStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [generating, setGenerating] = useState(false)
-  const [genProgress, setGenProgress] = useState(0)
+  const [introVisible, setIntroVisible] = useState(false)
+
+  const studentId = user?.id || user?.student_id || ''
 
   useEffect(() => {
     let cancelled = false
+    if (!studentId) {
+      setLoading(false)
+      return
+    }
 
     async function load() {
       setError(null)
       setLoading(true)
       try {
         const [profileData, evalData, statsData] = await Promise.all([
-          getProfile(STUDENT_ID).catch(() => null),
-          getEvaluation(STUDENT_ID).catch(() => null),
-          getProgressStats(STUDENT_ID).catch(() => null),
+          getProfile(studentId).catch(() => null),
+          getEvaluation(studentId).catch(() => null),
+          getProgressStats(studentId).catch(() => null),
         ])
         if (cancelled) return
 
-        // 画像降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
-        setProfile(profileData || (USE_MOCK ? {
-          name: '张同学',
-          level: '中级',
-          progress: 68,
-          strengths: ['数学', '物理', '化学'],
-          weaknesses: ['英语'],
-          style: '实践型',
-          dimensions: { knowledge: 82, ability: 70, thinking: 75, style: 72, progress: 68, goalClarity: 85 },
-          topics: [
-            { name: '二次函数', accuracy: 0.92 },
-            { name: '力学基础', accuracy: 0.85 },
-            { name: '电路分析', accuracy: 0.78 },
-            { name: '英语语法', accuracy: 0.55 },
-            { name: '三角函数', accuracy: 0.88 },
-          ],
-        } : null))
+        setProfile(profileData)
+        setEvaluation(evalData)
+        setProgressStats(statsData)
 
-        // 评估降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
-        setEvaluation(evalData || (USE_MOCK ? {
-          overallScore: 78,
-          recentTrend: 'up',
-          completedTasks: 24,
-          totalTime: 129600,
-          topicScores: [
-            { topic: '二次函数', score: 85, level: '优秀' },
-            { topic: '力学基础', score: 72, level: '良好' },
-            { topic: '电路分析', score: 60, level: '需提升' },
-            { topic: '英语语法', score: 68, level: '良好' },
-          ],
-          history: [
-            { date: '2026-06-01', score: 72, tasks: 3 },
-            { date: '2026-06-02', score: 74, tasks: 2 },
-            { date: '2026-06-03', score: 73, tasks: 4 },
-            { date: '2026-06-04', score: 76, tasks: 3 },
-            { date: '2026-06-05', score: 75, tasks: 5 },
-            { date: '2026-06-06', score: 77, tasks: 4 },
-            { date: '2026-06-07', score: 78, tasks: 3 },
-          ],
-        } : null))
-
-        // 学习进度降级 Mock（仅在 VITE_USE_MOCK=true 时启用）
-        setProgressStats(statsData || (USE_MOCK ? {
-          totalTopics: 12,
-          masteredTopics: 5,
-          learningTopics: 4,
-          notStartedTopics: 3,
-        } : null))
-
-        // 如果所有数据都为空且非 Mock，显示错误
-        if (!profileData && !evalData && !statsData && !USE_MOCK) {
+        if (!profileData && !evalData && !statsData) {
           setError('无法连接到后端服务，请检查网络连接后重试')
         }
       } finally {
@@ -149,54 +183,15 @@ export default function HomePage() {
 
     load()
     return () => { cancelled = true }
-  }, [])
-
-  // 生成评估（Mock 模式下模拟进度，正式模式直接调接口）
-  async function handleGenerate() {
-    if (!USE_MOCK) {
-      // 正式模式：直接调接口 + 轮询
-      try {
-        const data = await getEvaluation(STUDENT_ID)
-        setEvaluation(data)
-        const stats = await getProgressStats(STUDENT_ID)
-        if (stats) setProgressStats(stats)
-        message.success('评估已刷新')
-      } catch (err) {
-        message.error('获取评估失败: ' + (err.message || '未知错误'))
-      }
-      return
-    }
-
-    // Mock 模式：模拟生成进度
-    setGenerating(true)
-    setGenProgress(0)
-    const timer = setInterval(() => {
-      setGenProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(timer)
-          setGenerating(false)
-          // 重新加载数据
-          Promise.all([
-            getEvaluation(STUDENT_ID).catch(() => null),
-            getProgressStats(STUDENT_ID).catch(() => null),
-          ]).then(([evalData, statsData]) => {
-            if (evalData) setEvaluation(evalData)
-            if (statsData) setProgressStats(statsData)
-          })
-          return 100
-        }
-        return Math.min(prev + Math.random() * 15, 100)
-      })
-    }, 500)
-  }
+  }, [studentId])
 
   async function handleRefresh() {
     setLoading(true)
     try {
       const [profileData, evalData, statsData] = await Promise.all([
-        getProfile(STUDENT_ID).catch(() => null),
-        getEvaluation(STUDENT_ID).catch(() => null),
-        getProgressStats(STUDENT_ID).catch(() => null),
+        getProfile(studentId).catch(() => null),
+        getEvaluation(studentId).catch(() => null),
+        getProgressStats(studentId).catch(() => null),
       ])
       if (profileData) setProfile(profileData)
       if (evalData) setEvaluation(evalData)
@@ -206,23 +201,62 @@ export default function HomePage() {
     }
   }
 
+  async function handleGenerate() {
+    try {
+      const data = await getEvaluation(studentId)
+      setEvaluation(data)
+      const stats = await getProgressStats(studentId)
+      if (stats) setProgressStats(stats)
+    } catch {
+      // 静默失败
+    }
+  }
+
+  // ---------- 从 API 数据计算展示值 ----------
+  const displayData = useMemo(() => {
+    const topics = profile?.topics || []
+    return {
+      knowledgeTrend: buildKnowledgeTrend(topics),
+      cognitiveData: buildCognitiveData(topics),
+      timeDist: buildTimeDist(topics),
+      answerStats: buildAnswerStats(evaluation),
+    }
+  }, [profile, evaluation])
+
+  // 能力评估雷达图数据（从 profile.dimensions 映射）
+  const abilityData = useMemo(() => {
+    const dims = profile?.dimensions || {}
+    return {
+      memory: dims.memory || dims.knowledge || 0,
+      understand: dims.understand || dims.ability || 0,
+      apply: dims.apply || dims.thinking || 0,
+      analyze: dims.analyze || dims.style || 0,
+      evaluate: dims.evaluate || dims.progress || 0,
+      create: dims.create || dims.goalClarity || 0,
+    }
+  }, [profile])
+
+  // 学习建议（从 evaluation）
+  const suggestions = evaluation?.suggestions || []
+
+  // 统计数值
+  const totalTimeHours = evaluation?.totalTime ? Math.round(evaluation.totalTime / 3600) : 0
+  const overallScore = evaluation?.overallScore || 0
+  const completedTasks = evaluation?.completedTasks || 0
+  const totalTopics = progressStats?.totalTopics || (profile?.topics?.length || 0)
+  const masteredTopics = progressStats?.masteredTopics || 0
+
   if (loading) return <LoadingSkeleton type="detail" />
 
   if (error) {
     return (
       <div style={{ maxWidth: 600, margin: '60px auto', padding: 24 }}>
         <Result
-          status="error"
-          title="加载失败"
-          subTitle={error}
+          status="error" title="加载失败" subTitle={error}
           extra={
             <Space>
-              <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>
-                重新加载
-              </Button>
-              <Button icon={<DownloadOutlined />} onClick={handleGenerate}>
-                生成新评估
-              </Button>
+              <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>重新加载</Button>
+              <Button icon={<DownloadOutlined />} onClick={handleGenerate}>生成新评估</Button>
             </Space>
           }
         />
@@ -230,212 +264,321 @@ export default function HomePage() {
     )
   }
 
-  const trendArrow = evaluation?.recentTrend === 'up'
-    ? <CaretUpOutlined style={{ color: '#52c41a', fontSize: 14 }} />
-    : evaluation?.recentTrend === 'down'
-      ? <CaretDownOutlined style={{ color: '#ff4d4f', fontSize: 14 }} />
-      : null
-
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 48px' }}>
-      {/* ========== 欢迎横幅 ========== */}
-      <div
-        className="tech-banner"
-        style={{
-          position: 'relative',
-          borderRadius: 16,
-          padding: '24px 32px',
-          marginBottom: 24,
-          background: 'linear-gradient(135deg, #0f0c29 0%, #1a1040 40%, #0d1b3e 100%)',
-          overflow: 'hidden',
-          color: '#fff',
-          boxShadow: '0 4px 32px rgba(99, 102, 241, 0.25), 0 1px 4px rgba(0, 0, 0, 0.15)',
-        }}
-      >
-        {/* 背景光晕 */}
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 220, height: 220, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(99, 102, 241, 0.1) 40%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -60, left: '25%', width: 300, height: 150, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0.08) 40%, transparent 70%)', pointerEvents: 'none' }} />
-        <div className="tech-grid" style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '40px 40px', pointerEvents: 'none' }} />
+    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 24px 48px' }}>
+      {/* ========== 页面标题 ========== */}
+      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* 个人介绍弹窗 */}
+          <Popover
+            content={
+              <div style={{ maxWidth: 300, padding: '8px 4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                  <Avatar size={56} icon={<UserOutlined />} src={user?.avatar}
+                    style={{
+                      border: '2px solid rgba(139,92,246,0.5)',
+                      boxShadow: '0 0 16px rgba(139,92,246,0.25)',
+                      backgroundColor: '#1677ff', flexShrink: 0,
+                    }} />
+                  <div>
+                    <Text strong style={{ fontSize: 16, color: 'var(--text-primary)' }}>
+                      {profile?.name || user?.name || user?.username || '同学'}
+                    </Text>
+                    <br />
+                    <Tag color="purple" style={{ marginTop: 4, borderRadius: 4 }}>
+                      {profile?.level || '新手'} 学者
+                    </Tag>
+                  </div>
+                </div>
 
-        <Row align="middle" gutter={[24, 16]} style={{ position: 'relative', zIndex: 1 }}>
-          <Col>
-            <Avatar size={72} icon={<UserOutlined />} className="tech-avatar-glow"
-              style={{ backgroundColor: 'transparent', border: '2px solid rgba(139, 92, 246, 0.6)', boxShadow: '0 0 28px rgba(139, 92, 246, 0.4), inset 0 0 20px rgba(139, 92, 246, 0.12)' }} />
-          </Col>
-          <Col flex="auto">
-            <Title level={4} style={{ margin: 0, color: '#f8f7ff', fontWeight: 600, letterSpacing: 0.5 }}>
-              欢迎回来，{profile?.name || '同学'}
-            </Title>
-            <Space size="middle" style={{ marginTop: 6 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.78)' }}>{profile?.level || '--'} 级 · 学习进度 {profile?.progress ?? 0}%</Text>
-              {trendArrow && <Text style={{ color: 'rgba(255,255,255,0.78)' }}>{trendArrow} {evaluation?.recentTrend === 'up' ? '持续进步中' : '继续加油'}</Text>}
-            </Space>
-            <br />
-            <Space style={{ marginTop: 8 }}>
-              {profile?.strengths?.map((s) => (
-                <Tag key={s} color="purple" style={{ borderRadius: 4, background: 'rgba(139, 92, 246, 0.25)', border: '1px solid rgba(139, 92, 246, 0.45)', color: '#c4b5fd', fontWeight: 500 }}>优势: {s}</Tag>
-              ))}
-              {profile?.weaknesses?.map((w) => (
-                <Tag key={w} style={{ borderRadius: 4, background: 'rgba(251, 191, 36, 0.18)', border: '1px solid rgba(251, 191, 36, 0.4)', color: '#fcd34d', fontWeight: 500 }}>待提升: {w}</Tag>
-              ))}
-            </Space>
-          </Col>
-          <Col>
-            <Space>
-              <Button ghost icon={<ReloadOutlined />} onClick={handleRefresh}>刷新</Button>
-              <Button ghost icon={<DownloadOutlined />} onClick={handleGenerate} loading={generating}
-                style={{ borderColor: 'rgba(139, 92, 246, 0.6)', color: '#c4b5fd' }}>
-                {generating ? '生成中...' : '生成新评估'}
-              </Button>
-            </Space>
-          </Col>
-        </Row>
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(99,102,241,0.04) 100%)',
+                  borderRadius: 8, padding: '12px 14px', marginBottom: 14,
+                  border: '1px solid rgba(139,92,246,0.12)',
+                }}>
+                  <Text style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                    {user?.bio || '这个同学很懒，还没有填写个人简介~'}
+                  </Text>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[
+                    { label: '掌握专题', value: masteredTopics, color: '#8b5cf6' },
+                    { label: '完成任务', value: completedTasks, color: '#00b894' },
+                    { label: '综合评分', value: `${overallScore}分`, color: '#0984e3' },
+                  ].map((stat) => (
+                    <div key={stat.label} style={{
+                      flex: 1, textAlign: 'center', padding: '8px 4px',
+                      background: `${stat.color}08`, borderRadius: 8,
+                      border: `1px solid ${stat.color}18`,
+                    }}>
+                      <Text strong style={{ fontSize: 18, color: stat.color, display: 'block' }}>
+                        {stat.value}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>{stat.label}</Text>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: 14 }}>
+                  <Text style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    🎯 学习风格：{profile?.style || '未评估'}
+                  </Text>
+                  {profile?.strengths?.length > 0 && (
+                    <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {profile.strengths.map((s) => (
+                        <Tag key={s} color="purple" style={{ borderRadius: 4, margin: 0, fontSize: 11 }}>
+                          👍 {s}
+                        </Tag>
+                      ))}
+                      {profile?.weaknesses?.map((w) => (
+                        <Tag key={w} color="gold" style={{ borderRadius: 4, margin: 0, fontSize: 11 }}>
+                          💪 {w}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            }
+            title={null}
+            trigger="click"
+            open={introVisible}
+            onOpenChange={setIntroVisible}
+            placement="bottomLeft"
+            overlayStyle={{ maxWidth: 340 }}
+          >
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                userSelect: 'none', padding: '4px 10px', borderRadius: 8,
+                background: introVisible ? 'rgba(139,92,246,0.08)' : 'transparent',
+                transition: 'background 0.2s',
+              }}
+              onClick={(e) => { e.stopPropagation(); setIntroVisible(!introVisible) }}
+            >
+              <Avatar size={32} icon={<UserOutlined />} src={user?.avatar}
+                style={{ backgroundColor: '#1677ff', flexShrink: 0 }} />
+              <div>
+                <Text strong style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.1, display: 'block' }}>
+                  {profile?.name || user?.name || user?.username || '同学'}
+                </Text>
+                <Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  <IdcardOutlined style={{ marginRight: 4 }} />个人介绍
+                </Text>
+              </div>
+            </div>
+          </Popover>
+
+          <RiseOutlined style={{ fontSize: 22, color: '#8b5cf6' }} />
+          <Title level={4} style={{ margin: 0 }}>学习数据</Title>
+        </div>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={handleRefresh}>刷新</Button>
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleGenerate}
+            style={{ borderRadius: 6 }}>
+            生成新评估
+          </Button>
+        </Space>
       </div>
 
-      {/* 生成进度 */}
-      {generating && (
-        <Card style={{ marginBottom: 24 }}>
-          <ProgressBar status="running" percent={Math.min(genProgress, 100)} message="AI 正在评估你的学习情况..." />
-        </Card>
-      )}
+      {/* ========== 主内容 + 右侧面板 ========== */}
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        {/* ===== 左侧主内容区 ===== */}
+        <div style={{ flex: '1 1 600px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* ========== 统计卡片行（5 列均分占满） ========== */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
-        {[
-          { title: '综合评分', value: evaluation?.overallScore ?? 0, suffix: '分', icon: <TrophyOutlined />, color: '#aa3bff', trend: trendArrow },
-          { title: '近期趋势', value: evaluation?.recentTrend === 'up' ? '上升中 ↑' : '稳定 →', suffix: null, icon: <RiseOutlined />, color: evaluation?.recentTrend === 'up' ? '#52c41a' : '#1677ff' },
-          { title: '学习进度', value: profile?.progress ?? 0, suffix: '%', icon: <RiseOutlined />, color: '#52c41a' },
-          { title: '完成任务', value: evaluation?.completedTasks ?? 0, suffix: null, icon: <CheckCircleOutlined />, color: '#1677ff' },
-          { title: '学习时长', value: formatDuration(evaluation?.totalTime || 0), suffix: null, icon: <ClockCircleOutlined />, color: '#fa8c16' },
-        ].map((stat) => (
-          <div key={stat.title} style={{ flex: '1 1 180px', minWidth: 0, display: 'flex' }}>
-            <Card hoverable className="tech-stat-card"
-              style={{ width: '100%', borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04)' }}>
-              <div style={{ position: 'absolute', left: 0, top: '15%', height: '70%', width: 3, borderRadius: '0 3px 3px 0', background: `linear-gradient(180deg, ${stat.color}, ${stat.color}cc)`, opacity: 0.8 }} />
-              <Statistic
-                title={<Text style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 500 }}>{stat.title}</Text>}
-                value={stat.value}
-                suffix={<span style={{ fontSize: 14 }}>{stat.suffix} {stat.trend}</span>}
-                prefix={React.cloneElement(stat.icon, { style: { color: stat.color } })}
-                valueStyle={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 24 }}
-              />
-            </Card>
+          {/* ---------- 统计卡片 ---------- */}
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <StatCard title="学习次数" value={completedTasks}
+              icon={<ThunderboltOutlined style={{ color: '#8b5cf6', fontSize: 20 }} />} color="#8b5cf6" />
+            <StatCard title="学习时长" value={totalTimeHours} suffix="h"
+              icon={<FieldTimeOutlined style={{ color: '#00b894', fontSize: 20 }} />} color="#00b894" />
+            <StatCard title="掌握专题" value={masteredTopics}
+              icon={<EditOutlined style={{ color: '#0984e3', fontSize: 20 }} />} color="#0984e3" />
+            <StatCard title="待学习" value={totalTopics - masteredTopics}
+              icon={<CloseCircleOutlined style={{ color: '#e17055', fontSize: 20 }} />} color="#e17055" />
           </div>
-        ))}
-      </div>
 
-      {/* ========== 六维画像 · 进度总览 · 评分趋势（三列并排）========== */}
-      <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
-        {/* 六维学习画像 */}
-        <Col xs={24} md={9}>
+          {/* ---------- 知识掌握变化 ---------- */}
           <Card
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
+            title={<><RiseOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />知识掌握变化</>}
+            style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
+          >
+            {displayData.knowledgeTrend.series.length > 0 ? (
+              <MultiLineChart series={displayData.knowledgeTrend.series} xLabels={displayData.knowledgeTrend.xLabels} />
+            ) : (
+              <Empty description="暂无知识掌握数据" />
+            )}
+          </Card>
+
+          {/* ---------- 能力评估 + 认知能力评估 ---------- */}
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 320px', minWidth: 300 }}>
+              <Card
+                title={<><TrophyOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />能力评估</>}
+                style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)', height: '100%' }}
+                styles={{ body: { display: 'flex', justifyContent: 'center' } }}
+              >
+                <RadarChart dimensionDefs={ABILITY_DIMS} dimensions={abilityData} size={280} />
+              </Card>
+            </div>
+
+            <div style={{ flex: '1 1 300px', minWidth: 280 }}>
+              <Card
+                title={<><CheckCircleOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />认知能力评估</>}
+                style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)', height: '100%' }}
+              >
+                {displayData.cognitiveData.length > 0 ? (
+                  displayData.cognitiveData.map((item) => (
+                    <CognitiveBar key={item.name} name={item.name} score={item.score} color={item.color} />
+                  ))
+                ) : (
+                  <Empty description="暂无认知评估数据" />
+                )}
+              </Card>
+            </div>
+          </div>
+
+          {/* ---------- 学习建议 ---------- */}
+          <Card
+            title={<><BookOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />学习建议</>}
+            style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
+          >
+            {suggestions.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {suggestions.map((s, idx) => (
+                  <div key={s.id || idx} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, fontWeight: 700, flexShrink: 0, marginTop: 2,
+                    }}>
+                      {idx + 1}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <Text strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{s.title}</Text>
+                        {s.tag && <Tag color={s.tagColor || 'purple'} style={{ borderRadius: 4, fontSize: 11, lineHeight: '18px' }}>{s.tag}</Tag>}
+                      </div>
+                      <Text style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                        {s.content}
+                      </Text>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Empty description="暂无学习建议" />
+            )}
+          </Card>
+        </div>
+
+        {/* ===== 右侧面板 ===== */}
+        <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* 用户卡片 */}
+          <Card
+            style={{
+              borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--bg-card)', overflow: 'hidden', padding: 0,
+            }}
+            styles={{ body: { padding: 0 } }}
+          >
+            <div style={{
+              background: 'linear-gradient(135deg, #1a1040 0%, #0d1b3e 100%)',
+              padding: '24px 20px 20px', textAlign: 'center', position: 'relative',
+            }}>
+              <div style={{
+                position: 'absolute', top: -30, right: -30, width: 100, height: 100,
+                borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%)',
+              }} />
+              <Avatar size={72} icon={<UserOutlined />} src={user?.avatar}
+                style={{
+                  border: '3px solid rgba(139,92,246,0.6)',
+                  boxShadow: '0 0 20px rgba(139,92,246,0.3)',
+                  backgroundColor: 'transparent',
+                }} />
+              <Title level={5} style={{ color: '#f8f7ff', margin: '12px 0 4px' }}>
+                {profile?.name || user?.name || user?.username || '同学'}
+              </Title>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
+                {profile?.level || '新手'} 学者 · {profile?.style || '未评估'}
+              </Text>
+            </div>
+            <div style={{ padding: '16px 20px' }}>
+              <Text style={{ fontSize: 13, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                "学而不思则罔，思而不学则殆"
+              </Text>
+              <div style={{ marginTop: 12, display: 'flex', gap: 16 }}>
+                <div style={{ textAlign: 'center', flex: 1 }}>
+                  <Text strong style={{ fontSize: 18, color: '#8b5cf6' }}>{masteredTopics}</Text>
+                  <br /><Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>掌握专题</Text>
+                </div>
+                <div style={{ textAlign: 'center', flex: 1 }}>
+                  <Text strong style={{ fontSize: 18, color: '#00b894' }}>{completedTasks}</Text>
+                  <br /><Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>完成任务</Text>
+                </div>
+                <div style={{ textAlign: 'center', flex: 1 }}>
+                  <Text strong style={{ fontSize: 18, color: '#0984e3' }}>{overallScore}</Text>
+                  <br /><Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>综合评分</Text>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* 答题情况 — 环形图 */}
+          <Card
+            title="答题情况"
+            style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
             styles={{ body: { display: 'flex', flexDirection: 'column', alignItems: 'center' } }}
           >
-            <Title level={5} style={{ color: 'var(--text-primary)', marginBottom: 8, textAlign: 'center' }}>
-              <UserOutlined style={{ color: '#8b5cf6', marginRight: 6 }} />
-              六维学习画像
-            </Title>
-            <RadarChart dimensions={deriveDimensions(profile)} animated size={280} />
-          </Card>
-        </Col>
-
-        {/* 学习进度总览 */}
-        <Col xs={24} md={6}>
-          <Card
-            title="学习进度总览"
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
-          >
-            {progressStats && (
-              <Space direction="vertical" size="large" style={{ width: '100%', paddingTop: 8 }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 13 }}>✅ 已掌握</Text>
-                    <Text strong style={{ color: '#52c41a' }}>{progressStats.masteredTopics}/{progressStats.totalTopics}</Text>
-                  </div>
-                  <Progress percent={Math.round((progressStats.masteredTopics / progressStats.totalTopics) * 100)} strokeColor="#52c41a" size="small" />
+            {displayData.answerStats.length > 0 ? (
+              <>
+                <DonutChart data={displayData.answerStats} size={180}
+                  centerLabel={`${displayData.answerStats[0]?.value || 0}%`} centerSub="正确率" />
+                <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
+                  {displayData.answerStats.map((d) => (
+                    <span key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: 3, background: d.color, display: 'inline-block' }} />
+                      {d.label} {d.value}%
+                    </span>
+                  ))}
                 </div>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 13 }}>📖 学习中</Text>
-                    <Text strong style={{ color: '#1677ff' }}>{progressStats.learningTopics}/{progressStats.totalTopics}</Text>
-                  </div>
-                  <Progress percent={Math.round((progressStats.learningTopics / progressStats.totalTopics) * 100)} strokeColor="#1677ff" size="small" />
-                </div>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 13 }}>⏳ 未开始</Text>
-                    <Text strong style={{ color: 'var(--text-muted)' }}>{progressStats.notStartedTopics}/{progressStats.totalTopics}</Text>
-                  </div>
-                  <Progress percent={Math.round((progressStats.notStartedTopics / progressStats.totalTopics) * 100)} strokeColor="#d9d9d9" size="small" />
-                </div>
-              </Space>
-            )}
-          </Card>
-        </Col>
-
-        {/* 评分趋势 */}
-        <Col xs={24} md={9}>
-          <Card
-            title="📈 评分趋势"
-            style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', height: '100%' }}
-            styles={{ body: { padding: '12px 8px' } }}
-          >
-            {evaluation?.history?.length > 0 ? (
-              <ScoreTrendChart data={evaluation.history} height={235} />
+              </>
             ) : (
-              <div style={{ textAlign: 'center', padding: 48, color: 'var(--text-muted)' }}>暂无趋势数据</div>
+              <Empty description="暂无答题数据" />
             )}
           </Card>
-        </Col>
-      </Row>
 
-      {/* ========== 知识点得分明细表 ========== */}
-      {evaluation?.topicScores?.length > 0 && (
-        <Card title={<><TrophyOutlined style={{ color: '#aa3bff', marginRight: 8 }} />知识点得分明细</>}
-          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <Table dataSource={evaluation.topicScores} columns={topicColumns} rowKey="topic" pagination={false} size="small" />
-        </Card>
-      )}
-
-      {/* ========== 知识点掌握度 ========== */}
-      {profile?.topics?.length > 0 && (
-        <Card title={<><BookOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />知识点掌握度</>}
-          style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          {profile.topics.map((topic) => {
-            const pct = Math.round(topic.accuracy * 100)
-            return (
-              <div key={topic.name} style={{ marginBottom: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Text style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500 }}>{topic.name}</Text>
-                  <Text className="tech-percent" style={{ fontSize: 13, fontWeight: 600, color: pct >= 80 ? '#52c41a' : pct >= 60 ? '#fa8c16' : '#ff4d4f' }}>{pct}%</Text>
+          {/* 学习时长分布 */}
+          <Card
+            title={<><ClockCircleOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />学习时长分布</>}
+            style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
+          >
+            {displayData.timeDist.length > 0 ? (
+              displayData.timeDist.map((d) => (
+                <div key={d.label} style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{d.label}</Text>
+                    <Text strong style={{ fontSize: 12, color: 'var(--text-primary)' }}>{d.hours}h</Text>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-secondary)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${d.maxHours > 0 ? (d.hours / d.maxHours) * 100 : 0}%`,
+                      borderRadius: 3,
+                      background: d.color,
+                      transition: 'width 0.6s ease',
+                    }} />
+                  </div>
                 </div>
-                <Progress percent={pct} size="small" showInfo={false}
-                  strokeColor={pct >= 80 ? { '0%': '#52c41a', '100%': '#73d13d' } : pct >= 60 ? { '0%': '#fa8c16', '100%': '#ffc53d' } : { '0%': '#ff4d4f', '100%': '#ff7a45' }}
-                  trailColor="rgba(0,0,0,0.06)" />
-              </div>
-            )
-          })}
-        </Card>
-      )}
-
-      {/* ========== 评估历史 ========== */}
-      {evaluation?.history?.length > 0 && (
-        <Card title="评估历史"
-          style={{ borderRadius: 12, border: '1px solid var(--border, #e5e4e7)', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-          <Table
-            dataSource={evaluation.history}
-            columns={[
-              { title: '日期', dataIndex: 'date', key: 'date', render: (v) => formatDate(v, 'YYYY-MM-DD') },
-              { title: '评分', dataIndex: 'score', key: 'score', render: (v) => <Text strong>{v} 分</Text> },
-              { title: '完成任务', dataIndex: 'tasks', key: 'tasks', render: (v) => `${v} 个` },
-            ]}
-            rowKey="date"
-            pagination={false}
-            size="small"
-          />
-        </Card>
-      )}
+              ))
+            ) : (
+              <Empty description="暂无学习时长数据" />
+            )}
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
