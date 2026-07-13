@@ -93,6 +93,7 @@ export default function ChatBox({
   onSuggestionClick,
   defaultStyle = 'analogy',
   showStyleSelector = true,
+  headerHint,
 }) {
   const { resolved } = useTheme()
   const isDark = resolved === 'dark'
@@ -178,6 +179,27 @@ export default function ChatBox({
 
       {/* 消息列表 */}
       <div ref={listRef} className="chatbox-list" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', minHeight: 0 }}>
+        {/* 左上角提示框 */}
+        {headerHint && (
+          <div style={{
+            display: 'inline-block',
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(99,102,241,0.08) 100%)'
+              : 'linear-gradient(135deg, #f5f0ff 0%, #eef0ff 100%)',
+            border: isDark
+              ? '1px solid rgba(139,92,246,0.2)'
+              : '1px solid rgba(139,92,246,0.15)',
+            borderRadius: 10,
+            padding: '10px 16px',
+            marginBottom: 16,
+            maxWidth: 420,
+          }}>
+            <Text style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              💡 {headerHint}
+            </Text>
+          </div>
+        )}
+
         {isEmpty && showEmpty ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 300 }}>
             <div style={{

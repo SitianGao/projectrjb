@@ -3,13 +3,13 @@ import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from
 import { Typography, Dropdown, Avatar } from 'antd'
 import {
   HomeOutlined,
-  ArrowLeftOutlined,
   UserOutlined,
   LogoutOutlined,
   KeyOutlined,
   EditOutlined,
   SunOutlined,
   MoonOutlined,
+  DesktopOutlined,
   ReadOutlined,
 } from '@ant-design/icons'
 import LoadingSkeleton from './components/LoadingSkeleton'
@@ -29,6 +29,8 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const ResourcePage = lazy(() => import('./pages/ResourcePage'))
 const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
+const EditProfilePage = lazy(() => import('./pages/EditProfilePage'))
+const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
 
 const { Text } = Typography
 
@@ -45,9 +47,9 @@ function AuthLayout() {
       key: 'user-info',
       label: (
         <div style={{ padding: '4px 0', cursor: 'default' }}>
-          <Text strong>{user?.name}</Text>
+          <Text strong>{user?.name || user?.username}</Text>
           <br />
-          <Text type="secondary" style={{ fontSize: 12 }}>{user?.email}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>{user?.email || user?.phone || ''}</Text>
         </div>
       ),
       disabled: true,
@@ -57,11 +59,13 @@ function AuthLayout() {
       key: 'edit-profile',
       icon: <EditOutlined />,
       label: '修改信息',
+      onClick: () => navigate('/edit-profile'),
     },
     {
       key: 'change-password',
       icon: <KeyOutlined />,
       label: '修改密码',
+      onClick: () => navigate('/change-password'),
     },
     { type: 'divider' },
     {
@@ -122,30 +126,47 @@ function AuthLayout() {
 
           {/* 主题切换 */}
           <Dropdown menu={{
-            items: Object.values(THEMES).map((t) => ({
-              key: t.key,
-              icon: t.icon === 'sun' ? <SunOutlined /> : <MoonOutlined />,
-              label: t.label,
-              onClick: () => setMode(t.key),
-            })),
+            items: Object.values(THEMES).map((t) => {
+              const iconEl =
+                t.icon === 'sun' ? <SunOutlined /> :
+                t.icon === 'moon' ? <MoonOutlined /> :
+                <DesktopOutlined />
+              return {
+                key: t.key,
+                icon: iconEl,
+                label: t.label,
+                onClick: () => setMode(t.key),
+              }
+            }),
             selectedKeys: [mode],
           }} placement="bottomRight" trigger={['click']}>
             <div className="top-home-btn" title="主题切换">
-              {resolved === 'dark' ? <MoonOutlined /> : <SunOutlined />}
+              {mode === 'auto'
+                ? <DesktopOutlined />
+                : resolved === 'dark'
+                  ? <MoonOutlined />
+                  : <SunOutlined />
+              }
             </div>
           </Dropdown>
 
-          {/* 个人中心 / 画像 */}
-          <div className="top-home-btn" onClick={() => navigate(location.pathname === '/home' ? '/' : '/home')}
-            title={location.pathname === '/home' ? '平台主页' : '个人中心'}>
-            {location.pathname === '/home' ? <ArrowLeftOutlined /> : <HomeOutlined />}
+          {/* 个人中心 */}
+          <div
+            className="top-home-btn"
+            title="个人中心"
+            onClick={() => navigate('/home')}
+            style={{
+              color: location.pathname === '/home' ? '#8b5cf6' : undefined,
+            }}
+          >
+            <HomeOutlined />
           </div>
 
           {/* 用户头像下拉 */}
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
             <div className="top-user-btn">
-              <Avatar size={30} icon={<UserOutlined />} style={{ backgroundColor: '#1677ff' }} />
-              <span className="top-user-name">{user?.name}</span>
+              <Avatar size={30} icon={<UserOutlined />} src={user?.avatar} style={{ backgroundColor: '#1677ff' }} />
+              <span className="top-user-name">{user?.name || user?.username}</span>
             </div>
           </Dropdown>
         </div>
@@ -162,6 +183,8 @@ function AuthLayout() {
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/resources" element={<ResourcePage />} />
             <Route path="/learning-path/:pathId" element={<LearningPathPage />} />
+            <Route path="/edit-profile" element={<EditProfilePage />} />
+            <Route path="/change-password" element={<ChangePasswordPage />} />
           </Routes>
         </Suspense>
       </div>
