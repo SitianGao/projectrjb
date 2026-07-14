@@ -41,18 +41,21 @@ class ResourceAgent(BaseAgent):
             "- 不使用序号，纯 Markdown 列表，缩进用 2 个空格"
         ),
         "exercise": (
-            "生成 JSON 格式练习题，要求：\n"
+            "生成 Markdown 格式练习题，要求：\n"
             "- 3-5 道题，覆盖概念理解、公式应用、场景判断\n"
-            "- 每道题含 question/options/answer/explanation\n"
+            "- 使用 Markdown 标题（### 题目 N）、列表、加粗等排版\n"
+            "- 每题包含：题目描述、选项（A/B/C/D）、正确答案、详细解析\n"
             "- 初级难度以单选和判断为主，中高级加入简答和代码补全\n"
-            "- 正确答案需逻辑正确，干扰项需有迷惑性"
+            "- 正确答案需逻辑正确并用 **加粗** 标注，干扰项需有迷惑性\n"
+            "- 用 --- 分隔各题"
         ),
         "code": (
-            "生成完整可运行的 Python 代码示例，要求：\n"
+            "生成完整可运行的 Python 代码示例，用 Markdown 代码块（```python...```）包裹，要求：\n"
             "- 包含必要的 import 和 main 入口\n"
             "- 关键步骤用中文注释解释 WHY 而不仅仅是 WHAT\n"
             "- 如有多个实现方式，提供对比并标注适用场景\n"
-            "- 代码风格遵循 PEP 8"
+            "- 代码风格遵循 PEP 8\n"
+            "- 代码块前后可加简短说明文字"
         ),
         "reading": (
             "生成一份拓展阅读推荐材料，要求：\n"
@@ -83,10 +86,17 @@ class ResourceAgent(BaseAgent):
             "## 资源类型\n"
             "- document: 结构化 Markdown 讲解文档，含标题、定义、原理、示例。\n"
             "- mindmap: 嵌套 Markdown 列表（用 - 和缩进表示层级），前端用 markmap 渲染。\n"
-            "- exercise: JSON 格式练习题，每道题含 question / options / answer / explanation。\n"
-            "- code: 完整可运行的 Python 代码 + 详细注释。\n"
+            "- exercise: Markdown 格式练习题，用标题、列表、加粗等排版，每题含题目、选项、答案和解析。\n"
+            "- code: 完整可运行的 Python 代码，用 Markdown 代码块（```python）包裹。\n"
             "- reading: 拓展阅读材料，含分级推荐文献、阅读顺序、拓展思考题。\n"
             "- ppt: 12-slide 讲稿大纲，每 slide 含标题、bullets、讲师备注。\n\n"
+            "## 关卡对齐（重要）\n"
+            "当提供关卡信息（stage_info）时，你生成的资源必须贴合当前关卡的上下文：\n"
+            "1. 资源标题和内容应围绕关卡目标（objectives）展开，而非泛泛介绍知识点。\n"
+            "2. 练习题应直接服务于关卡任务（tasks）——将任务描述转化为具体题目。\n"
+            "3. 代码示例应覆盖关卡任务中要求的实战场景。\n"
+            "4. 讲解文档的导入部分应引用关卡主题，建立「这个知识点在你当前学习阶段的位置」的认知。\n"
+            "5. 关卡前置知识点（来自前序关卡）可在资源中简要回顾，帮助串联知识体系。\n\n"
             "## 个性化要求\n"
             "- 初级: 多解释、多示例、避免术语堆砌。\n"
             "- 中级: 适当的公式和原理，配合实战练习。\n"
@@ -101,7 +111,7 @@ class ResourceAgent(BaseAgent):
             "6. 不生成违规、敏感或不安全的内容。\n\n"
             "## 输出格式\n"
             "严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}\n"
-            "content 字段为 Markdown 字符串（exercise 类型为 JSON 字符串）。"
+            "content 字段为 Markdown 字符串（exercise 和 code 类型也使用 Markdown 格式排版）。"
         )
 
     def _build_generate_prompt(
@@ -111,14 +121,52 @@ class ResourceAgent(BaseAgent):
         difficulty: str,
         profile_json: str,
         context_text: str,
+        stage_info: Optional[dict] = None,
+        path_goal: Optional[str] = None,
     ) -> str:
-        """为 LLM 构建含类型详细要求的生成提示词"""
+        """为 LLM 构建含类型详细要求的生成提示词（v2: 关卡对齐）"""
         lines = [
             f"知识点: {topic}",
             f"难度: {difficulty}",
             f"资源类型: {json.dumps(resource_types, ensure_ascii=False)}",
-            f"学生画像:\n{profile_json}",
         ]
+
+        # ── 关卡上下文（v2：关卡对齐） ──
+        if stage_info and isinstance(stage_info, dict):
+            lines.append("\n## 当前关卡信息（资源必须贴合此上下文）")
+            stage_title = stage_info.get("title", "")
+            if stage_title:
+                lines.append(f"关卡名称: {stage_title}")
+            objectives = stage_info.get("objectives", "")
+            if objectives:
+                lines.append(f"关卡目标: {objectives}")
+            stage_topics = stage_info.get("topics") or []
+            if stage_topics:
+                lines.append(f"关卡知识点: {', '.join(stage_topics)}")
+            tasks = stage_info.get("tasks") or []
+            if tasks:
+                lines.append("关卡任务清单:")
+                for i, t in enumerate(tasks, 1):
+                    task_desc = t.get("task", "") if isinstance(t, dict) else str(t)
+                    resource_hint = t.get("resource_type", "") if isinstance(t, dict) else ""
+                    extra = f"  → 推荐资源类型: {resource_hint}" if resource_hint else ""
+                    lines.append(f"  {i}. {task_desc}{extra}")
+            stage_index = stage_info.get("stage_index")
+            if stage_index is not None:
+                lines.append(f"这是学习路径的第 {stage_index} 个阶段。")
+            previous_stage = stage_info.get("previous_stage_title", "")
+            if previous_stage:
+                lines.append(f"前置关卡: {previous_stage}（可在资源中简要回顾前置知识点）")
+            next_stage = stage_info.get("next_stage_title", "")
+            if next_stage:
+                lines.append(f"下一关卡: {next_stage}（可在资源末尾预告，激发学习预期）")
+
+        if path_goal:
+            lines.append(f"\n学习路径总目标: {path_goal}")
+            if stage_info and isinstance(stage_info, dict):
+                lines.append("请将当前关卡放在整个学习路径中定位，让资源体现「这一步在通向什么目标」。")
+
+        lines.append(f"\n学生画像:\n{profile_json}")
         if context_text:
             lines.append(f"知识库上下文:\n{context_text}")
 
@@ -126,6 +174,17 @@ class ResourceAgent(BaseAgent):
         for rtype in resource_types:
             detail = self.TYPE_PROMPTS.get(rtype, f"请生成 {rtype} 类型的资源。")
             lines.append(f"\n### {rtype}\n{detail}")
+
+        # 关卡对齐的强调
+        if stage_info and isinstance(stage_info, dict):
+            lines.append(
+                "\n## 关卡对齐检查清单\n"
+                "生成每份资源时请检查：\n"
+                "1. 标题是否反映了关卡目标（而非仅仅知识点名称）？\n"
+                "2. 内容是否覆盖了关卡任务的具体要求？\n"
+                "3. 练习题/代码是否直接服务于关卡中的 task？\n"
+                "4. 难度是否匹配学生当前阶段（不超前、不滞后）？"
+            )
 
         lines.append(
             "\n请严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}"
@@ -142,9 +201,11 @@ class ResourceAgent(BaseAgent):
         difficulty: str = "中级",
         profile: Optional[dict] = None,
         knowledge_context: Optional[List[str]] = None,
+        stage_info: Optional[dict] = None,
+        path_goal: Optional[str] = None,
     ) -> Dict:
         """
-        生成学习资源。
+        生成学习资源（v2: 关卡对齐）。
 
         Args:
             topic: 知识点主题
@@ -152,6 +213,15 @@ class ResourceAgent(BaseAgent):
             difficulty: 难度等级（初级/中级/高级）
             profile: 学生画像
             knowledge_context: RAG 检索到的知识库上下文
+            stage_info: 当前关卡信息（v2 新增）:
+                - title: 关卡名称
+                - objectives: 关卡学习目标
+                - topics: 关卡涵盖知识点列表
+                - tasks: 关卡任务列表 [{task, resource_type, estimated_hours}, ...]
+                - stage_index: 关卡序号（第几个阶段）
+                - previous_stage_title: 前置关卡名（用于知识串联）
+                - next_stage_title: 下一关卡名（用于学习预期引导）
+            path_goal: 学习路径总目标（v2 新增）
 
         Returns:
             {"resources": [{"type", "title", "topic", "difficulty", "content"}, ...]}
@@ -169,6 +239,8 @@ class ResourceAgent(BaseAgent):
                     difficulty=difficulty,
                     profile_json=profile_json,
                     context_text=context_text,
+                    stage_info=stage_info,
+                    path_goal=path_goal,
                 )
                 chunks = []
                 async for chunk in self.call_llm(user_prompt):
@@ -180,7 +252,7 @@ class ResourceAgent(BaseAgent):
             except Exception as exc:
                 logger.warning("ResourceAgent LLM 调用失败，回退规则化: %s", exc)
 
-        return self._rule_based_resources(topic, resource_types, difficulty, profile)
+        return self._rule_based_resources(topic, resource_types, difficulty, profile, stage_info)
 
     # ------------------------------------------------------------------
     # LLM 输出校验
@@ -250,23 +322,31 @@ class ResourceAgent(BaseAgent):
         resource_types: List[str],
         difficulty: str,
         profile: dict,
+        stage_info: Optional[dict] = None,
     ) -> Dict:
-        """开发期无 API Key 时使用的规则化资源生成"""
+        """开发期无 API Key 时使用的规则化资源生成（v2: 关卡感知）"""
         resources = []
         profile_inner = profile.get("profile", profile)
         cognitive = profile_inner.get("cognitive_style", "")
 
+        # 关卡感知的标题前缀
+        stage_prefix = ""
+        if stage_info and isinstance(stage_info, dict):
+            stage_name = stage_info.get("title", "")
+            if stage_name:
+                stage_prefix = f"【{stage_name}】"
+
         for rtype in resource_types:
             title_map = {
-                "document": f"{topic} 讲解文档",
-                "mindmap": f"{topic} 思维导图",
-                "exercise": f"{topic} 练习题",
-                "code": f"{topic} 代码案例",
-                "reading": f"{topic} 拓展阅读",
-                "ppt": f"{topic} PPT 大纲",
+                "document": f"{stage_prefix}{topic} 讲解文档",
+                "mindmap": f"{stage_prefix}{topic} 思维导图",
+                "exercise": f"{stage_prefix}{topic} 练习题",
+                "code": f"{stage_prefix}{topic} 代码案例",
+                "reading": f"{stage_prefix}{topic} 拓展阅读",
+                "ppt": f"{stage_prefix}{topic} PPT 大纲",
             }
 
-            content = self._build_content(rtype, topic, difficulty, cognitive)
+            content = self._build_content(rtype, topic, difficulty, cognitive, stage_info)
             resources.append({
                 "type": rtype,
                 "title": title_map.get(rtype, f"{topic} 学习资源"),
@@ -277,12 +357,57 @@ class ResourceAgent(BaseAgent):
 
         return {"resources": resources}
 
+    @staticmethod
+    def _build_stage_context_markdown(stage_info: Optional[dict]) -> str:
+        """构建关卡背景 markdown 块（统一注入到各类型资源中）。"""
+        if not stage_info or not isinstance(stage_info, dict):
+            return ""
+
+        stage_title = stage_info.get("title", "")
+        if not stage_title:
+            return ""
+
+        lines = ["> 🎯 **当前关卡**：" + stage_title]
+
+        objectives = stage_info.get("objectives", "")
+        if objectives:
+            lines.append("> **关卡目标**：" + str(objectives))
+
+        stage_topics = stage_info.get("topics") or []
+        if stage_topics:
+            lines.append("> **涵盖知识点**：" + ", ".join(stage_topics))
+
+        tasks = stage_info.get("tasks") or []
+        if tasks:
+            lines.append("> **关卡任务**：")
+            for t in tasks:
+                task_desc = t.get("task", "") if isinstance(t, dict) else str(t)
+                lines.append(f">  - {task_desc}")
+
+        stage_index = stage_info.get("stage_index")
+        if stage_index is not None:
+            lines.append(f"> 这是学习路径的第 **{stage_index}** 个阶段")
+
+        lines.append("")  # 空行分隔
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # 骨骼内容构建
+    # ------------------------------------------------------------------
     def _build_content(
-        self, rtype: str, topic: str, difficulty: str, cognitive: str
+        self,
+        rtype: str,
+        topic: str,
+        difficulty: str,
+        cognitive: str,
+        stage_info: Optional[dict] = None,
     ) -> str:
-        """为每种资源类型生成骨架内容"""
+        """为每种资源类型生成骨架内容（v2: 关卡感知）"""
         diff_labels = {"初级": "入门", "中级": "进阶", "高级": "深入"}
         level = diff_labels.get(difficulty, "入门")
+
+        # 构建关卡背景块（统一注入到各资源类型开头）
+        stage_context = self._build_stage_context_markdown(stage_info)
 
         if rtype == "document":
             cognitive_hint = (
@@ -292,6 +417,7 @@ class ResourceAgent(BaseAgent):
             )
             return (
                 f"# {topic} 讲解文档（{level}）\n\n"
+                f"{stage_context}"
                 f"## 1. 概念导入\n\n"
                 f"{topic} 是{level}阶段的核心知识点。{cognitive_hint}。\n\n"
                 f"## 2. 概念定义\n\n"
@@ -317,8 +443,18 @@ class ResourceAgent(BaseAgent):
                 f"> 标注「建议核实」的内容建议对照教材确认后使用。\n"
             )
         elif rtype == "mindmap":
+            # 关卡感知的思维导图：当有 stage_info 时，围绕关卡知识点展开
+            stage_topics_bullets = ""
+            if stage_info and isinstance(stage_info, dict):
+                stage_topics_list = stage_info.get("topics") or []
+                if stage_topics_list:
+                    stage_topics_bullets = "  - 关卡知识点\n" + "".join(
+                        f"    - {t}\n" for t in stage_topics_list
+                    )
             return (
+                f"{stage_context}"
                 f"- {topic}\n"
+                f"{stage_topics_bullets}"
                 f"  - 概念定义\n"
                 f"    - 核心术语\n"
                 f"    - 公式表达\n"
@@ -334,35 +470,60 @@ class ResourceAgent(BaseAgent):
                 f"    - 误区2\n"
             )
         elif rtype == "exercise":
-            questions = [
-                {
-                    "question": f"关于{topic}，以下说法正确的是？（单选）",
-                    "options": {
-                        "A": f"{topic}是AI领域的基础概念之一",
-                        "B": f"{topic}完全不实用",
-                        "C": f"学习{topic}不需要任何前置知识",
-                        "D": "以上都不对",
-                    },
-                    "answer": "A",
-                    "explanation": f"{topic}是重要基础概念，学习前建议具备相关前置知识。",
-                },
-                {
-                    "question": f"请简述{topic}的核心思想。（简答）",
-                    "options": {},
-                    "answer": "（开放式答案，围绕核心概念展开）",
-                    "explanation": "重点考察对核心原理的理解深度。",
-                },
-                {
-                    "question": f"{topic}在实际项目中如何应用？请举例说明。（简答）",
-                    "options": {},
-                    "answer": "（结合实际场景作答）",
-                    "explanation": "考察理论联系实际的能力。",
-                },
-            ]
-            return json.dumps(questions, ensure_ascii=False, indent=2)
+            # 关卡感知的练习题：将关卡任务转化为具体题目
+            tasks_questions = ""
+            if stage_info and isinstance(stage_info, dict):
+                stage_tasks = stage_info.get("tasks") or []
+                if stage_tasks:
+                    tasks_questions = "### 关卡任务练习\n\n"
+                    for i, t in enumerate(stage_tasks, 1):
+                        task_desc = t.get("task", "") if isinstance(t, dict) else str(t)
+                        resource_hint = t.get("resource_type", "") if isinstance(t, dict) else ""
+                        hint_note = f"（推荐资源类型: {resource_hint}）" if resource_hint else ""
+                        tasks_questions += (
+                            f"**关卡任务 {i}**：{task_desc} {hint_note}\n\n"
+                            f"> **📝 练习要求**：请根据上述任务描述完成练习。\n\n"
+                        )
+                    tasks_questions += "---\n\n"
+            return (
+                f"# {topic} 练习题（{level}）\n\n"
+                f"{stage_context}"
+                f"{tasks_questions}"
+                f"### 题目 1（单选）\n\n"
+                f"关于 {topic}，以下说法正确的是？\n\n"
+                f"A. {topic} 是 AI 领域的基础概念之一\n\n"
+                f"B. {topic} 完全不实用\n\n"
+                f"C. 学习 {topic} 不需要任何前置知识\n\n"
+                f"D. 以上都不对\n\n"
+                f"> **✅ 正确答案：A**\n>\n"
+                f"> **📖 解析：** {topic} 是重要基础概念，学习前建议具备相关前置知识。B 过于绝对，C 不符合实际。\n\n"
+                f"---\n\n"
+                f"### 题目 2（简答）\n\n"
+                f"请简述 {topic} 的核心思想。\n\n"
+                f"> **📝 参考答案：** （围绕核心概念展开，重点考察对核心原理的理解深度）\n\n"
+                f"---\n\n"
+                f"### 题目 3（应用）\n\n"
+                f"{topic} 在实际项目中如何应用？请举例说明。\n\n"
+                f"> **📝 参考答案：** （结合实际场景作答，考察理论联系实际的能力）\n"
+            )
         elif rtype == "code":
             func_name = topic.lower().replace(" ", "_").replace("-", "_")
+            # 关卡感知：将关卡任务作为代码示例的场景说明
+            task_scenario = ""
+            if stage_info and isinstance(stage_info, dict):
+                stage_tasks = stage_info.get("tasks") or []
+                if stage_tasks:
+                    task_scenario = "**关卡实战场景**：\n"
+                    for t in stage_tasks:
+                        td = t.get("task", "") if isinstance(t, dict) else str(t)
+                        task_scenario += f"> 任务：{td}\n"
+                    task_scenario += "\n"
             return (
+                f"# {topic} — 代码示例（{level}）\n\n"
+                f"{stage_context}"
+                f"{task_scenario}"
+                f"本代码演示 {topic} 的典型实现方式，包含数据准备、模型构建、训练和评估四个阶段。\n\n"
+                f"```python\n"
                 f'"""\n'
                 f'{topic} — 代码示例（{level}）\n'
                 f'本代码演示 {topic} 的典型实现方式，包含数据准备、模型构建、训练和评估四个阶段。\n'
@@ -431,10 +592,12 @@ class ResourceAgent(BaseAgent):
                 f'    final_mse = np.mean((y_final_pred - y) ** 2)\n'
                 f'    print(f"\\n训练完成！最终 MSE: {{final_mse:.6f}}")\n'
                 f'    print(f"学习到的权重: {{np.round(learned_weights, 4)}}")\n'
+                f'```\n'
             )
         elif rtype == "reading":
             return (
                 f"# {topic} 拓展阅读\n\n"
+                f"{stage_context}"
                 f"## 推荐文献\n\n"
                 f"1. **经典教材**: 相关章节 —— {topic}原理与推导\n"
                 f"2. **综述文章**: {topic} 最新研究进展\n"
@@ -446,9 +609,16 @@ class ResourceAgent(BaseAgent):
                 f"> 建议核实: 具体文献请以课程指定教材为准。\n"
             )
         elif rtype == "ppt":
+            # 关卡感知的 PPT：封面加入关卡关联信息
+            stage_subtitle = ""
+            if stage_info and isinstance(stage_info, dict):
+                st = stage_info.get("title", "")
+                if st:
+                    stage_subtitle = f"  - 关联关卡：{st}\n"
             slides = [
                 f"Slide 1: 封面 —— {topic}（{level}）\n"
                 f"  - 副标题：从原理到实践的系统讲解\n"
+                f"{stage_subtitle}"
                 f"  - 讲师备注：本课件面向{level}阶段学习者，建议配合代码演示使用",
                 f"Slide 2: 学习目标\n"
                 f"  - 理解{topic}的基本概念和数学定义\n"
