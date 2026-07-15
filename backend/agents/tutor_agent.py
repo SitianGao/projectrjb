@@ -106,7 +106,10 @@ class TutorAgent(BaseAgent):
             JSON 字符串: {answer, explanation_style, references, diagrams}
         """
         # ---- Day 10: 安全过滤 ----
-        from safety.content_filter import check_safety
+        try:
+            from safety.content_filter import check_safety
+        except ModuleNotFoundError:
+            from backend.safety.content_filter import check_safety
         filter_result = check_safety(question, context="tutor_question")
         if not filter_result["safe"]:
             return json.dumps({

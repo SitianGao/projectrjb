@@ -94,9 +94,10 @@ class ProfileAgent(BaseAgent):
             "- confidence < 0.7：信息不足，多为默认填充\n"
             "\n"
             "## 追问策略\n"
-            "当 completeness < 0.7 时，next_questions 中列出 2~3 个结构化追问，\n"
-            "优先询问当前最缺的维度（薄弱点 > 学习目标 > 认知风格 > 兴趣 > 节奏）。\n"
-            "当 completeness ≥ 0.85 时，next_questions 可以为空数组。\n"
+            "当 completeness < 0.85 时，next_questions 中列出 1~2 个结构化追问，\n"
+            "只问当前最缺的维度，不要重复询问已有明确信息的维度。\n"
+            "优先级：薄弱点 > 学习目标 > 认知风格 > 兴趣 > 节奏。\n"
+            "当 completeness ≥ 0.85 时，next_questions 必须为空数组 []。\n"
             "\n"
             "## 防幻觉约束\n"
             "1. 仅基于学生实际表述提取画像，不猜测未提及的信息。\n"
@@ -135,7 +136,10 @@ class ProfileAgent(BaseAgent):
             }
         """
         # ---- Day 10: 安全过滤 ----
-        from safety.content_filter import check_safety
+        try:
+            from safety.content_filter import check_safety
+        except ModuleNotFoundError:
+            from backend.safety.content_filter import check_safety
         filter_result = check_safety(message, context="profile_message")
         if not filter_result["safe"]:
             return self._keyword_fallback(student_id, "请介绍你的学习情况", history or [], current_profile)
@@ -308,8 +312,6 @@ class ProfileAgent(BaseAgent):
         next_questions = result.get("next_questions", []) if isinstance(result, dict) else []
         completeness = result.get("completeness", 0) if isinstance(result, dict) else 0
 
-        lines = ["我已经根据你的描述更新了学习画像。"]
-
         knowledge_level = profile.get("knowledge_level")
         learning_goal = profile.get("learning_goal")
         cognitive_style = profile.get("cognitive_style")
@@ -331,14 +333,40 @@ class ProfileAgent(BaseAgent):
         if pace_preference:
             summary.append(f"学习节奏：{pace_preference}")
 
+        # ---- >= 0.85：已可生成学习路径 ----
+        if completeness >= 0.85:
+            lines = ["📋 **学习画像已经达到生成学习路径的条件，可以开启学习之旅。**"]
+            if summary:
+                lines.append("")
+                lines.append("当前画像摘要：")
+                lines.extend(f"- {item}" for item in summary)
+            return "\n".join(lines)
+
+        # ---- < 0.85：继续追问 ----
+        lines = ["我已经根据你的描述更新了学习画像。"]
+
         if summary:
             lines.append("")
             lines.extend(f"- {item}" for item in summary)
 
-        if completeness and completeness < 0.7 and next_questions:
+        if next_questions:
             lines.append("")
-            lines.append("为了继续完善画像，我还想确认：")
-            lines.extend(f"{idx}. {question}" for idx, question in enumerate(next_questions[:3], 1))
+            lines.append("为了继续完善画像（当前完整度 {:.0%}），我还想确认：".format(completeness))
+            lines.extend(f"{idx}. {question}" for idx, question in enumerate(next_questions[:2], 1))
+        elif completeness < 0.85:
+            # 有 completeness 但没有 next_questions 的兜底：提示缺失维度
+            missing = []
+            if not weaknesses:
+                missing.append("薄弱环节")
+            if not learning_goal or learning_goal == "掌握课程核心概念":
+                missing.append("学习目标")
+            if not cognitive_style or cognitive_style == "偏好图解与案例":
+                missing.append("学习偏好")
+            if not interests:
+                missing.append("兴趣方向")
+            if missing:
+                lines.append("")
+                lines.append("以下信息还需要确认：{}".format("、".join(missing[:2])))
 
         return "\n".join(lines)
 
@@ -356,7 +384,8 @@ class ProfileAgent(BaseAgent):
         其余保持原值；weakness/interest 合并去重；completeness 不减。
         """
         # ---- 从已有画像加载现有值（增量基础） ----
-        existing = (current_profile or {}).get("profile", current_profile or {})
+        cp = current_profile or {}
+        existing = cp.get("profile", cp)  # 兼容 {profile:{...}} 和直接 {...} 两种结构
         if not isinstance(existing, dict):
             existing = {}
 
@@ -366,7 +395,7 @@ class ProfileAgent(BaseAgent):
         weaknesses: List[str] = list(existing.get("weakness") or [])
         interests: List[str] = list(existing.get("interest") or [])
         pace_preference = existing.get("pace_preference", "中速均衡型")
-        prev_completeness = existing.get("completeness", 0.0)
+        prev_completeness = cp.get("completeness", existing.get("completeness", 0.0))
 
         msg = message.lower()
 
@@ -444,31 +473,31 @@ class ProfileAgent(BaseAgent):
     ) -> float:
         """基于各维度信息覆盖情况计算 completeness (0.0~1.0)。
 
-        评分逻辑：
-        - knowledge_level: 非默认（非"中级"）= +0.2
-        - learning_goal: 非默认（非"掌握课程核心概念"）= +0.2
-        - cognitive_style: 非默认（非"偏好图解与案例"）= +0.15
-        - weakness: 有内容 = +0.15
-        - interest: 有内容 = +0.15
-        - pace_preference: 非默认（非"中速均衡型"）= +0.15
-        上限 0.92，最小值 0.2
+        评分逻辑（关键字降级路径偏保守，LLM 路径由模型自行判定）：
+        - knowledge_level: 非默认（非"中级"）= +0.15
+        - learning_goal: 非默认（非"掌握课程核心概念"）= +0.20
+        - cognitive_style: 非默认（非"偏好图解与案例"）= +0.12
+        - weakness: 有内容 = +0.10
+        - interest: 有内容 = +0.10
+        - pace_preference: 非默认（非"中速均衡型"）= +0.08
+        上限 0.80（关键字路径无法达到 0.85，需 LLM 或人工补充），最小值 0.15
         """
-        score = 0.2  # base: 至少有一定信息
+        score = 0.15  # base: 至少有一定信息
 
         if knowledge_level and knowledge_level != "中级":
-            score += 0.2
+            score += 0.15
         if learning_goal and learning_goal != "掌握课程核心概念":
-            score += 0.2
+            score += 0.20
         if cognitive_style and cognitive_style != "偏好图解与案例":
-            score += 0.15
+            score += 0.12
         if weaknesses:
-            score += 0.15
+            score += 0.10
         if interests:
-            score += 0.15
+            score += 0.10
         if pace_preference and pace_preference != "中速均衡型":
-            score += 0.15
+            score += 0.08
 
-        return min(score, 0.92)
+        return min(score, 0.80)
 
     @staticmethod
     def _gen_next_questions(
@@ -482,18 +511,36 @@ class ProfileAgent(BaseAgent):
         """生成追问列表：优先询问最缺的维度，最多 2 条。
 
         优先级：薄弱点 > 学习目标 > 认知风格 > 兴趣 > 学习节奏
+        不重复询问已有明确信息的维度。
         """
         questions: List[str] = []
 
+        # 1. 薄弱点 — 最高优先级
         if not weaknesses:
             questions.append("你在学习中最容易卡住的地方是什么？（比如数学推导、代码实现等）")
-        if not learning_goal or learning_goal == "掌握课程核心概念":
-            questions.append("你希望通过本课程达到什么具体目标？")
+
+        # 2. 学习目标
+        if len(questions) < 2 and (not learning_goal or learning_goal == "掌握课程核心概念"):
+            questions.append("你希望通过本课程达到什么具体目标？（比如掌握某个算法、完成一个项目等）")
+
+        # 3. 认知风格
         if len(questions) < 2 and (
             not cognitive_style or cognitive_style == "偏好图解与案例"
         ):
-            questions.append("你更偏好视频讲解、图文教程还是动手代码示例？")
+            questions.append("你更偏好哪种学习方式？视频讲解、图文教程还是动手代码示例？")
+
+        # 4. 兴趣方向
         if len(questions) < 2 and not interests:
-            questions.append("你对哪些技术方向比较感兴趣？")
+            questions.append("你对哪些技术方向或应用领域比较感兴趣？")
+
+        # 5. 知识水平
+        if len(questions) < 2 and (not knowledge_level or knowledge_level == "中级"):
+            questions.append("你目前的基础大概在什么水平？零基础/入门/中级/进阶？")
+
+        # 6. 学习节奏
+        if len(questions) < 2 and (
+            not pace_preference or pace_preference == "中速均衡型"
+        ):
+            questions.append("你偏好快节奏速成还是慢节奏深入的学习方式？")
 
         return questions[:2]
