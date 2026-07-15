@@ -22,6 +22,7 @@ import './App.css'
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const ResourceGenerationPage = lazy(() => import('./pages/ResourceGenerationPage'))
 
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
@@ -29,6 +30,8 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const ResourcePage = lazy(() => import('./pages/ResourcePage'))
 const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
+const LearningJourneyPage = lazy(() => import('./pages/LearningJourneyPage'))
+const StageResourcePage = lazy(() => import('./pages/StageResourcePage'))
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
 
@@ -177,12 +180,15 @@ function AuthLayout() {
         <Suspense fallback={<LoadingSkeleton type="detail" />}>
           <Routes>
             <Route path="/" element={<ProfilePage />} />
+            <Route path="/generating" element={<ResourceGenerationPage />} />
             <Route path="/home" element={<HomePage />} />
             <Route path="/landing" element={<LandingPage />} />
 
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/resources" element={<ResourcePage />} />
             <Route path="/learning-path/:pathId" element={<LearningPathPage />} />
+            <Route path="/journey" element={<LearningJourneyPage />} />
+            <Route path="/stage/:stageId/resources" element={<StageResourcePage />} />
             <Route path="/edit-profile" element={<EditProfilePage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
           </Routes>

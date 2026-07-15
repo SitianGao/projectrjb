@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Typography, Space, Tabs, Row, Col, Card, Statistic, Input, Select, Button, Empty, Tag, message } from 'antd'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Typography, Space, Row, Col, Card, Statistic, Input, Select, Button, Empty, Tag, message, Result, Spin } from 'antd'
 import {
   PlusOutlined,
   ReloadOutlined,
@@ -13,6 +14,8 @@ import {
   MessageOutlined,
   DeleteOutlined,
   ExclamationCircleOutlined,
+  RocketOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 import ChatBox from '../components/ChatBox'
 import ResourceCard from '../components/ResourceCard'
@@ -21,17 +24,14 @@ import MermaidChart from '../components/MermaidChart'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import PathTimeline from '../components/PathTimeline'
 import ForgettingCurve from '../components/ForgettingCurve'
-import FloatingChat from '../components/FloatingChat'
 import LoadingSkeleton from '../components/LoadingSkeleton'
-import { useChat } from '../hooks/useChat'
-import { startProfileChat } from '../api/profile'
+import { useChat, PHASE } from '../hooks/useChat'
+import { startProfileChat, getProfile } from '../api/profile'
 import { getResources } from '../api/resource'
 import { getLearningPath, generateLearningPath } from '../api/planner'
-import ResourcePage from '../pages/ResourcePage'
-import { shouldUseMock } from '../utils/useMock'
 
-const USE_MOCK = shouldUseMock()
-
+import StageLineChart from '../components/StageLineChart'
+import { getStageStatus } from '../utils/stageUtils'
 const { Title, Text, Paragraph } = Typography
 
 const SUGGESTIONS = [
@@ -77,16 +77,7 @@ function ResourcePanel() {
       const data = await getResources({ page, page_size: 12, keyword, type: type || undefined })
       setResources(Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [])
     } catch {
-      if (USE_MOCK) {
-        setResources([
-          { id: '1', type: 'document', title: '二次函数知识点总结', description: '核心概念与常见题型', tags: ['数学', '函数'], createdAt: new Date() },
-          { id: '2', type: 'quiz', title: '力学基础练习题', description: '牛顿三大定律、受力分析', tags: ['物理', '力学'], createdAt: new Date() },
-          { id: '3', type: 'mindmap', title: '英语语法体系', description: '时态、语态、从句框架', tags: ['英语', '语法'], createdAt: new Date() },
-          { id: '4', type: 'document', title: '电路分析方法', description: '基尔霍夫定律核心方法', tags: ['物理', '电学'], createdAt: new Date() },
-        ])
-      } else {
-        setError('加载资源失败')
-      }
+      setError('加载资源失败')
     } finally { setLoading(false) }
   }
 
@@ -134,13 +125,17 @@ function ResourcePanel() {
 }
 
 // ==================== 学习路径面板 ====================
-function LearningPathPanel() {
-  const [pathData, setPathData] = useState(null)
-  const [loading, setLoading] = useState(true)
+function LearningPathPanel({ initialPathData = null }) {
+  const [pathData, setPathData] = useState(initialPathData)
+  const [loading, setLoading] = useState(!initialPathData)
   const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(false)
 
-  useEffect(() => { loadPath() }, [])
+  useEffect(() => {
+    if (!initialPathData) {
+      loadPath()
+    }
+  }, [])
 
   async function loadPath() {
     setError(null)
@@ -158,7 +153,7 @@ function LearningPathPanel() {
   async function handleGenerate() {
     setGenerating(true)
     try {
-      const resp = await generateLearningPath({ student_id: 'demo-student-01', goal: '掌握高中数学核心知识' })
+      const resp = await generateLearningPath({ student_id: 'demo-student-01' })
       const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = ''
       while (true) {
         const { done, value } = await reader.read(); if (done) break
@@ -228,24 +223,85 @@ function LearningPathPanel() {
 
 // ==================== 主页面 ====================
 export default function ProfilePage() {
-  const [activeTab, setActiveTab] = useState('resource')
-  const [profile, setProfile] = useState(null)
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // ── 状态恢复（页面刷新后从后端恢复）──
+  const [stateRestored, setStateRestored] = useState(false)
+  const [restoredPath, setRestoredPath] = useState(null)
+
+  // ── 学习旅程生成状态 ──
+  const [isStartingJourney, setIsStartingJourney] = useState(false)
+  const [journeyError, setJourneyError] = useState(null)
+
+  // 用于防止生成期间的重复点击
+  const startingRef = useRef(false)
+
+  // 页面加载时从后端恢复画像和学习路径状态
+  useEffect(() => {
+    let cancelled = false
+
+    async function restoreState() {
+      try {
+        const [profileResult, pathResult] = await Promise.allSettled([
+          getProfile('demo-student-01'),
+          getLearningPath('demo-student-01'),
+        ])
+
+        if (cancelled) return
+
+        const profile = profileResult.status === 'fulfilled' ? profileResult.value : null
+        const path = pathResult.status === 'fulfilled' ? pathResult.value : null
+
+        if (path && path.stages?.length > 0) {
+          setRestoredPath(path)
+        }
+      } catch {
+        // 恢复失败不影响使用，保持 collecting
+      } finally {
+        if (!cancelled) setStateRestored(true)
+      }
+    }
+
+    restoreState()
+    return () => { cancelled = true }
+  }, [])
 
   const handleProfileUpdate = useCallback((updatedProfile) => {
-    setProfile(updatedProfile)
     message.success('学习画像已更新 📊')
   }, [])
 
+  // streamFetcher: 将 signal 传到 fetch，确保取消生效
   const streamFetcher = useCallback(
     (msg, signal, options) => {
       const style = options?.style
       const stylePrompt = STYLE_PROMPTS[style]
       const styledMsg = stylePrompt ? `${stylePrompt}\n\n${msg}` : msg
-      return startProfileChat({ student_id: 'demo-student-01', message: styledMsg, style })
+      return startProfileChat({
+        student_id: 'demo-student-01',
+        message: styledMsg,
+        style,
+        signal,
+        history: options?.history,
+        current_profile: options?.current_profile,
+      })
     },
     [],
   )
-  const { messages, isLoading, sendMessage, abort } = useChat({
+
+  const {
+    messages,
+    isLoading,
+    sendMessage,
+    abort,
+    completeness,
+    nextQuestions,
+    error: chatError,
+    retryLastMessage,
+    profile,
+    phase,
+    setPhase,
+  } = useChat({
     streamFetcher,
     onProfileUpdate: handleProfileUpdate,
     initialMessages: [{
@@ -254,8 +310,396 @@ export default function ProfilePage() {
       content: '你好！我是你的专属学习助手 🤖\n\n让我们来聊聊你的学习情况吧：\n- 你的年级和目标？\n- 你擅长或不擅长的科目？\n- 你更喜欢的学习方式（看视频📺、读书📖、做题✏️）？\n\n告诉我这些，我会为你定制最佳学习路径！',
     }],
   })
-  const handleSuggestion = useCallback((t, opts) => sendMessage(t, opts), [sendMessage])
 
+  // 状态恢复后，根据后端数据同步阶段
+  useEffect(() => {
+    if (!stateRestored) return
+
+    // 从 LandingPage"开始学习"按钮进入 → 始终显示 ChatBox
+    if (location.state?.startChat) {
+      return
+    }
+
+    if (restoredPath && restoredPath.stages?.length > 0) {
+      // 已有学习路径 → 直接 active
+      setPhase(PHASE.ACTIVE)
+    }
+    // 否则保持 useChat 内部根据 completeness 推导的阶段（collecting / ready）
+  }, [stateRestored, restoredPath, setPhase, location.state?.startChat])
+
+  // ── 开启学习之旅 ──
+  // 严格按顺序调用:
+  //   1. POST /api/planner/generate   (SSE: start/delta/data/error/done)
+  //   2. 保存路径，获取 path_id
+  //   3. 读取 current_stage → 选择第一个 topic
+  //   4. POST /api/resource/generate  (传入 path_id)
+  //   5. 轮询 GET /api/task/{task_id}/status → done
+  //   6. 刷新路径 → 进入 active
+  const handleStartJourney = useCallback(async () => {
+    if (startingRef.current) return  // 防止重复点击
+    startingRef.current = true
+    setIsStartingJourney(true)
+    setJourneyError(null)
+
+    // 1. 进入 planning 阶段（兼容从 ready 或 failed 状态调用）
+    setPhase(PHASE.PLANNING)
+
+    try {
+      // 2. 调用 POST /api/planner/generate
+      //    只传 student_id；goal 必须来自最新画像（不硬编码）
+      const goal = profile?.profile?.learning_goal || profile?.goal || undefined
+      const response = await generateLearningPath({
+        student_id: 'demo-student-01',
+        ...(goal ? { goal } : {}),
+      })
+
+      if (!response || !response.body) {
+        throw new Error('不支持流式响应')
+      }
+
+      // 3. 解析 SSE 事件: start / delta / data / error / done
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let pathData = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+
+          try {
+            const parsed = parseSSEEvent(data)
+            if (!parsed) continue
+
+            switch (parsed.type) {
+              case 'start':
+                // 流开始 — 元信息（可忽略）
+                break
+              case 'delta':
+                // LLM 增量思考过程（可忽略）
+                break
+              case 'data': {
+                // 4. 收到 data → 提取路径数据
+                //    兼容两种格式: { stages } 直铺 或 { data: { stages } } 嵌套
+                const pd = parsed.data || parsed
+                if (pd && pd.stages?.length > 0) {
+                  pathData = pd
+                }
+                break
+              }
+              case 'error':
+                throw new Error(parsed.message || '路径生成失败')
+              case 'done':
+                break
+            }
+          } catch (parseErr) {
+            // JSON 解析错误忽略，但业务错误继续抛出
+            if (parseErr.message && !parseErr.message.includes('JSON')) {
+              throw parseErr
+            }
+          }
+        }
+      }
+
+      if (!pathData || !pathData.stages?.length) {
+        throw new Error('未能生成学习路径，请重试')
+      }
+
+      // 路径已在后端自动持久化（planner_service 在 data 事件时 save_path）
+      // 从后端获取完整路径数据（包含 path_id = id）
+      let pathId = null
+      try {
+        const savedPath = await getLearningPath('demo-student-01')
+        if (savedPath) {
+          pathId = savedPath.id  // id 即为 path_id
+          pathData = { ...pathData, ...savedPath }
+          // 不在此处 setRestoredPath，避免触发 useEffect 竞态提前切到 ACTIVE
+        }
+      } catch {
+        // 获取失败时尝试从 SSE data 中提取
+        pathId = pathData.path_id || pathData.id || null
+      }
+
+      if (!pathId) {
+        throw new Error('路径保存失败，缺少 path_id')
+      }
+
+      // 5. 读取 current_stage 对应阶段（1-indexed → 0-indexed）
+      const currentStageIndex = (pathData.current_stage || 1) - 1
+      const currentStage = pathData.stages[currentStageIndex]
+      if (!currentStage) {
+        throw new Error('路径缺少阶段信息')
+      }
+
+      // 6. 选择当前阶段第一个主要 topic
+      const firstTopic = currentStage.topics?.[0] || currentStage.title
+      if (!firstTopic) {
+        throw new Error('当前阶段缺少学习主题')
+      }
+
+      // 跳转到资源生成进度页面
+      navigate('/generating', {
+        state: {
+          studentId: 'demo-student-01',
+          pathId,
+          topic: firstTopic,
+        },
+      })
+      setIsStartingJourney(false)
+      startingRef.current = false
+
+    } catch (err) {
+      const errMsg = err.message || '学习路径生成失败，请重试'
+      setJourneyError(errMsg)
+      setPhase(PHASE.FAILED)
+      message.error(errMsg)
+      setIsStartingJourney(false)
+      startingRef.current = false
+    }
+  }, [setPhase, profile, navigate])
+
+  // 重试（从 failed 状态恢复 / 重新开始）
+  const handleRetryJourney = useCallback(() => {
+    setJourneyError(null)
+    setRestoredPath(null) // 清除已保存的路径，防止 useEffect 立即切回 ACTIVE
+    setPhase(PHASE.COLLECTING)
+  }, [setPhase])
+
+  // 点击阶段折线图拐点 → 跳转到阶段资源详情页
+  const handleStageClick = useCallback(
+    (stage, index) => {
+      const path = restoredPath
+      navigate(`/stage/${stage.stage_id}/resources`, {
+        state: { stage, pathId: path?.id, pathData: path },
+      })
+    },
+    [restoredPath, navigate],
+  )
+
+  const handleSuggestion = useCallback((t, opts) => sendMessage(t, opts), [sendMessage])
+  const handleNextQuestion = useCallback((q) => sendMessage(q), [sendMessage])
+  const handleDismissError = useCallback(() => {}, [])
+  const handleRetry = useCallback(() => retryLastMessage?.(), [retryLastMessage])
+
+  // ── 加载中：等待状态恢复 ──
+  if (!stateRestored) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-page)' }}>
+        <LoadingSkeleton type="detail" />
+      </div>
+    )
+  }
+
+  // ── 学习旅程已激活 → 折线图 + 阶段详情 ──
+  if (phase === PHASE.ACTIVE) {
+    const stages = restoredPath?.stages || []
+    const currentStageNum = Number(restoredPath?.current_stage) || 1
+    const currentStageData = stages.find((s) => Number(s.stage_id) === currentStageNum)
+    const totalTasks = stages.reduce((s, st) => s + (st.tasks?.length || 0), 0)
+    const completedTasks = stages.reduce(
+      (s, st) => s + (st.tasks?.filter((t) => t.status === 'completed')?.length || 0),
+      0,
+    )
+
+    return (
+      <div style={{ height: '100%', overflow: 'auto', background: 'var(--bg-page)' }}>
+        <div style={{ maxWidth: 1060, margin: '0 auto', padding: '24px' }}>
+          {/* 页面标题 */}
+          <div style={{ marginBottom: 20, textAlign: 'center' }}>
+            <Title level={2} style={{ margin: 0, fontWeight: 700 }}>
+              📐 我的课程
+            </Title>
+            {restoredPath?.goal && (
+              <Text type="secondary" style={{ fontSize: 15 }}>
+                学习目标：{restoredPath.goal}
+              </Text>
+            )}
+            <div style={{ marginTop: 12 }}>
+              <Button
+                size="small"
+                icon={<ReloadOutlined />}
+                onClick={handleRetryJourney}
+              >
+                重新开始
+              </Button>
+            </div>
+          </div>
+
+          {/* 阶段折线图 */}
+          <Card
+            style={{ borderRadius: 16, marginBottom: 24 }}
+            styles={{ body: { padding: '24px 16px 8px' } }}
+          >
+            <StageLineChart
+              stages={stages}
+              currentStage={currentStageNum}
+              onStageClick={handleStageClick}
+            />
+            <div style={{ textAlign: 'center', marginTop: 4, marginBottom: 12 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                💡 点击拐点查看该阶段的学习资源
+              </Text>
+            </div>
+          </Card>
+
+          {/* 当前阶段详情卡片 */}
+          {currentStageData && (
+            <Card
+              style={{
+                borderRadius: 12,
+                marginBottom: 24,
+                border: '1px solid rgba(22,119,255,0.2)',
+              }}
+              styles={{ body: { padding: '20px 24px' } }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <Space size={8}>
+                    <Text strong style={{ fontSize: 16 }}>
+                      当前阶段：{currentStageData.title}
+                    </Text>
+                    <Tag color="blue">进行中</Tag>
+                  </Space>
+                  <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 13 }}>
+                    {currentStageData.description}
+                  </Paragraph>
+                  <Space size={4} wrap style={{ marginTop: 4 }}>
+                    {(currentStageData.topics || []).map((t) => (
+                      <Tag key={t} color="purple" style={{ fontSize: 11 }}>
+                        {t}
+                      </Tag>
+                    ))}
+                  </Space>
+                </div>
+                <Button
+                  type="primary"
+                  onClick={() => handleStageClick(currentStageData, currentStageNum - 1)}
+                >
+                  查看当前阶段资源
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* 统计卡片 */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            <Col xs={12} sm={6}>
+              <Card size="small" style={{ borderRadius: 10 }}>
+                <Statistic
+                  title="学习阶段"
+                  value={stages.length}
+                  suffix="个"
+                  prefix={<BookOutlined style={{ color: '#1677ff' }} />}
+                />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card size="small" style={{ borderRadius: 10 }}>
+                <Statistic
+                  title="已完成任务"
+                  value={completedTasks}
+                  suffix={<Text type="secondary">/ {totalTasks}</Text>}
+                  prefix={<TrophyOutlined style={{ color: '#52c41a' }} />}
+                />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card size="small" style={{ borderRadius: 10 }}>
+                <Statistic
+                  title="学习时长"
+                  value="--"
+                  prefix={<ClockCircleOutlined style={{ color: '#fa8c16' }} />}
+                />
+              </Card>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Card size="small" style={{ borderRadius: 10 }}>
+                <Statistic
+                  title="连续学习"
+                  value="--"
+                  prefix={<FireOutlined style={{ color: '#eb2f96' }} />}
+                />
+              </Card>
+            </Col>
+          </Row>
+
+          {/* 学习路径面板（可折叠） */}
+          <Card
+            title={<Text strong style={{ fontSize: 16 }}>📐 学习路径详情</Text>}
+            style={{ borderRadius: 12 }}
+            styles={{ body: { padding: '12px 20px 20px' } }}
+          >
+            <LearningPathPanel initialPathData={restoredPath} />
+          </Card>
+        </div>
+
+      </div>
+    )
+  }
+
+  // ── failed 状态 ──
+  if (phase === PHASE.FAILED) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-page)' }}>
+        <Result
+          status="error"
+          title="学习路径生成失败"
+          subTitle={journeyError || '生成过程中出现错误，请重试'}
+          extra={
+            <Space>
+              <Button type="primary" icon={<ReloadOutlined />} onClick={handleRetryJourney}>
+                重新开始
+              </Button>
+              <Button icon={<RocketOutlined />} onClick={handleStartJourney} loading={isStartingJourney}>
+                再次尝试
+              </Button>
+            </Space>
+          }
+        />
+      </div>
+    )
+  }
+
+  // ── planning 阶段：显示生成进度 ──
+  if (phase === PHASE.PLANNING) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-page)' }}>
+        <div style={{
+          maxWidth: 520, width: '100%', textAlign: 'center',
+          padding: '48px 32px', borderRadius: 16,
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        }}>
+          <Spin size="large" />
+          <Title level={4} style={{ marginTop: 24, marginBottom: 8 }}>
+            🧠 正在生成学习路径...
+          </Title>
+          <Text type="secondary">
+            AI 正在根据你的画像量身定制学习路径，请稍候
+          </Text>
+        </div>
+      </div>
+    )
+  }
+
+  // ── collecting / ready 阶段：显示画像采集 ChatBox ──
   return (
     <div style={{ height: '100%', overflow: 'auto', background: 'var(--bg-page)' }}>
       {/* 对话区 */}
@@ -287,36 +731,24 @@ export default function ProfilePage() {
               isLoading={isLoading}
               onSend={sendMessage}
               onAbort={abort}
+              onRetry={handleRetry}
               placeholder="说说你的学习情况，我会为你定制学习方案..."
               emptyText="和 AI 助手聊聊你的学习情况"
               suggestions={SUGGESTIONS}
               onSuggestionClick={handleSuggestion}
               showStyleSelector={false}
-              headerHint="介绍一下自己，AI 老师会根据你的背景个性化教学"
+              completeness={completeness}
+              nextQuestions={nextQuestions}
+              onNextQuestionClick={handleNextQuestion}
+              chatError={chatError}
+              onDismissError={handleDismissError}
+              phase={phase}
+              onStartJourney={handleStartJourney}
+              isStartingJourney={isStartingJourney}
             />
           </div>
 
-        </div>
-
-        {/* Tab 区 */}
-        <div style={{ padding: '0 24px 24px' }}>
-          <div style={{
-            maxWidth: 800, margin: '0 auto', width: '100%',
-            padding: '8px 0 20px',
-          }}>
-            <Tabs activeKey={activeTab} onChange={setActiveTab} centered
-              items={[
-                { key: 'resource', label: '📄 学习资源', children: null },
-                { key: 'path', label: '📐 学习路径', children: null },
-              ]} />
-            <div style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
-              {activeTab === 'resource' ? <ResourcePage /> : <LearningPathPanel />}
-            </div>
-          </div>
-        </div>
-
-      {/* 右下角悬浮对话 */}
-      <FloatingChat />
+    </div>
     </div>
   )
 }

@@ -43,6 +43,14 @@ export async function generateEvaluationStream(data) {
   return response
 }
 
+// 提交学习行为记录
+// action: 'view' | 'complete' | 'answer'
+// 后端端点: POST /api/evaluate/record
+// 请求体: { student_id, action, resource_id?, topic?, score?, time_spent? }
+export async function recordLearning(data) {
+  return client.post('/evaluate/record', data)
+}
+
 // 提交自评
 export async function submitSelfEval(data) {
   return client.post('/evaluate/self', data)

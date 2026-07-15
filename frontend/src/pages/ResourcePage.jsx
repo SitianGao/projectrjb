@@ -1,13 +1,14 @@
 import { useState, useRef } from 'react'
-import { Typography, Input, Select, Button, Empty, Row, Col, message, Modal } from 'antd'
+import { Typography, Input, Select, Button, Empty, Row, Col, Space, message, Modal } from 'antd'
 import {
   SearchOutlined, ThunderboltOutlined, FileTextOutlined,
-  EditOutlined, CodeOutlined, ReloadOutlined,
+  EditOutlined, CodeOutlined, ReloadOutlined, CheckCircleOutlined,
 } from '@ant-design/icons'
 import ResourceCard from '../components/ResourceCard'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import ProgressBar from '../components/ProgressBar'
 import { useTaskStatus } from '../hooks/useTaskStatus'
+import { useLearningBehavior } from '../hooks/useLearningBehavior'
 import { generateResources, getTaskStatus } from '../api/resource'
 import { shouldUseMock } from '../utils/useMock'
 
@@ -364,6 +365,10 @@ export default function ResourcePage() {
   const [difficulty, setDifficulty] = useState('intermediate')
   const [selectedTypes, setSelectedTypes] = useState(['document', 'exercise', 'code'])
   const [detailResource, setDetailResource] = useState(null)
+  const [completing, setCompleting] = useState(false)
+
+  // 学习行为追踪
+  const { trackView, trackComplete } = useLearningBehavior(null)
 
   // 页面初始不展示 Mock 数据，由用户输入后主动生成
   const [initialResources] = useState([])
@@ -445,6 +450,21 @@ export default function ResourcePage() {
       }
     } catch (err) {
       message.error('生成请求失败: ' + (err.message || '未知错误'))
+    }
+  }
+
+  /** 标记资源完成 */
+  async function handleCompleteResource() {
+    if (!detailResource) return
+    setCompleting(true)
+    try {
+      await trackComplete(detailResource)
+      message.success('学习进度已更新！')
+      setDetailResource(null)
+    } catch (err) {
+      message.error('记录失败: ' + (err.message || '未知错误'))
+    } finally {
+      setCompleting(false)
     }
   }
 
@@ -611,7 +631,7 @@ export default function ResourcePage() {
           <Row gutter={[16, 16]}>
             {resultResources.map((r) => (
               <Col key={r.id} xs={24} md={8}>
-                <ResourceCard resource={r} onClick={(res) => setDetailResource(res)} />
+                <ResourceCard resource={r} onClick={(res) => { trackView(res); setDetailResource(res) }} />
               </Col>
             ))}
           </Row>
@@ -626,7 +646,7 @@ export default function ResourcePage() {
           <Row gutter={[16, 16]}>
             {initialResources.map((r) => (
               <Col key={r.id} xs={24} md={8}>
-                <ResourceCard resource={r} onClick={(res) => setDetailResource(res)} />
+                <ResourceCard resource={r} onClick={(res) => { trackView(res); setDetailResource(res) }} />
               </Col>
             ))}
           </Row>
@@ -645,7 +665,19 @@ export default function ResourcePage() {
         title={detailResource?.title}
         open={!!detailResource}
         onCancel={() => setDetailResource(null)}
-        footer={null}
+        footer={
+          <Space>
+            <Button onClick={() => setDetailResource(null)}>关闭</Button>
+            <Button
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              onClick={handleCompleteResource}
+              loading={completing}
+            >
+              完成学习
+            </Button>
+          </Space>
+        }
         width={960}
         style={{ top: 40 }}
         styles={{ body: { maxHeight: '80vh', overflow: 'auto', padding: '24px 32px' } }}

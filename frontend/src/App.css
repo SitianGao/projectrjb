@@ -256,6 +256,52 @@
   }
 }
 
+/* ===== 1366×768 小屏笔记本优化 ===== */
+@media (max-height: 768px) {
+  .top-bar {
+    height: 48px;
+  }
+
+  /* 减少页面内边距，释放垂直空间 */
+  .site-content {
+    padding: 16px 20px;
+  }
+}
+
+/* ===== 移动端基本保障 ===== */
+@media (max-width: 768px) {
+  /* 顶栏压缩 */
+  .top-bar {
+    height: 48px;
+    padding: 0 12px;
+  }
+
+  /* 隐藏用户名，仅保留头像 */
+  .top-user-name {
+    display: none;
+  }
+
+  /* 确保 body 可滚动，避免白屏 */
+  body {
+    overflow: auto;
+  }
+
+  /* 页面内容区减 padding */
+  .site-content {
+    padding: 12px;
+  }
+
+  /* 统计卡片小屏下调整间距 */
+  .stat-mini-card .ant-statistic-content {
+    font-size: 18px;
+  }
+
+  /* 学习旅程页小屏适配 */
+  .journey-stage-list {
+    font-size: 13px;
+  }
+}
+
 .auth-header {
   text-align: center;
   margin-bottom: 32px;

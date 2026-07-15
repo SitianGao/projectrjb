@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from 'react'
-import { Input, Button, Space, Avatar, Typography, Spin, Tooltip, Segmented } from 'antd'
+import { Input, Button, Space, Avatar, Typography, Spin, Tooltip, Segmented, Progress, Alert, Tag } from 'antd'
 import {
   SendOutlined,
   UserOutlined,
@@ -7,6 +7,10 @@ import {
   StopOutlined,
   ArrowDownOutlined,
   ReloadOutlined,
+  CloseCircleOutlined,
+  CheckCircleOutlined,
+  QuestionCircleOutlined,
+  RocketOutlined,
 } from '@ant-design/icons'
 import MarkdownRenderer from './MarkdownRenderer'
 import { useTheme } from '../contexts/ThemeContext'
@@ -94,6 +98,15 @@ export default function ChatBox({
   defaultStyle = 'analogy',
   showStyleSelector = true,
   headerHint,
+  completeness = null,
+  nextQuestions = [],
+  onNextQuestionClick,
+  chatError = null,
+  onDismissError,
+  // 阶段状态机相关
+  phase = null,
+  onStartJourney,
+  isStartingJourney = false,
 }) {
   const { resolved } = useTheme()
   const isDark = resolved === 'dark'
@@ -200,6 +213,92 @@ export default function ChatBox({
           </div>
         )}
 
+        {/* 画像完整度进度条 */}
+        {completeness !== null && (
+          <div style={{
+            marginBottom: 12,
+            padding: '10px 16px',
+            borderRadius: 10,
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(99,102,241,0.04) 100%)'
+              : 'linear-gradient(135deg, #faf8ff 0%, #f5f3ff 100%)',
+            border: isDark
+              ? '1px solid rgba(139,92,246,0.15)'
+              : '1px solid rgba(139,92,246,0.12)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                📊 画像完整度
+              </Text>
+              <Tag color={completeness >= 0.8 ? 'success' : completeness >= 0.4 ? 'processing' : 'warning'}
+                style={{ margin: 0, fontSize: 12 }}>
+                {Math.round(completeness * 100)}%
+              </Tag>
+            </div>
+            <Progress
+              percent={Math.round(completeness * 100)}
+              strokeColor={{
+                '0%': '#8b5cf6',
+                '100%': '#6366f1',
+              }}
+              trailColor={isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'}
+              size="small"
+              showInfo={false}
+            />
+          </div>
+        )}
+
+        {/* ready 阶段：画像已足够，提示用户开启学习之旅 */}
+        {phase === 'ready' && (
+          <Alert
+            type="success"
+            icon={<CheckCircleOutlined />}
+            message={
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  🎉 画像信息已足够！
+                </span>
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<RocketOutlined />}
+                  onClick={onStartJourney}
+                  loading={isStartingJourney}
+                  disabled={isStartingJourney}
+                  style={{
+                    background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+                    border: 'none',
+                    borderRadius: 6,
+                    fontWeight: 600,
+                  }}
+                >
+                  {isStartingJourney ? '生成中...' : '开启学习之旅'}
+                </Button>
+              </div>
+            }
+            description="AI 已充分了解你的学习情况。点击按钮生成专属学习路径，你也可以继续补充更多信息。"
+            style={{ marginBottom: 12, borderRadius: 10 }}
+          />
+        )}
+
+        {/* 全局错误提示 */}
+        {chatError && (
+          <Alert
+            type="error"
+            message={chatError.message}
+            closable
+            onClose={onDismissError}
+            style={{ marginBottom: 12, borderRadius: 10 }}
+            action={
+              onRetry ? (
+                <Button size="small" danger icon={<ReloadOutlined />} onClick={onRetry}>
+                  重试
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+
         {isEmpty && showEmpty ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 300 }}>
             <div style={{
@@ -302,6 +401,50 @@ export default function ChatBox({
                 )
               })}
 
+              {/* 后端推荐的下一轮问题 */}
+              {nextQuestions.length > 0 && !isLoading && (
+                <div style={{ marginTop: 4 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+                  }}>
+                    <QuestionCircleOutlined style={{ color: '#8b5cf6', fontSize: 14 }} />
+                    <Text style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                      你可以继续问：
+                    </Text>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {nextQuestions.map((q, i) => (
+                      <Tag
+                        key={i}
+                        style={{
+                          cursor: 'pointer',
+                          padding: '4px 12px',
+                          borderRadius: 16,
+                          fontSize: 12,
+                          border: '1px dashed #d9d9d9',
+                          background: 'var(--bg-card)',
+                          color: 'var(--text-secondary)',
+                          transition: 'all 0.2s',
+                        }}
+                        onClick={() => onNextQuestionClick?.(q)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#8b5cf6'
+                          e.currentTarget.style.color = '#8b5cf6'
+                          e.currentTarget.style.background = 'rgba(139,92,246,0.04)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#d9d9d9'
+                          e.currentTarget.style.color = 'var(--text-secondary)'
+                          e.currentTarget.style.background = 'var(--bg-card)'
+                        }}
+                      >
+                        {q}
+                      </Tag>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {showStreaming && (
                 <div className="chat-msg-enter" style={{ paddingLeft: 48, display: 'flex', alignItems: 'center', gap: 10 }}>
                   <ThinkingDots />
@@ -359,13 +502,24 @@ export default function ChatBox({
               <Button danger shape="circle" icon={<StopOutlined />} onClick={onAbort} size="middle" />
             ) : (
               <Button
-                type="primary" shape="circle" icon={<SendOutlined />}
-                onClick={handleSend} disabled={!inputValue.trim()} size="middle"
+                type="primary"
+                icon={<RocketOutlined />}
+                onClick={handleSend}
+                disabled={!inputValue.trim()}
                 style={{
-                  background: inputValue.trim() ? 'linear-gradient(135deg, #8b5cf6, #6366f1)' : '#d9d9d9',
-                  border: 'none', flexShrink: 0,
+                  background: inputValue.trim()
+                    ? 'linear-gradient(135deg, #8b5cf6, #6366f1)'
+                    : '#d9d9d9',
+                  border: 'none',
+                  flexShrink: 0,
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  opacity: inputValue.trim() ? 1 : 0.6,
+                  transition: 'all 0.25s',
                 }}
-              />
+              >
+                开启我的学习之旅
+              </Button>
             )}
           </div>
         </div>

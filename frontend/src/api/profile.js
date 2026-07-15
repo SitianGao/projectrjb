@@ -31,25 +31,28 @@ export async function updateProfile(studentId, data) {
  * @param {object} params
  * @param {string} params.student_id       — 学生 ID
  * @param {string} params.message          — 当前轮用户消息
- * @param {string[]} [params.history]      — 历史对话消息
+ * @param {Array} [params.history]         — 历史对话消息 [{role, content}, ...]
  * @param {object} [params.current_profile] — 已有画像（增量更新时传入）
- * @param {string} [params.style] — 解释风格：analogy | formula | diagram | story
+ * @param {string} [params.style]          — 解释风格：analogy | formula | diagram | story
+ * @param {AbortSignal} [params.signal]    — 取消信号，用于中断 SSE 请求
  * @returns {Promise<Response>} fetch Response，SSE 流
  */
-export async function startProfileChat({ student_id, message, history, current_profile, style } = {}) {
+export async function startProfileChat({ student_id, message, history, current_profile, style, signal } = {}) {
   const response = await fetch('/api/profile/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       student_id,
       message,
-      ...(history && { history }),
+      ...(history?.length && { history }),
       ...(current_profile && { current_profile }),
       ...(style && { style }),
     }),
+    signal,
   })
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`)
+    const errorBody = await response.text().catch(() => '')
+    throw new Error(errorBody || `HTTP ${response.status}`)
   }
   return response
 }

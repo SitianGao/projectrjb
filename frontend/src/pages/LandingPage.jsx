@@ -1,7 +1,6 @@
 import { Row, Col, Card, Typography, Space, Button, Steps, message } from 'antd'
 import {
   RobotOutlined,
-  BookOutlined,
   CompassOutlined,
   BarChartOutlined,
   ThunderboltOutlined,
@@ -24,10 +23,10 @@ const { Title, Text, Paragraph } = Typography
 // 核心功能
 const MODULES = [
   { key: 'profile', icon: <BarChartOutlined />, title: '学习画像', desc: '六维雷达图 + 评分趋势，全面掌握学习状态与进步轨迹', route: '/home', color: '#fa8c16' },
-  { key: 'resource', icon: <BookOutlined />, title: '学习资源', desc: '海量资源库，涵盖文档、练习题、思维导图，支持 AI 智能生成', route: '/resources', color: '#1677ff' },
-  { key: 'path', icon: <CompassOutlined />, title: '学习路径', desc: 'AI 根据学习画像定制个性化路线，分阶段达成学习目标', route: '/learning-path/1', color: '#52c41a' },
-  { key: 'tutor', icon: <RobotOutlined />, title: '智能辅导', desc: 'AI 辅导老师随时待命，解答疑问、批改作业，提供个性化学习建议', route: '/', color: '#8b5cf6' },
+  { key: 'course', icon: <RocketOutlined />, title: '我的课程', desc: '与 AI 对话后自动生成专属课程，分阶段可视化呈现学习路线，点击拐点直达资源', route: '/journey', color: '#8b5cf6' },
+  { key: 'tutor', icon: <RobotOutlined />, title: '智能辅导', desc: 'AI 辅导老师随时待命，解答疑问、批改作业，提供个性化学习建议', route: '/', color: '#1677ff' },
   { key: 'evaluate', icon: <TrophyOutlined />, title: '学习评估', desc: '综合评分 + 知识点掌握度分析，精准定位强弱项，追踪学习趋势', route: '/home', color: '#eb2f96' },
+  { key: 'journey', icon: <CompassOutlined />, title: '学习路径', desc: 'AI 定制的分阶段学习路径，直观追踪进度，按计划逐步达成学习目标', route: '/journey', color: '#52c41a' },
 ]
 
 // 亮点
@@ -65,13 +64,13 @@ export default function LandingPage() {
   const { isLoggedIn } = useAuth()
 
   // 登录校验跳转
-  function safeNavigate(path) {
+  function safeNavigate(path, opts) {
     if (!isLoggedIn) {
       message.warning('请先登录后再继续操作')
       navigate('/login', { replace: true })
       return
     }
-    navigate(path)
+    navigate(path, opts)
   }
 
   return (
@@ -118,7 +117,7 @@ export default function LandingPage() {
 
           <Space size="middle">
             <Button type="primary" size="large" icon={<RocketOutlined />}
-              onClick={() => safeNavigate('/')}
+              onClick={() => safeNavigate('/', { state: { startChat: true } })}
               className="hero-cta-primary"
               style={{
                 height: 46, borderRadius: 12, fontWeight: 600, fontSize: 15,
@@ -156,7 +155,7 @@ export default function LandingPage() {
           <Title level={2} style={{ fontSize: TITLE_FONT_SIZE, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
             核心功能
           </Title>
-          <Text type="secondary" style={{ fontSize: 16 }}>五大模块协同工作，为你提供完整的学习闭环</Text>
+          <Text type="secondary" style={{ fontSize: 16 }}>智能模块协同，为你提供完整的学习闭环</Text>
         </div>
 
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
@@ -165,6 +164,7 @@ export default function LandingPage() {
               <Card
                 hoverable
                 className="home-module-card"
+                onClick={() => safeNavigate(mod.route)}
                 style={{
                   borderRadius: 16, height: '100%', border: 'none', boxShadow: 'none',
                   overflow: 'hidden', cursor: 'pointer',
