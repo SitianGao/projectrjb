@@ -11,6 +11,7 @@ import logging
 import uuid
 from typing import AsyncIterator, Dict, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.student import Student, StudentProfile
@@ -58,7 +59,14 @@ class ProfileService:
         )
         if not profile:
             return None
-        return self._profile_to_dict(profile)
+        result = self._profile_to_dict(profile)
+        # 旧数据中可能已经出现“新版本完整度低于历史版本”的情况。
+        # 读取时也以历史最高值为准，使现有脏数据无需等待下一次对话即可恢复。
+        result["completeness"] = max(
+            _as_completeness(result.get("completeness")),
+            self._get_highest_completeness(db, student_id),
+        )
+        return result
 
     def get_profile_history(self, db: Session, student_id: str) -> list:
         """获取学生画像历史版本列表。"""
@@ -85,6 +93,7 @@ class ProfileService:
         increment_version: bool = True,
     ) -> StudentProfile:
         """保存或更新学生画像。"""
+        historical_completeness = self._get_highest_completeness(db, student_id)
         latest = (
             db.query(StudentProfile)
             .filter(StudentProfile.student_id == student_id)
@@ -96,6 +105,10 @@ class ProfileService:
 
         if latest and not increment_version:
             # 原地更新
+            latest.completeness = max(
+                _as_completeness(latest.completeness),
+                historical_completeness,
+            )
             self._apply_profile_fields(latest, p, profile_data)
             db.commit()
             db.refresh(latest)
@@ -107,6 +120,7 @@ class ProfileService:
             id=str(uuid.uuid4()),
             student_id=student_id,
             version=new_version,
+            completeness=historical_completeness,
         )
         # 先复制旧版本的所有字段（如果有）
         if latest:
@@ -119,7 +133,10 @@ class ProfileService:
             record.interest = latest.interest
             record.chat_history = latest.chat_history
             record.memory_strength = latest.memory_strength
-            record.completeness = latest.completeness
+            record.completeness = max(
+                _as_completeness(latest.completeness),
+                historical_completeness,
+            )
         # 再应用新数据（部分更新：只覆盖传入的字段）
         self._apply_profile_fields(record, p, profile_data)
         db.add(record)
@@ -152,8 +169,11 @@ class ProfileService:
         self.get_or_create_student(db, student_id)
 
         latest_before_chat = self._get_latest_profile_record(db, student_id)
-        old_completeness = _as_completeness(
-            latest_before_chat.completeness if latest_before_chat else 0.0
+        old_completeness = max(
+            _as_completeness(
+                latest_before_chat.completeness if latest_before_chat else 0.0
+            ),
+            self._get_highest_completeness(db, student_id),
         )
 
         # The model is stateless. When the client omits context, restore it from
@@ -272,6 +292,16 @@ class ProfileService:
             .order_by(StudentProfile.version.desc())
             .first()
         )
+
+    @staticmethod
+    def _get_highest_completeness(db: Session, student_id: str) -> float:
+        """返回学生全部画像版本中的最高完整度。"""
+        value = (
+            db.query(func.max(StudentProfile.completeness))
+            .filter(StudentProfile.student_id == student_id)
+            .scalar()
+        )
+        return _as_completeness(value)
 
     def _apply_profile_fields(self, record: StudentProfile, p: Dict, meta: Dict):
         """将 dict 字段写入 ORM 对象（仅更新显式传入的字段，支持部分更新）。"""

@@ -14,6 +14,7 @@ from typing import Any, AsyncIterator, Dict, Optional
 
 from sqlalchemy.orm import Session
 
+from config import PROFILE_READY_THRESHOLD
 from api.response import sse_done, sse_error
 from models.learning_path import LearningPath
 
@@ -142,10 +143,11 @@ class PlannerService:
                 return
 
             completeness = _as_float(profile.get("completeness"), 0.0)
-            if completeness < 0.85:
+            if completeness < PROFILE_READY_THRESHOLD:
                 yield sse_error(
                     "PLANNER_GENERATE_FAILED",
-                    f"学生画像完整度为 {completeness:.0%}，达到 85% 后才能生成学习路径",
+                    f"学生画像完整度为 {completeness:.0%}，达到 "
+                    f"{PROFILE_READY_THRESHOLD:.0%} 后才能生成学习路径",
                 )
                 yield sse_done()
                 return
@@ -196,8 +198,10 @@ class PlannerService:
             raise ValueError("请先完成学生画像构建")
 
         completeness = _as_float(profile.get("completeness"), 0.0)
-        if completeness < 0.85:
-            raise ValueError("学生画像完整度不足 85%，不能生成学习路径")
+        if completeness < PROFILE_READY_THRESHOLD:
+            raise ValueError(
+                f"学生画像完整度不足 {PROFILE_READY_THRESHOLD:.0%}，不能生成学习路径"
+            )
 
         resolved_goal = _resolve_goal(profile, goal)
         if not resolved_goal:

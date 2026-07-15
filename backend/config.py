@@ -40,6 +40,11 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "30"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
 
+# 画像达到该完整度后，才允许进入学习路径生成阶段。
+# ProfileService 与 PlannerService 必须共享同一门槛，避免出现画像停止追问、
+# 但路径仍无法生成的业务断层。
+PROFILE_READY_THRESHOLD = 0.85
+
 # 向量库配置
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_data")
 
