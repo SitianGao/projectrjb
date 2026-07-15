@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from models.learning_path import LearningPath
 from models.resource import Resource
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class ResourceService:
         """Generate resources with the agent and persist the result."""
         _emit_progress(on_progress, 10, "preparing", "正在准备学生画像和生成参数")
         self.profile_service.get_or_create_student(db, student_id)
+        self.validate_path_ownership(db, student_id, path_id)
         profile = self.profile_service.get_profile(db, student_id)
 
         _emit_progress(on_progress, 35, "generating", "正在调用资源生成逻辑")
@@ -91,6 +93,7 @@ class ResourceService:
         types: Optional[List[str]] = None,
         difficulty: str = "中级",
         count: int = 1,
+        path_id: Optional[str] = None,
     ):
         """Generate resources and expose the result as SSE events."""
         yield f'data: {{"type":"start","message":"开始生成{topic}学习资源"}}\n\n'
@@ -102,6 +105,7 @@ class ResourceService:
             types=types,
             difficulty=difficulty,
             count=count,
+            path_id=path_id,
         )
         yield f'data: {{"type":"data","data":{_json_dumps(result)}}}\n\n'
         yield f'data: {{"type":"done"}}\n\n'
@@ -153,6 +157,27 @@ class ResourceService:
         if not resource:
             return None
         return self._resource_to_dict(resource, include_content=True)
+
+    @staticmethod
+    def validate_path_ownership(
+        db: Session,
+        student_id: str,
+        path_id: Optional[str],
+    ) -> Optional[LearningPath]:
+        """Reject cross-student or unknown path associations."""
+        if not path_id:
+            return None
+        path = (
+            db.query(LearningPath)
+            .filter(
+                LearningPath.id == path_id,
+                LearningPath.student_id == student_id,
+            )
+            .first()
+        )
+        if not path:
+            raise ValueError("学习路径不存在或不属于当前学生")
+        return path
 
     @staticmethod
     def _resource_to_dict(resource: Resource, include_content: bool = True) -> Dict:
@@ -265,8 +290,9 @@ def _parse_agent_json(raw: Any) -> Dict:
 
 def _normalize_types(types: Optional[List[str]]) -> List[str]:
     allowed = {"document", "exercise", "code", "mindmap", "reading"}
-    normalized = [item for item in (types or ["document", "exercise", "code"]) if item in allowed]
-    return normalized or ["document", "exercise", "code"]
+    defaults = ["document", "exercise", "code", "mindmap", "reading"]
+    normalized = [item for item in (types or defaults) if item in allowed]
+    return normalized or defaults
 
 
 def _template_resources(

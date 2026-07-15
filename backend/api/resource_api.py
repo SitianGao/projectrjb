@@ -34,14 +34,25 @@ class ResourceGenerateRequest(BaseModel):
     "/generate",
     responses=json_responses(
         "RESOURCE_GENERATE_FAILED",
+        "PATH_NOT_FOUND",
         success_example=TASK_SUCCESS_EXAMPLE,
     ),
 )
 async def generate_resource(
     request: ResourceGenerateRequest,
     background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
 ):
     """生成学习资源，返回 task_id；前端轮询 /api/task/{task_id}/status。"""
+    try:
+        resource_service.validate_path_ownership(
+            db,
+            request.student_id,
+            request.path_id,
+        )
+    except ValueError as exc:
+        raise ApiError("PATH_NOT_FOUND", str(exc)) from exc
+
     task = task_service.create("资源生成任务已创建")
 
     async def run_task():
@@ -105,6 +116,7 @@ async def generate_resource_stream(request: ResourceGenerateRequest):
                 types=request.types,
                 difficulty=request.difficulty,
                 count=request.count,
+                path_id=request.path_id,
             ):
                 yield event
         except Exception:

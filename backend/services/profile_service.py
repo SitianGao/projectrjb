@@ -70,6 +70,13 @@ class ProfileService:
         )
         return [self._profile_to_dict(p) for p in profiles]
 
+    def get_chat_history(self, db: Session, student_id: str) -> list:
+        """Return the latest successful profile-chat messages."""
+        latest = self._get_latest_profile_record(db, student_id)
+        if not latest:
+            return []
+        return _safe_json_loads(latest.chat_history, [])
+
     def save_profile(
         self,
         db: Session,
@@ -144,73 +151,79 @@ class ProfileService:
         yield f'data: {{"type":"start","message":"开始分析学习画像"}}\n\n'
         self.get_or_create_student(db, student_id)
 
+        latest_before_chat = self._get_latest_profile_record(db, student_id)
+        old_completeness = _as_completeness(
+            latest_before_chat.completeness if latest_before_chat else 0.0
+        )
+
+        # The model is stateless. When the client omits context, restore it from
+        # the latest persisted profile so a browser refresh does not restart the
+        # interview from the first question.
+        effective_history = (
+            _normalize_chat_history(history)
+            if history is not None
+            else _history_for_agent(latest_before_chat)
+        )
+        effective_profile = current_profile
+        if effective_profile is None and latest_before_chat:
+            effective_profile = self._profile_to_dict(latest_before_chat)
+
         full_chat = []
-        profile_received = None
+        profile_saved = False
         error_occurred = False
 
         async for event in self.agent.chat(
             student_id=student_id,
             message=message,
-            history=history,
-            current_profile=current_profile,
+            history=effective_history,
+            current_profile=effective_profile,
         ):
-            # 透传 Agent 产出的 SSE 事件
-            yield event
+            payload = _parse_sse_payload(event)
 
             # 检测 profile_update 事件以便持久化
-            if '"type":"profile_update"' in event:
+            if payload and payload.get("type") == "profile_update" and not profile_saved:
                 try:
-                    # 从 SSE 行中提取 JSON
-                    prefix = "data: "
-                    json_str = event.strip()
-                    if json_str.startswith(prefix):
-                        json_str = json_str[len(prefix):]
-                    payload = json.loads(json_str)
                     profile_data = payload.get("profile", {})
                     if profile_data:
+                        # Completeness is accumulated knowledge and must never
+                        # regress because of one unstable LLM response.
+                        profile_data["completeness"] = max(
+                            old_completeness,
+                            _as_completeness(profile_data.get("completeness", 0.0)),
+                        )
                         self.save_profile(
                             db,
                             student_id,
                             profile_data,
                             increment_version=True,
                         )
+                        profile_saved = True
+                        event = _format_sse_payload(payload)
                         logger.info(f"画像已自动持久化: student={student_id}")
-                except (json.JSONDecodeError, KeyError) as e:
+                except (TypeError, ValueError, KeyError) as e:
+                    db.rollback()
                     logger.warning(f"解析 profile_update 事件失败: {e}")
 
             # 收集 chat 内容用于记录
-            if '"type":"chat"' in event:
-                try:
-                    prefix = "data: "
-                    json_str = event.strip()
-                    if json_str.startswith(prefix):
-                        json_str = json_str[len(prefix):]
-                    payload = json.loads(json_str)
-                    content = payload.get("content", "")
-                    if content:
-                        full_chat.append(content)
-                except json.JSONDecodeError:
-                    pass
+            if payload and payload.get("type") == "chat":
+                content = payload.get("content", "")
+                if content:
+                    full_chat.append(str(content))
 
-            if '"type":"error"' in event:
+            if payload and payload.get("type") == "error":
                 error_occurred = True
 
+            # 透传 Agent 事件；profile_update 会携带修正后的完整度。
+            yield event
+
         # 更新聊天历史到画像
-        if full_chat and not error_occurred:
+        if profile_saved and full_chat and not error_occurred:
             try:
-                latest = (
-                    db.query(StudentProfile)
-                    .filter(StudentProfile.student_id == student_id)
-                    .order_by(StudentProfile.version.desc())
-                    .first()
-                )
+                latest = self._get_latest_profile_record(db, student_id)
                 if latest:
-                    chat_list = []
-                    if latest.chat_history:
-                        try:
-                            chat_list = json.loads(latest.chat_history)
-                        except json.JSONDecodeError:
-                            chat_list = []
+                    chat_list = _safe_json_loads(latest.chat_history, [])
+                    if not isinstance(chat_list, list):
+                        chat_list = []
                     chat_list.append({
                         "role": "user",
                         "content": message,
@@ -222,6 +235,7 @@ class ProfileService:
                     latest.chat_history = json.dumps(chat_list, ensure_ascii=False)
                     db.commit()
             except Exception as e:
+                db.rollback()
                 logger.warning(f"更新聊天历史失败: {e}")
 
     # ── 非流式画像构建（供编排器使用） ───────────────────────
@@ -246,6 +260,18 @@ class ProfileService:
         return result
 
     # ── 工具方法 ─────────────────────────────────────────────
+
+    @staticmethod
+    def _get_latest_profile_record(
+        db: Session,
+        student_id: str,
+    ) -> Optional[StudentProfile]:
+        return (
+            db.query(StudentProfile)
+            .filter(StudentProfile.student_id == student_id)
+            .order_by(StudentProfile.version.desc())
+            .first()
+        )
 
     def _apply_profile_fields(self, record: StudentProfile, p: Dict, meta: Dict):
         """将 dict 字段写入 ORM 对象（仅更新显式传入的字段，支持部分更新）。"""
@@ -273,7 +299,11 @@ class ProfileService:
                 record.learning_history = "[]"
 
         if "completeness" in meta or "completeness" in p:
-            record.completeness = meta.get("completeness", p.get("completeness", 0.0))
+            previous = _as_completeness(record.completeness)
+            incoming = _as_completeness(
+                meta.get("completeness", p.get("completeness", 0.0))
+            )
+            record.completeness = max(previous, incoming)
 
     @staticmethod
     def _profile_to_dict(profile: StudentProfile) -> Dict:
@@ -304,3 +334,48 @@ def _safe_json_loads(value, default):
         return json.loads(value)
     except (json.JSONDecodeError, TypeError):
         return default
+
+
+def _as_completeness(value) -> float:
+    try:
+        return max(0.0, min(1.0, float(value or 0.0)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _normalize_chat_history(history) -> list:
+    if not isinstance(history, list):
+        return []
+    normalized = []
+    for item in history[-20:]:
+        if isinstance(item, dict):
+            role = item.get("role") or "message"
+            content = item.get("content")
+            if content:
+                normalized.append(f"{role}: {content}")
+        elif item is not None:
+            normalized.append(str(item))
+    return normalized
+
+
+def _history_for_agent(profile: Optional[StudentProfile]) -> list:
+    if not profile:
+        return []
+    return _normalize_chat_history(_safe_json_loads(profile.chat_history, []))
+
+
+def _parse_sse_payload(event: str) -> Optional[Dict]:
+    if not isinstance(event, str):
+        return None
+    raw = event.strip()
+    if raw.startswith("data:"):
+        raw = raw[5:].strip()
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _format_sse_payload(payload: Dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"

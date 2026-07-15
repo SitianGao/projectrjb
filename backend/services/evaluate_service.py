@@ -16,13 +16,17 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from api.response import ApiError
 from models.evaluation import EvaluationReport, LearningRecord
+from models.resource import Resource
 
 logger = logging.getLogger(__name__)
 
 
 class EvaluateService:
     """学习记录管理 + 多维度评估报告（DB 持久化 + EvaluateAgent 增强）"""
+
+    VALID_ACTIONS = {"view", "complete", "answer", "ask", "self_eval"}
 
     def __init__(self, profile_service, evaluate_agent=None):
         self.profile_service = profile_service
@@ -59,6 +63,26 @@ class EvaluateService:
         time_spent: Optional[int] = None,
     ) -> Dict:
         self.profile_service.get_or_create_student(db, student_id)
+        if action not in self.VALID_ACTIONS:
+            raise ApiError(
+                "VALIDATION_ERROR",
+                f"action 必须是 {', '.join(sorted(self.VALID_ACTIONS))} 之一",
+            )
+
+        if resource_id:
+            resource = (
+                db.query(Resource)
+                .filter(
+                    Resource.id == resource_id,
+                    Resource.student_id == student_id,
+                )
+                .first()
+            )
+            if not resource:
+                raise ApiError("RESOURCE_NOT_FOUND", "学习资源不存在或不属于当前学生")
+            if not topic:
+                topic = resource.topic
+
         record = LearningRecord(
             id=str(uuid.uuid4()),
             student_id=student_id,
