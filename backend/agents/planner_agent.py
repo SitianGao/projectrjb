@@ -99,53 +99,60 @@ class PlannerAgent(BaseAgent):
         goal_override: Optional[str] = None,
         course_outline: Optional[List[str]] = None,
     ) -> str:
-        """开发期无 API Key 时使用的规则化路径生成"""
+        """开发期无 API Key 时使用的规则化路径生成（v2: 画像驱动 + stage_id）"""
         profile_inner = profile.get("profile", profile)
         knowledge = profile_inner.get("knowledge_level", "初级")
         goal = goal_override or profile_inner.get("learning_goal", "掌握课程核心知识")
-        weaknesses = profile_inner.get("weakness", [])
-        topics = course_outline or [
-            "基础知识回顾", "核心概念入门", "进阶技术实践", "综合项目实战"
-        ]
+        weaknesses = list(profile_inner.get("weakness") or [])
+        interests = list(profile_inner.get("interest") or [])
+
+        # ---- 从画像数据推导阶段主题（而非硬编码默认值） ----
+        if course_outline:
+            topics = list(course_outline)
+        else:
+            topics = PlannerAgent._derive_stages_from_profile(
+                goal, knowledge, weaknesses, interests
+            )
 
         stages = []
         for i, topic in enumerate(topics, 1):
             tasks = []
             if i == 1:
                 tasks = [
-                    {"task": f"浏览{topic}大纲与前置要求", "resource_type": "document", "estimated_hours": 0.5},
-                    {"task": f"完成{topic}预习阅读", "resource_type": "reading", "estimated_hours": 1.5},
+                    {"task": f"浏览「{topic}」学习大纲并了解前置要求", "resource_type": "document", "estimated_hours": 0.5},
+                    {"task": f"阅读「{topic}」入门材料并完成概念预习", "resource_type": "reading", "estimated_hours": 1.5},
                 ]
             elif i < len(topics):
                 tasks = [
-                    {"task": f"学习{topic}核心讲解", "resource_type": "document", "estimated_hours": 2.0},
-                    {"task": f"完成{topic}思维导图整理", "resource_type": "mindmap", "estimated_hours": 1.0},
-                    {"task": f"练习{topic}基础习题", "resource_type": "exercise", "estimated_hours": 1.5},
+                    {"task": f"精读「{topic}」核心讲解并做笔记", "resource_type": "document", "estimated_hours": 2.0},
+                    {"task": f"用思维导图梳理「{topic}」的知识框架", "resource_type": "mindmap", "estimated_hours": 1.0},
+                    {"task": f"完成「{topic}」基础练习题（至少 3 道）", "resource_type": "exercise", "estimated_hours": 1.5},
                 ]
             else:
                 tasks = [
-                    {"task": f"{topic}综合实践", "resource_type": "code", "estimated_hours": 3.0},
-                    {"task": "撰写学习总结", "resource_type": "document", "estimated_hours": 1.0},
+                    {"task": f"「{topic}」综合实战项目", "resource_type": "code", "estimated_hours": 3.0},
+                    {"task": "撰写学习总结并梳理知识体系", "resource_type": "document", "estimated_hours": 1.0},
                 ]
 
             # 为薄弱点插入额外任务
             for w in weaknesses:
                 if w and w in topic:
                     tasks.insert(1, {
-                        "task": f"重点补习: {w}",
+                        "task": f"重点补习弱项: {w}（完成专项练习）",
                         "resource_type": "exercise",
                         "estimated_hours": 1.0,
                     })
 
             stages.append({
+                "stage_id": f"stage_{i}",
                 "title": f"阶段{i}: {topic}",
-                "objectives": f"学完本阶段，你将能够理解并应用{topic}的核心内容",
+                "objectives": f"学完本阶段，你将能够理解并应用「{topic}」的核心内容",
                 "topics": [topic],
                 "tasks": tasks,
             })
 
         # 根据知识水平调整预估天数
-        day_multiplier = {"初级": 1.5, "中级": 1.0, "高级": 0.7}
+        day_multiplier = {"初级": 1.5, "中级": 1.0, "中高级": 0.8, "高级": 0.7}
         multiplier = day_multiplier.get(knowledge, 1.0)
         estimated_days = max(1, int(len(stages) * 3 * multiplier))
 
@@ -157,3 +164,66 @@ class PlannerAgent(BaseAgent):
         }
 
         return json.dumps(plan, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def _derive_stages_from_profile(
+        goal: str,
+        knowledge: str,
+        weaknesses: List[str],
+        interests: List[str],
+    ) -> List[str]:
+        """从画像数据中推导 3-5 个阶段主题（无 course_outline 时使用）。
+
+        策略:
+        1. 如有薄弱点，首阶段安排基础补强
+        2. 从 learning_goal 中提取关键概念作为核心阶段
+        3. 如有兴趣方向，末尾阶段加入兴趣拓展
+        4. 保证 3-5 个阶段
+        """
+        stages: List[str] = []
+
+        # 基础补强阶段（如有薄弱点）
+        if weaknesses:
+            first_weak = weaknesses[0]
+            if "数学" in first_weak or "推导" in first_weak:
+                stages.append("数学基础与公式推导")
+            elif "概率" in first_weak or "统计" in first_weak:
+                stages.append("概率与统计基础")
+            elif "代码" in first_weak or "编程" in first_weak:
+                stages.append("编程基础与环境搭建")
+            else:
+                stages.append("基础知识回顾与补强")
+
+        # 从 learning_goal 提取核心阶段
+        goal_lower = goal.lower()
+        if "机器学习" in goal_lower or "machine learning" in goal_lower:
+            core_stages = ["机器学习核心算法入门", "经典模型深入实践"]
+        elif "深度学习" in goal_lower or "deep learning" in goal_lower:
+            core_stages = ["神经网络基础架构", "深度学习框架实战"]
+        elif "nlp" in goal_lower or "自然语言" in goal_lower:
+            core_stages = ["文本处理基础", "NLP模型实践"]
+        elif "计算机视觉" in goal_lower or "cv" in goal_lower or "视觉" in goal_lower:
+            core_stages = ["图像处理基础", "卷积神经网络实践"]
+        else:
+            # 从 goal 中取关键短句
+            short_goal = goal[:20] if len(goal) > 20 else goal
+            core_stages = ["核心概念入门", "进阶技术实践"]
+
+        stages.extend(core_stages)
+
+        # 综合/兴趣阶段
+        if interests:
+            stages.append(f"兴趣拓展: {interests[0]}")
+        else:
+            stages.append("综合项目实战")
+
+        # 保证 3-5 个阶段
+        if len(stages) > 5:
+            # 合并后两个核心阶段
+            stages = stages[:2] + ["核心技术与综合实战"] + stages[-1:]
+            stages = stages[:5]
+        elif len(stages) < 3:
+            while len(stages) < 3:
+                stages.insert(-1, f"进阶专题 {len(stages)}")
+
+        return stages[:5]

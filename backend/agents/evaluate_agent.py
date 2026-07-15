@@ -318,6 +318,9 @@ class EvaluateAgent(BaseAgent):
         # 薄弱点即使 R 不低也应出现在复习计划中
         for wt in weak_topics:
             if wt and wt not in {p["topic"] for p in plan}:
+                # 跳过占位文本（非真实知识点）
+                if wt in ("暂未检测到明显薄弱点", "未知"):
+                    continue
                 plan.append({
                     "topic": wt,
                     "urgency": "medium",

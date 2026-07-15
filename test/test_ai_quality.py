@@ -444,13 +444,18 @@ class TestEvaluateQuality:
 
     def test_forgetting_curve_memory_decay(self, agent):
         """遗忘曲线：距上次学习时间越长，越容易被推入复习计划"""
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+
+        # 今天刚学的内容
         recent_records = [
             {"topic": "逻辑回归", "action": "complete", "score": 0.90, "time_spent": 1800,
-             "created_at": "2026-06-20T08:00:00+08:00"},  # 今天
+             "created_at": now.isoformat()},
         ]
+        # 30 天前学的内容（早该忘了）
         old_records = [
             {"topic": "SVM", "action": "complete", "score": 0.90, "time_spent": 1800,
-             "created_at": "2026-06-01T08:00:00+08:00"},  # 19 天前
+             "created_at": (now - timedelta(days=30)).isoformat()},
         ]
 
         recent_raw = agent._rule_based_evaluate("stu-recent", {}, recent_records)
@@ -459,8 +464,12 @@ class TestEvaluateQuality:
         old_raw = agent._rule_based_evaluate("stu-old", {}, old_records)
         old_plan = json.loads(old_raw)["review_plan"]
 
-        # 旧记录更可能触达复习阈值
-        assert len(old_plan) >= 0  # 至少不崩溃
+        # 旧记录应触达复习阈值（30天前，R ≈ e^(-30/7) ≈ 1.4%，high urgency）
+        assert len(old_plan) >= 1, f"30天前的记录应触发复习: {old_plan}"
+        old_urgencies = {p["topic"]: p["urgency"] for p in old_plan}
+        assert old_urgencies.get("SVM") == "high", \
+            f"30天前的内容应为 high urgency，实际: {old_urgencies}"
+
         # 新学的内容不应该被紧急推送（R 应该还很高）
         recent_topics_high_urgency = [p for p in recent_plan if p.get("urgency") == "high"]
         assert len(recent_topics_high_urgency) == 0, \

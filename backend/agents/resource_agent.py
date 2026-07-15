@@ -41,13 +41,16 @@ class ResourceAgent(BaseAgent):
             "- 不使用序号，纯 Markdown 列表，缩进用 2 个空格"
         ),
         "exercise": (
-            "生成 Markdown 格式练习题，要求：\n"
+            "生成练习题 JSON 数组，要求：\n"
             "- 3-5 道题，覆盖概念理解、公式应用、场景判断\n"
-            "- 使用 Markdown 标题（### 题目 N）、列表、加粗等排版\n"
-            "- 每题包含：题目描述、选项（A/B/C/D）、正确答案、详细解析\n"
-            "- 初级难度以单选和判断为主，中高级加入简答和代码补全\n"
-            "- 正确答案需逻辑正确并用 **加粗** 标注，干扰项需有迷惑性\n"
-            "- 用 --- 分隔各题"
+            "- 严格输出 JSON 数组：[{\"question\", \"options\", \"answer\", \"explanation\"}, ...]\n"
+            "- question: 题目描述字符串\n"
+            "- options: 选项数组 [\"A. ...\", \"B. ...\", \"C. ...\", \"D. ...\"]\n"
+            "- answer: 正确答案字母 \"A\"/\"B\"/\"C\"/\"D\"\n"
+            "- explanation: 详细解析字符串\n"
+            "- 初级难度以单选为主，中高级加入简答（options 可为空数组）\n"
+            "- 正确答案需逻辑正确，干扰项需有迷惑性\n"
+            "- 不用 Markdown 标题，不要用 --- 分隔，必须是纯 JSON 数组"
         ),
         "code": (
             "生成完整可运行的 Python 代码示例，用 Markdown 代码块（```python...```）包裹，要求：\n"
@@ -86,7 +89,7 @@ class ResourceAgent(BaseAgent):
             "## 资源类型\n"
             "- document: 结构化 Markdown 讲解文档，含标题、定义、原理、示例。\n"
             "- mindmap: 嵌套 Markdown 列表（用 - 和缩进表示层级），前端用 markmap 渲染。\n"
-            "- exercise: Markdown 格式练习题，用标题、列表、加粗等排版，每题含题目、选项、答案和解析。\n"
+            "- exercise: JSON 数组字符串，格式 [{\"question\", \"options\", \"answer\", \"explanation\"}]，可直接 json.loads 解析。\n"
             "- code: 完整可运行的 Python 代码，用 Markdown 代码块（```python）包裹。\n"
             "- reading: 拓展阅读材料，含分级推荐文献、阅读顺序、拓展思考题。\n"
             "- ppt: 12-slide 讲稿大纲，每 slide 含标题、bullets、讲师备注。\n\n"
@@ -111,7 +114,7 @@ class ResourceAgent(BaseAgent):
             "6. 不生成违规、敏感或不安全的内容。\n\n"
             "## 输出格式\n"
             "严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}\n"
-            "content 字段为 Markdown 字符串（exercise 和 code 类型也使用 Markdown 格式排版）。"
+            "content 字段为 Markdown 字符串（exercise 类型为 JSON 数组字符串，code 类型使用 Markdown 代码块）。"
         )
 
     def _build_generate_prompt(
@@ -471,41 +474,60 @@ class ResourceAgent(BaseAgent):
             )
         elif rtype == "exercise":
             # 关卡感知的练习题：将关卡任务转化为具体题目
-            tasks_questions = ""
+            # 输出格式：JSON 数组字符串 [{"question","options","answer","explanation"}, ...]
+            exercises = [
+                {
+                    "question": f"关于 {topic}，以下说法正确的是？",
+                    "options": [
+                        f"A. {topic} 是机器学习领域的基础概念之一，应用广泛",
+                        f"B. {topic} 在实际项目中完全没有实用价值",
+                        f"C. 学习 {topic} 不需要任何前置知识，零基础即可深入",
+                        f"D. 以上说法都不正确",
+                    ],
+                    "answer": "A",
+                    "explanation": f"{topic} 是机器学习领域的重要基础概念，学习前建议具备相关数学和编程前置知识。B 选项过于绝对，C 选项不符合实际学习路径。",
+                },
+                {
+                    "question": f"请简述 {topic} 的核心思想，并说明其适用场景。",
+                    "options": [],
+                    "answer": f"{topic} 的核心思想是通过数据驱动的方式学习从输入到输出的映射关系。适用场景包括：预测分析、模式识别、自动化决策等。具体实现因算法类型而异，{level}阶段重点掌握基本原理和典型应用。",
+                    "explanation": f"理解{topic}的核心思想有助于在合适的场景中选择正确的算法。{level}阶段重在建立直觉理解，为进一步深入打下基础。",
+                },
+                {
+                    "question": f"在{level}阶段学习 {topic} 时，以下哪种做法最有助于理解和掌握？",
+                    "options": [
+                        "A. 先记住结论和公式，理解可以以后再说",
+                        "B. 从简单示例入手，手动推导一遍核心步骤，再扩展到复杂情况",
+                        "C. 直接阅读最新论文，从前沿研究倒推基础知识",
+                        "D. 只关注代码实现，理论推导不重要",
+                    ],
+                    "answer": "B",
+                    "explanation": f"学习{topic}的最佳路径是：先理解核心原理（通过简单示例手动推导），建立直觉，再逐步扩展。A 会导致理解不深，C 在{level}阶段可能难度过高，D 忽视了理论基础的重要性。",
+                },
+            ]
+
+            # 关卡感知：将关卡任务转化为额外题目
             if stage_info and isinstance(stage_info, dict):
                 stage_tasks = stage_info.get("tasks") or []
-                if stage_tasks:
-                    tasks_questions = "### 关卡任务练习\n\n"
-                    for i, t in enumerate(stage_tasks, 1):
-                        task_desc = t.get("task", "") if isinstance(t, dict) else str(t)
-                        resource_hint = t.get("resource_type", "") if isinstance(t, dict) else ""
-                        hint_note = f"（推荐资源类型: {resource_hint}）" if resource_hint else ""
-                        tasks_questions += (
-                            f"**关卡任务 {i}**：{task_desc} {hint_note}\n\n"
-                            f"> **📝 练习要求**：请根据上述任务描述完成练习。\n\n"
-                        )
-                    tasks_questions += "---\n\n"
-            return (
-                f"# {topic} 练习题（{level}）\n\n"
-                f"{stage_context}"
-                f"{tasks_questions}"
-                f"### 题目 1（单选）\n\n"
-                f"关于 {topic}，以下说法正确的是？\n\n"
-                f"A. {topic} 是 AI 领域的基础概念之一\n\n"
-                f"B. {topic} 完全不实用\n\n"
-                f"C. 学习 {topic} 不需要任何前置知识\n\n"
-                f"D. 以上都不对\n\n"
-                f"> **✅ 正确答案：A**\n>\n"
-                f"> **📖 解析：** {topic} 是重要基础概念，学习前建议具备相关前置知识。B 过于绝对，C 不符合实际。\n\n"
-                f"---\n\n"
-                f"### 题目 2（简答）\n\n"
-                f"请简述 {topic} 的核心思想。\n\n"
-                f"> **📝 参考答案：** （围绕核心概念展开，重点考察对核心原理的理解深度）\n\n"
-                f"---\n\n"
-                f"### 题目 3（应用）\n\n"
-                f"{topic} 在实际项目中如何应用？请举例说明。\n\n"
-                f"> **📝 参考答案：** （结合实际场景作答，考察理论联系实际的能力）\n"
-            )
+                for t in stage_tasks:
+                    task_desc = t.get("task", "") if isinstance(t, dict) else str(t)
+                    resource_hint = t.get("resource_type", "") if isinstance(t, dict) else ""
+                    exercises.append({
+                        "question": f"【关卡任务】{task_desc}",
+                        "options": (
+                            [
+                                f"A. 按步骤完成{resource_hint or '练习'}任务并记录关键过程",
+                                "B. 跳过此任务，直接进入下一阶段",
+                                "C. 大致浏览即可，不需要实际操作",
+                                "D. 等待老师给出完整答案",
+                            ]
+                            if resource_hint else []
+                        ),
+                        "answer": "A" if resource_hint else f"请根据关卡任务「{task_desc}」的要求，动手完成练习并记录关键步骤和结果。",
+                        "explanation": f"此练习对应关卡「{stage_info.get('title', '')}」的任务要求。动手实践是掌握{topic}的关键，建议完成后对照关卡目标（{stage_info.get('objectives', '')}）自查是否达标。",
+                    })
+
+            return json.dumps(exercises, ensure_ascii=False, indent=2)
         elif rtype == "code":
             func_name = topic.lower().replace(" ", "_").replace("-", "_")
             # 关卡感知：将关卡任务作为代码示例的场景说明

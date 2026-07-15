@@ -138,7 +138,7 @@ class ProfileAgent(BaseAgent):
         from safety.content_filter import check_safety
         filter_result = check_safety(message, context="profile_message")
         if not filter_result["safe"]:
-            return self._keyword_fallback(student_id, "请介绍你的学习情况", history or [])
+            return self._keyword_fallback(student_id, "请介绍你的学习情况", history or [], current_profile)
 
         user_prompt = self._build_user_prompt(message, history, current_profile)
 
@@ -168,7 +168,7 @@ class ProfileAgent(BaseAgent):
             pass  # fall through to fallback
 
         # 降级：关键字规则兜底
-        return self._keyword_fallback(student_id, message, history or [])
+        return self._keyword_fallback(student_id, message, history or [], current_profile)
 
     # ---- 流式：供 /api/profile/chat SSE 端点使用 ----
 
@@ -201,7 +201,7 @@ class ProfileAgent(BaseAgent):
                 full_response.append(chunk)
         except Exception as e:
             # 降级
-            result = self._keyword_fallback(student_id, message, history or [])
+            result = self._keyword_fallback(student_id, message, history or [], current_profile)
             reply = self._build_chat_reply(result)
             yield f'data: {{"type":"chat","content":{json.dumps(reply, ensure_ascii=False)}}}\n\n'
             profile_json = json.dumps(result, ensure_ascii=False)
@@ -228,7 +228,7 @@ class ProfileAgent(BaseAgent):
             yield f'data: {{"type":"profile_update","profile":{profile_json}}}\n\n'
         else:
             # 解析失败，用 fallback
-            result = self._keyword_fallback(student_id, message, history or [])
+            result = self._keyword_fallback(student_id, message, history or [], current_profile)
             reply = self._build_chat_reply(result)
             yield f'data: {{"type":"chat","content":{json.dumps(reply, ensure_ascii=False)}}}\n\n'
             profile_json = json.dumps(result, ensure_ascii=False)
@@ -347,21 +347,30 @@ class ProfileAgent(BaseAgent):
         student_id: str,
         message: str,
         history: List[str],
+        current_profile: Optional[Dict] = None,
     ) -> Dict:
         """
         关键字规则降级方案 —— LLM 不可用时的兜底逻辑。
 
-        保留 v0 的简单关键字匹配，保证基本可用性。
+        v2: 支持增量更新——如已有 current_profile，仅更新检测到变化的维度，
+        其余保持原值；weakness/interest 合并去重；completeness 不减。
         """
-        knowledge_level = "中级"
-        learning_goal = "掌握课程核心概念"
-        cognitive_style = "偏好图解与案例"
-        weaknesses: List[str] = []
-        interests: List[str] = []
-        pace_preference = "中速均衡型"
+        # ---- 从已有画像加载现有值（增量基础） ----
+        existing = (current_profile or {}).get("profile", current_profile or {})
+        if not isinstance(existing, dict):
+            existing = {}
+
+        knowledge_level = existing.get("knowledge_level", "中级")
+        learning_goal = existing.get("learning_goal", "掌握课程核心概念")
+        cognitive_style = existing.get("cognitive_style", "偏好图解与案例")
+        weaknesses: List[str] = list(existing.get("weakness") or [])
+        interests: List[str] = list(existing.get("interest") or [])
+        pace_preference = existing.get("pace_preference", "中速均衡型")
+        prev_completeness = existing.get("completeness", 0.0)
 
         msg = message.lower()
 
+        # ---- 关键字匹配：仅当明确检测到时覆盖 ----
         if "入门" in msg or "基础" in msg or "零基础" in msg:
             knowledge_level = "初级"
             learning_goal = "掌握基础概念与示例"
@@ -371,17 +380,41 @@ class ProfileAgent(BaseAgent):
             learning_goal = "完成实践项目"
             cognitive_style = "偏好动手和代码示例"
         if "数学" in msg or "推导" in msg or "公式" in msg:
-            weaknesses.append("数学推导")
+            w = "数学推导"
+            if w not in weaknesses:
+                weaknesses.append(w)
         if "概率" in msg or "统计" in msg:
-            weaknesses.append("概率与统计")
+            w = "概率与统计"
+            if w not in weaknesses:
+                weaknesses.append(w)
         if "代码" in msg or "编程" in msg:
-            interests.append("代码案例")
+            i = "代码案例"
+            if i not in interests:
+                interests.append(i)
         if "视频" in msg or "看" in msg:
             cognitive_style = "视觉型（偏好视频/图解）"
         if "快" in msg or "速成" in msg:
             pace_preference = "快速概览型"
         if "慢" in msg or "仔细" in msg:
             pace_preference = "慢速深入型"
+
+        # ---- 计算 completeness：基于维度信息覆盖率 ----
+        completeness = ProfileAgent._calc_completeness(
+            knowledge_level, learning_goal, cognitive_style,
+            weaknesses, interests, pace_preference,
+        )
+        # 保证 completeness 单调不减
+        if completeness < prev_completeness:
+            completeness = prev_completeness
+
+        # ---- next_questions：<0.85 最多 2 条，≥0.85 为空 ----
+        if completeness >= 0.85:
+            next_questions: List[str] = []
+        else:
+            next_questions = ProfileAgent._gen_next_questions(
+                knowledge_level, learning_goal, cognitive_style,
+                weaknesses, interests, pace_preference,
+            )
 
         return {
             "student_id": student_id,
@@ -394,12 +427,73 @@ class ProfileAgent(BaseAgent):
                 "interest": interests,
                 "pace_preference": pace_preference,
             },
-            "completeness": 0.5 if (weaknesses or interests) else 0.3,
+            "completeness": completeness,
             "confidence": 0.4,  # 规则匹配置信度低
             "sources": ["keyword_fallback"],
-            "next_questions": [
-                "你希望通过本课程达到什么目标？",
-                "你更偏好视频、图文还是动手代码示例？",
-                "你在学习中最容易卡住的地方是什么？",
-            ],
+            "next_questions": next_questions,
         }
+
+    @staticmethod
+    def _calc_completeness(
+        knowledge_level: str,
+        learning_goal: str,
+        cognitive_style: str,
+        weaknesses: List[str],
+        interests: List[str],
+        pace_preference: str,
+    ) -> float:
+        """基于各维度信息覆盖情况计算 completeness (0.0~1.0)。
+
+        评分逻辑：
+        - knowledge_level: 非默认（非"中级"）= +0.2
+        - learning_goal: 非默认（非"掌握课程核心概念"）= +0.2
+        - cognitive_style: 非默认（非"偏好图解与案例"）= +0.15
+        - weakness: 有内容 = +0.15
+        - interest: 有内容 = +0.15
+        - pace_preference: 非默认（非"中速均衡型"）= +0.15
+        上限 0.92，最小值 0.2
+        """
+        score = 0.2  # base: 至少有一定信息
+
+        if knowledge_level and knowledge_level != "中级":
+            score += 0.2
+        if learning_goal and learning_goal != "掌握课程核心概念":
+            score += 0.2
+        if cognitive_style and cognitive_style != "偏好图解与案例":
+            score += 0.15
+        if weaknesses:
+            score += 0.15
+        if interests:
+            score += 0.15
+        if pace_preference and pace_preference != "中速均衡型":
+            score += 0.15
+
+        return min(score, 0.92)
+
+    @staticmethod
+    def _gen_next_questions(
+        knowledge_level: str,
+        learning_goal: str,
+        cognitive_style: str,
+        weaknesses: List[str],
+        interests: List[str],
+        pace_preference: str,
+    ) -> List[str]:
+        """生成追问列表：优先询问最缺的维度，最多 2 条。
+
+        优先级：薄弱点 > 学习目标 > 认知风格 > 兴趣 > 学习节奏
+        """
+        questions: List[str] = []
+
+        if not weaknesses:
+            questions.append("你在学习中最容易卡住的地方是什么？（比如数学推导、代码实现等）")
+        if not learning_goal or learning_goal == "掌握课程核心概念":
+            questions.append("你希望通过本课程达到什么具体目标？")
+        if len(questions) < 2 and (
+            not cognitive_style or cognitive_style == "偏好图解与案例"
+        ):
+            questions.append("你更偏好视频讲解、图文教程还是动手代码示例？")
+        if len(questions) < 2 and not interests:
+            questions.append("你对哪些技术方向比较感兴趣？")
+
+        return questions[:2]

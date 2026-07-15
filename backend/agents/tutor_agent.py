@@ -354,7 +354,31 @@ class TutorAgent(BaseAgent):
         }
 
         answer = templates.get(style, templates["analogy"])
-        refs = context if context else ["建议参考课程指定教材相关章节"]
+
+        # 构建 references（格式: [{title, source, content, similarity}]）
+        if context and isinstance(context, list) and len(context) > 0:
+            # context 可能是 dict 列表（RAG 结果）或纯文本列表
+            if isinstance(context[0], dict):
+                refs = context
+            else:
+                refs = [
+                    {
+                        "title": "相关知识点参考",
+                        "source": "知识库",
+                        "content": str(c)[:200],
+                        "similarity": 0.7,
+                    }
+                    for c in context[:3]
+                ]
+        else:
+            refs = [
+                {
+                    "title": "建议参考课程指定教材相关章节",
+                    "source": "教材",
+                    "content": "当前知识库中暂无与问题相关的检索结果。建议参考课程指定教材，或换个方式描述问题后重新提问。",
+                    "similarity": 0.0,
+                }
+            ]
 
         diagrams = []
         if style == "visual":
