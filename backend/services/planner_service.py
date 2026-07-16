@@ -176,6 +176,21 @@ class PlannerService:
                 except (json.JSONDecodeError, KeyError) as e:
                     logger.warning(f"解析路径 data 事件失败: {e}")
 
+            # 检测 data 事件以便持久化
+            if '"type":"data"' in event:
+                try:
+                    prefix = "data: "
+                    json_str = event.strip()
+                    if json_str.startswith(prefix):
+                        json_str = json_str[len(prefix):]
+                    payload = json.loads(json_str)
+                    path_data = payload.get("data", {})
+                    if path_data and path_data.get("stages"):
+                        self.save_path(db, student_id, path_data)
+                        logger.info(f"路径已自动持久化: student={student_id}")
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.warning(f"解析路径 data 事件失败: {e}")
+
     # ── 非流式路径生成（供编排器使用） ───────────────────────────
 
     async def build_path(

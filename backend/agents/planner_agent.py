@@ -18,7 +18,10 @@ PlannerAgent —— 学习路径规划智能体
 """
 import json
 import asyncio
+import logging
 from typing import Optional, List, Dict
+
+logger = logging.getLogger(__name__)
 
 from .base_agent import BaseAgent
 
@@ -28,6 +31,71 @@ class PlannerAgent(BaseAgent):
 
     def __init__(self, llm_client=None):
         super().__init__(llm_client)
+
+    async def chat(
+        self,
+        student_id: str,
+        profile: dict,
+        goal: Optional[str] = None,
+        current_path: Optional[dict] = None,
+    ):
+        """
+        流式生成学习路径（SSE 事件流）。
+
+        产出:
+            data: {"type":"delta","content":"..."}
+            data: {"type":"data","data":{...}}
+            data: {"type":"done"}
+        """
+        try:
+            raw = await self.generate_plan(
+                profile=profile,
+                goal_override=goal,
+            )
+            parsed = self._parse_plan_json(raw)
+            if parsed:
+                data_json = json.dumps(parsed, ensure_ascii=False)
+                yield f'data: {{"type":"data","data":{data_json}}}\n\n'
+            else:
+                yield f'data: {{"type":"error","code":"PLANNER_PARSE_FAILED","message":"路径生成结果解析失败"}}\n\n'
+        except Exception as e:
+            logger.error(f"PlannerAgent.chat 失败: {e}")
+            yield f'data: {{"type":"error","code":"PLANNER_GENERATE_FAILED","message":"学习路径生成失败: {str(e)}"}}\n\n'
+        yield 'data: {"type":"done"}\n\n'
+
+    def _parse_plan_json(self, raw: str) -> Optional[dict]:
+        """从 LLM 输出中提取学习路径 JSON"""
+        import re
+
+        # 1. 尝试直接解析
+        try:
+            data = json.loads(raw)
+            if "stages" in data:
+                return data
+        except json.JSONDecodeError:
+            pass
+
+        # 2. 尝试从 markdown 代码块中提取
+        match = re.search(r'```(?:json)?\s*\n?(.*?)```', raw, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group(1).strip())
+                if "stages" in data:
+                    return data
+            except json.JSONDecodeError:
+                pass
+
+        # 3. 尝试从文本中提取 JSON 对象（{...}）
+        match = re.search(r'\{[\s\S]*"stages"[\s\S]*\}', raw)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+                if "stages" in data:
+                    return data
+            except json.JSONDecodeError:
+                pass
+
+        return None
 
     def get_system_prompt(self) -> str:
         return (
@@ -84,7 +152,11 @@ class PlannerAgent(BaseAgent):
                 chunks = []
                 async for chunk in self.call_llm(user_prompt):
                     chunks.append(chunk)
-                return "".join(chunks)
+                raw = "".join(chunks)
+                # 检查 LLM 是否返回了有效的 JSON 路径
+                if self._parse_plan_json(raw):
+                    return raw
+                logger.warning(f"LLM 未返回有效 JSON 路径，使用规则化兜底")
             except Exception:
                 pass  # fall through to rule-based
 

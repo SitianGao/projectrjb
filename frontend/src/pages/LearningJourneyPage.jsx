@@ -327,7 +327,7 @@ export default function LearningJourneyPage() {
         ? getLearningPathById(STUDENT_ID, pathId).catch(() => null)
         : getLearningPath(STUDENT_ID).catch(() => null)
 
-      const [path, resList, evalReport, feed, wrongBook] = await Promise.all([
+      const [path, resList, evalReport] = await Promise.all([
         pathPromise,
         getResources({ student_id: STUDENT_ID, page_size: 100 }).catch(() => null),
         getEvaluation(STUDENT_ID).catch(() => null),
@@ -497,7 +497,7 @@ export default function LearningJourneyPage() {
           <Button
             type="text"
             icon={<LeftOutlined />}
-            onClick={() => navigate('/profile', { state: { startChat: true } })}
+            onClick={() => navigate('/', { state: { startChat: true } })}
             style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1 }}
           >
             返回主页
@@ -510,7 +510,7 @@ export default function LearningJourneyPage() {
           <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
             <Space wrap>
               <Button icon={<InboxOutlined />} onClick={() => navigate('/wrong-book')}>
-                错题本{wrongBookCount > 0 ? `（${wrongBookCount}）` : ''}
+                错题本
               </Button>
             </Space>
           </div>

@@ -9,8 +9,6 @@ import {
   computeStageDifficulty,
   DIFFICULTY_LABELS,
   getStageStatusColors,
-  normalizeStringList,
-  normalizeTasks,
 } from '../utils/stageUtils'
 
 /**

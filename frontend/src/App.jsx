@@ -88,7 +88,7 @@ function AuthLayout() {
       {/* 顶部导航栏 */}
       <div className="top-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <Text strong style={{ color: 'var(--text-primary)', fontSize: 18, cursor: 'pointer' }} onClick={() => navigate('/')}>
+          <Text strong style={{ color: 'var(--text-primary)', fontSize: 18, cursor: 'pointer' }} onClick={() => navigate('/', { state: { startChat: true } })}>
             🤖 智能学习平台
           </Text>
           <span
