@@ -56,9 +56,9 @@ const DIFFICULTY_COLORS = {
 }
 
 const STATUS_CONFIG = {
-  completed: { icon: CheckCircleFilled, color: '#52c41a', label: '已完成' },
-  in_progress: { icon: PlayCircleFilled, color: '#1677ff', label: '进行中' },
-  locked: { icon: LockFilled, color: '#d9d9d9', label: '未解锁' },
+  completed: { icon: CheckCircleFilled, color: 'var(--stage-completed)', label: '已完成', tagColor: 'green' },
+  in_progress: { icon: PlayCircleFilled, color: 'var(--stage-inprogress)', label: '进行中', tagColor: 'processing' },
+  locked: { icon: LockFilled, color: 'var(--stage-locked-dot)', label: '未解锁', tagColor: 'default' },
 }
 
 export default function StageResourcePage() {
@@ -256,7 +256,7 @@ export default function StageResourcePage() {
                 <Title level={3} style={{ margin: 0 }}>
                   第{stage.stage_id}阶段：{stage.title}
                 </Title>
-                <Tag icon={<StatusIcon />} color={statusCfg.color}>{statusCfg.label}</Tag>
+                <Tag icon={<StatusIcon />} color={statusCfg.tagColor}>{statusCfg.label}</Tag>
               </Space>
               {stage.description && (
                 <Paragraph type="secondary" style={{ margin: '8px 0 0', fontSize: 14, lineHeight: 1.7 }}>
@@ -273,7 +273,7 @@ export default function StageResourcePage() {
               </div>
               <div style={{ textAlign: 'center' }}>
                 <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>匹配资源</Text>
-                <Text strong style={{ fontSize: 20, color: '#1677ff' }}>
+                <Text strong style={{ fontSize: 20, color: 'var(--color-primary)' }}>
                   {matchedResources.length}
                 </Text>
               </div>
@@ -281,7 +281,7 @@ export default function StageResourcePage() {
                 type="circle"
                 percent={stageTotal > 0 ? Math.round((stageCompleted / stageTotal) * 100) : 0}
                 size={56}
-                strokeColor={{ '0%': '#1677ff', '100%': '#52c41a' }}
+                strokeColor={{ '0%': 'var(--color-primary)', '100%': 'var(--color-success)' }}
               />
             </Space>
           </div>
@@ -309,7 +309,7 @@ export default function StageResourcePage() {
                 title="学习任务"
                 value={stageTotal}
                 suffix="项"
-                prefix={<UnorderedListOutlined style={{ color: '#1677ff' }} />}
+                prefix={<UnorderedListOutlined style={{ color: 'var(--color-primary)' }} />}
                 valueStyle={{ fontSize: 20 }}
               />
             </Col>
@@ -318,7 +318,7 @@ export default function StageResourcePage() {
                 title="预计天数"
                 value={stageDays}
                 suffix="天"
-                prefix={<ClockCircleOutlined style={{ color: '#fa8c16' }} />}
+                prefix={<ClockCircleOutlined style={{ color: 'var(--color-warning)' }} />}
                 valueStyle={{ fontSize: 20 }}
               />
             </Col>
@@ -327,7 +327,7 @@ export default function StageResourcePage() {
                 title="已完成"
                 value={stageCompleted}
                 suffix={`/ ${stageTotal}`}
-                prefix={<TrophyOutlined style={{ color: '#52c41a' }} />}
+                prefix={<TrophyOutlined style={{ color: 'var(--color-success)' }} />}
                 valueStyle={{ fontSize: 20 }}
               />
             </Col>
@@ -336,7 +336,7 @@ export default function StageResourcePage() {
                 title="匹配资源"
                 value={matchedResources.length}
                 suffix="个"
-                prefix={<BookOutlined style={{ color: '#722ed1' }} />}
+                prefix={<BookOutlined style={{ color: 'var(--color-purple)' }} />}
                 valueStyle={{ fontSize: 20 }}
               />
             </Col>
@@ -365,8 +365,8 @@ export default function StageResourcePage() {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '8px 14px', borderRadius: 8,
-                      background: isCompleted ? '#f6ffed' : 'var(--surface-secondary)',
-                      border: `1px solid ${isCompleted ? '#b7eb8f' : 'var(--border)'}`,
+                      background: isCompleted ? 'var(--stage-completed-bg)' : 'var(--surface-secondary)',
+                      border: `1px solid ${isCompleted ? 'var(--stage-completed-border)' : 'var(--border)'}`,
                       opacity: isCompleted ? 0.85 : 1,
                     }}
                   >
@@ -374,7 +374,7 @@ export default function StageResourcePage() {
                     <span style={{
                       flex: 1, fontSize: 14,
                       textDecoration: isCompleted ? 'line-through' : 'none',
-                      color: isCompleted ? '#999' : 'var(--text-primary)',
+                      color: isCompleted ? 'var(--color-text-disabled)' : 'var(--text-primary)',
                     }}>
                       {task.description}
                     </span>
@@ -384,7 +384,7 @@ export default function StageResourcePage() {
                         ⏱ {task.estimated_hours}h
                       </Text>
                     )}
-                    {isCompleted && <CheckCircleFilled style={{ color: '#52c41a', fontSize: 14 }} />}
+                    {isCompleted && <CheckCircleFilled style={{ color: 'var(--color-success)', fontSize: 14 }} />}
                   </div>
                 )
               })}
@@ -393,7 +393,7 @@ export default function StageResourcePage() {
               <Progress
                 percent={Math.round((stageCompleted / stageTotal) * 100)}
                 style={{ marginTop: 12 }}
-                strokeColor={stageCompleted === stageTotal ? '#52c41a' : '#1677ff'}
+                strokeColor={stageCompleted === stageTotal ? 'var(--color-success)' : 'var(--color-primary)'}
               />
             )}
           </Card>

@@ -58,9 +58,21 @@ export function computeStageDifficulty(stage) {
 /** 难度数值 → 文本映射 */
 export const DIFFICULTY_LABELS = { 1: '初级', 2: '中级', 3: '高级', 4: '专家' }
 
-/** 阶段状态颜色配置 */
-export const STAGE_STATUS_COLORS = {
-  completed: { fill: '#52c41a', border: '#389e0d', glow: 'rgba(82,196,26,0.3)' },
-  in_progress: { fill: '#1677ff', border: '#0958d9', glow: 'rgba(22,119,255,0.4)' },
-  locked: { fill: '#d9d9d9', border: '#bfbfbf', glow: 'rgba(217,217,217,0.2)' },
+/** 阶段状态颜色配置（支持深色模式） */
+export function getStageStatusColors(isDark = false) {
+  if (isDark) {
+    return {
+      completed: { fill: '#73d13d', border: '#52c41a', glow: 'rgba(115,209,61,0.3)' },
+      in_progress: { fill: '#4dabff', border: '#2989e8', glow: 'rgba(77,171,255,0.4)' },
+      locked: { fill: '#555', border: '#444', glow: 'rgba(85,85,85,0.2)' },
+    }
+  }
+  return {
+    completed: { fill: '#52c41a', border: '#389e0d', glow: 'rgba(82,196,26,0.3)' },
+    in_progress: { fill: '#1677ff', border: '#0958d9', glow: 'rgba(22,119,255,0.4)' },
+    locked: { fill: '#d9d9d9', border: '#bfbfbf', glow: 'rgba(217,217,217,0.2)' },
+  }
 }
+
+// 向后兼容的别名
+export const STAGE_STATUS_COLORS = getStageStatusColors()

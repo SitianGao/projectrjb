@@ -60,26 +60,44 @@ class PlannerService:
         )
         return [self._path_to_dict(p) for p in paths]
 
+    def get_path_by_id(self, db: Session, student_id: str, path_id: str) -> Optional[Dict]:
+        """获取指定的学习路径。"""
+        path = (
+            db.query(LearningPath)
+            .filter(
+                LearningPath.id == path_id,
+                LearningPath.student_id == student_id,
+            )
+            .first()
+        )
+        if not path:
+            return None
+        return self._path_to_dict(path)
+
+    def delete_path(self, db: Session, student_id: str, path_id: str) -> bool:
+        """删除指定的学习路径。"""
+        path = (
+            db.query(LearningPath)
+            .filter(
+                LearningPath.id == path_id,
+                LearningPath.student_id == student_id,
+            )
+            .first()
+        )
+        if not path:
+            return False
+        db.delete(path)
+        db.commit()
+        logger.info(f"学习路径已删除: student={student_id} path={path_id}")
+        return True
+
     def save_path(
         self,
         db: Session,
         student_id: str,
         path_data: Dict,
     ) -> LearningPath:
-        """保存新的学习路径版本。旧 active 路径标记为 superseded。"""
-        # 将旧 active 路径标记为 superseded
-        old_active = (
-            db.query(LearningPath)
-            .filter(
-                LearningPath.student_id == student_id,
-                LearningPath.status == "active",
-            )
-            .order_by(LearningPath.version.desc())
-            .all()
-        )
-        for old in old_active:
-            old.status = "superseded"
-
+        """保存新的学习路径版本。所有路径保持 active，可手动删除。"""
         # 确定新版本号
         latest = (
             db.query(LearningPath)

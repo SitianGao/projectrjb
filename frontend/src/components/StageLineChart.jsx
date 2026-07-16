@@ -8,7 +8,9 @@ import {
   computeStageDays,
   computeStageDifficulty,
   DIFFICULTY_LABELS,
-  STAGE_STATUS_COLORS,
+  getStageStatusColors,
+  normalizeStringList,
+  normalizeTasks,
 } from '../utils/stageUtils'
 
 /**
@@ -73,7 +75,7 @@ export default function StageLineChart({
 
     const seriesData = stages.map((s, idx) => {
       const status = getStageStatus(s, currentStage)
-      const colors = STAGE_STATUS_COLORS[status]
+      const colors = getStageStatusColors(isDark)[status]
       return {
         value: yData[idx],
         symbol: 'circle',
@@ -90,7 +92,7 @@ export default function StageLineChart({
           position: 'top',
           distance: 14,
           fontSize: 11,
-          color: status === 'locked' ? '#bfbfbf' : (isDark ? '#ddd' : '#333'),
+          color: status === 'locked' ? (isDark ? '#555' : '#bfbfbf') : (isDark ? '#ddd' : '#333'),
           fontWeight: status === 'in_progress' ? 700 : 400,
           formatter: xData[idx],
         },

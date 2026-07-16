@@ -25,6 +25,7 @@ import MarkdownRenderer from '../components/MarkdownRenderer'
 import PathTimeline from '../components/PathTimeline'
 import ForgettingCurve from '../components/ForgettingCurve'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import MyCourses from '../components/MyCourses'
 import { useChat, PHASE } from '../hooks/useChat'
 import { startProfileChat, getProfile } from '../api/profile'
 import { getResources } from '../api/resource'
@@ -711,7 +712,7 @@ export default function ProfilePage() {
           {/* 项目标题 */}
           <div style={{ textAlign: 'center', marginBottom: 12 }}>
             <Title level={2} style={{ margin: 0, fontWeight: 700, background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: 2 }}>
-              🤖 智能学习平台
+              智能学习平台
             </Title>
             <Text type="secondary" style={{ fontSize: 14 }}>个性化 AI 学习助手</Text>
           </div>
@@ -746,6 +747,16 @@ export default function ProfilePage() {
               onStartJourney={handleStartJourney}
               isStartingJourney={isStartingJourney}
             />
+          </div>
+
+          {/* 我的课程栏目 */}
+          <div style={{
+            maxWidth: 1060,
+            margin: '24px auto 0',
+            width: '100%',
+            padding: '0 24px 24px',
+          }}>
+            <MyCourses studentId="demo-student-01" />
           </div>
 
     </div>

@@ -29,6 +29,25 @@
   --msg-user-bg: linear-gradient(135deg, #e6f4ff 0%, #f0f8ff 100%);
   --msg-user-border: rgba(22,119,255,0.12);
   --scrollbar-thumb: #c1c1c1;
+  /* ── 阶段状态色 ── */
+  --stage-completed: #52c41a;
+  --stage-completed-bg: #f6ffed;
+  --stage-completed-border: #b7eb8f;
+  --stage-inprogress: #1677ff;
+  --stage-inprogress-bg: #e6f4ff;
+  --stage-inprogress-border: rgba(22,119,255,0.19);
+  --stage-inprogress-glow: rgba(22,119,255,0.19);
+  --stage-locked: #bfbfbf;
+  --stage-locked-bg: #fafafa;
+  --stage-locked-dot: #d9d9d9;
+  /* ── 功能色 ── */
+  --color-success: #52c41a;
+  --color-primary: #1677ff;
+  --color-warning: #fa8c16;
+  --color-danger: #ff4d4f;
+  --color-pink: #eb2f96;
+  --color-purple: #722ed1;
+  --color-text-disabled: #999;
 }
 
 [data-theme='dark'] {
@@ -60,6 +79,25 @@
   --msg-user-bg: linear-gradient(135deg, rgba(22,119,255,0.1) 0%, rgba(22,119,255,0.04) 100%);
   --msg-user-border: rgba(22,119,255,0.15);
   --scrollbar-thumb: rgba(255,255,255,0.2);
+  /* ── 阶段状态色 ── */
+  --stage-completed: #73d13d;
+  --stage-completed-bg: rgba(82,196,26,0.1);
+  --stage-completed-border: rgba(82,196,26,0.2);
+  --stage-inprogress: #4dabff;
+  --stage-inprogress-bg: rgba(22,119,255,0.1);
+  --stage-inprogress-border: rgba(77,171,255,0.2);
+  --stage-inprogress-glow: rgba(77,171,255,0.2);
+  --stage-locked: #555;
+  --stage-locked-bg: rgba(255,255,255,0.02);
+  --stage-locked-dot: #444;
+  /* ── 功能色 ── */
+  --color-success: #73d13d;
+  --color-primary: #4dabff;
+  --color-warning: #ffc069;
+  --color-danger: #ff7875;
+  --color-pink: #ff85c0;
+  --color-purple: #b37feb;
+  --color-text-disabled: rgba(255,255,255,0.3);
   /* ── 阴影 ── */
   --shadow: rgba(0,0,0,0.45) 0 10px 15px -3px, rgba(0,0,0,0.3) 0 4px 6px -2px;
 }

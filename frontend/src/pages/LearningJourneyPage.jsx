@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Typography, Card, Tag, Progress, Button, Modal, Space, Row, Col,
   Statistic, Result, Empty, Tooltip, Badge, Collapse, List, Divider, message,
@@ -7,11 +8,8 @@ import {
   CheckCircleFilled,
   PlayCircleFilled,
   LockFilled,
-  TrophyOutlined,
   ClockCircleOutlined,
   BookOutlined,
-  ThunderboltOutlined,
-  FireOutlined,
   ReloadOutlined,
   ExpandOutlined,
   FileTextOutlined,
@@ -27,10 +25,13 @@ import {
   CaretRightOutlined,
   WarningFilled,
   CheckCircleOutlined,
+  InboxOutlined,
+  LeftOutlined,
 } from '@ant-design/icons'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import LoadingSkeleton from '../components/LoadingSkeleton'
-import { getLearningPath } from '../api/planner'
+import StageLineChart from '../components/StageLineChart'
+import { getLearningPath, getLearningPathById } from '../api/planner'
 import { getResources, getResource } from '../api/resource'
 import { getEvaluation } from '../api/evaluate'
 import { shouldUseMock } from '../utils/useMock'
@@ -46,16 +47,19 @@ const STUDENT_ID = 'demo-student-01'
 
 const STATUS_CONFIG = {
   completed: {
-    icon: CheckCircleFilled, color: '#52c41a', bg: '#f6ffed',
-    label: '已完成', dot: '#52c41a',
+    icon: CheckCircleFilled, color: 'var(--stage-completed)', bg: 'var(--stage-completed-bg)',
+    label: '已完成', dot: 'var(--stage-completed)',
+    tagColor: 'green', glow: 'none',
   },
   in_progress: {
-    icon: PlayCircleFilled, color: '#1677ff', bg: '#e6f4ff',
-    label: '进行中', dot: '#1677ff', pulse: true,
+    icon: PlayCircleFilled, color: 'var(--stage-inprogress)', bg: 'var(--stage-inprogress-bg)',
+    label: '进行中', dot: 'var(--stage-inprogress)', pulse: true,
+    tagColor: 'processing', glow: '0 0 0 4px var(--stage-inprogress-glow)',
   },
   locked: {
-    icon: LockFilled, color: '#d9d9d9', bg: '#fafafa',
-    label: '未解锁', dot: '#bfbfbf',
+    icon: LockFilled, color: 'var(--stage-locked-dot)', bg: 'var(--stage-locked-bg)',
+    label: '未解锁', dot: 'var(--stage-locked)',
+    tagColor: 'default', glow: 'none',
   },
 }
 
@@ -68,9 +72,9 @@ const TYPE_CONFIG = {
 }
 
 const URGENCY_CONFIG = {
-  high: { color: 'red', label: '高优先', icon: <WarningFilled /> },
-  medium: { color: 'orange', label: '中优先', icon: <ClockCircleOutlined /> },
-  low: { color: 'blue', label: '低优先', icon: <CheckCircleOutlined /> },
+  high: { color: 'var(--color-danger)', label: '高优先', icon: <WarningFilled />, tagColor: 'red' },
+  medium: { color: 'var(--color-warning)', label: '中优先', icon: <ClockCircleOutlined />, tagColor: 'orange' },
+  low: { color: 'var(--color-primary)', label: '低优先', icon: <CheckCircleOutlined />, tagColor: 'blue' },
 }
 
 const TASK_TYPE_ICONS = {
@@ -281,6 +285,13 @@ function ResourceDetailModal({ resource, visible, onClose, onRetry, onComplete, 
 // ══════════════════════════════════════════════════════════════
 
 export default function LearningJourneyPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // 从 URL 查询参数获取 pathId
+  const searchParams = new URLSearchParams(location.search)
+  const pathId = searchParams.get('pathId')
+
   // ── 数据状态 ──
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -304,15 +315,20 @@ export default function LearningJourneyPage() {
   // ── 首次加载：并行读取路径、资源、评估报告 ──
   useEffect(() => {
     loadAllData()
-  }, [])
+  }, [pathId])
 
   async function loadAllData() {
     setLoading(true)
     setError(null)
 
     try {
-      const [path, resList, evalReport] = await Promise.all([
-        getLearningPath(STUDENT_ID).catch(() => null),
+      // 如果有 pathId，加载指定路径；否则加载当前活跃路径
+      const pathPromise = pathId
+        ? getLearningPathById(STUDENT_ID, pathId).catch(() => null)
+        : getLearningPath(STUDENT_ID).catch(() => null)
+
+      const [path, resList, evalReport, feed, wrongBook] = await Promise.all([
+        pathPromise,
         getResources({ student_id: STUDENT_ID, page_size: 100 }).catch(() => null),
         getEvaluation(STUDENT_ID).catch(() => null),
       ])
@@ -477,72 +493,55 @@ export default function LearningJourneyPage() {
     <div style={{ height: '100%', overflow: 'auto', background: 'var(--bg-page)', padding: '20px 24px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         {/* ═══ 页面标题 ═══ */}
-        <div style={{ marginBottom: 20 }}>
-          <Title level={3} style={{ margin: 0 }}>
-            🗺️ 学习旅程
-          </Title>
-          {pathData?.goal && (
-            <Text type="secondary" style={{ fontSize: 14 }}>
-              目标：{pathData.goal}
-            </Text>
-          )}
+        <div style={{ marginBottom: 20, position: 'relative' }}>
+          <Button
+            type="text"
+            icon={<LeftOutlined />}
+            onClick={() => navigate('/profile', { state: { startChat: true } })}
+            style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 1 }}
+          >
+            返回主页
+          </Button>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Title level={3} style={{ margin: 0 }}>
+              🗺️ {pathData?.goal || '闯关学习旅程'}
+            </Title>
+          </div>
+          <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
+            <Space wrap>
+              <Button icon={<InboxOutlined />} onClick={() => navigate('/wrong-book')}>
+                错题本{wrongBookCount > 0 ? `（${wrongBookCount}）` : ''}
+              </Button>
+            </Space>
+          </div>
         </div>
 
-        {/* ═══ 统计卡片 ═══ */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          <Col xs={12} sm={6}>
-            <Card size="small" style={{ borderRadius: 10 }}>
-              <Statistic
-                title="综合评分"
-                value={overallScore}
-                suffix="分"
-                prefix={<TrophyOutlined style={{ color: '#1677ff' }} />}
-                valueStyle={{ color: overallScore >= 80 ? '#52c41a' : overallScore >= 60 ? '#fa8c16' : '#ff4d4f' }}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small" style={{ borderRadius: 10 }}>
-              <Statistic
-                title="学习阶段"
-                value={stages.length}
-                prefix={<BookOutlined style={{ color: '#1677ff' }} />}
-                suffix="个"
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small" style={{ borderRadius: 10 }}>
-              <Statistic
-                title="完成任务"
-                value={completedTasks}
-                suffix={<Text type="secondary" style={{ fontSize: 14 }}>/ {totalTasks}</Text>}
-                prefix={<ThunderboltOutlined style={{ color: '#52c41a' }} />}
-              />
-            </Card>
-          </Col>
-          <Col xs={12} sm={6}>
-            <Card size="small" style={{ borderRadius: 10 }}>
-              <Statistic
-                title="连续学习"
-                value={streakDays}
-                suffix="天"
-                prefix={<FireOutlined style={{ color: '#eb2f96' }} />}
-              />
-            </Card>
-          </Col>
-        </Row>
+        {/* ═══ 折线式闯关路径：每个拐点是一关 ═══ */}
+        <Card
+          title={<Text strong style={{ fontSize: 16 }}>📈 折线闯关路径</Text>}
+          style={{ borderRadius: 12, marginBottom: 24 }}
+          styles={{ body: { padding: '12px 16px 0' } }}
+        >
+          <StageLineChart
+            stages={stages}
+            currentStage={currentStage}
+            height={360}
+            onStageClick={(stage) => navigate(`/stage/${stage.stage_id}/resources`, {
+              state: { stage, pathId: pathData?.id, pathData },
+            })}
+          />
+        </Card>
 
         {/* ═══ 当前阶段进度 ═══ */}
         {currentStageData && (
           <Card
-            style={{ marginBottom: 24, borderRadius: 12, border: '1px solid #1677ff30' }}
+            style={{ marginBottom: 24, borderRadius: 12, border: '1px solid var(--stage-inprogress-border)' }}
             styles={{ body: { padding: '20px 24px' } }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <Space size={8}>
-                  <FlagFilled style={{ color: '#1677ff' }} />
+                  <FlagFilled style={{ color: 'var(--stage-inprogress)' }} />
                   <Text strong style={{ fontSize: 16 }}>
                     当前阶段：{currentStageData.title}
                   </Text>
@@ -561,7 +560,7 @@ export default function LearningJourneyPage() {
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>匹配资源</Text>
-                  <Text strong style={{ fontSize: 18, color: '#1677ff' }}>
+                  <Text strong style={{ fontSize: 18, color: 'var(--color-primary)' }}>
                     {currentStageResources.length}
                   </Text>
                 </div>
@@ -569,7 +568,7 @@ export default function LearningJourneyPage() {
                   type="circle"
                   percent={currentStageTotal > 0 ? Math.round((currentStageCompleted / currentStageTotal) * 100) : 0}
                   size={52}
-                  strokeColor={{ '0%': '#1677ff', '100%': '#52c41a' }}
+                  strokeColor={{ '0%': 'var(--color-primary)', '100%': 'var(--color-success)' }}
                 />
               </Space>
             </div>
@@ -609,19 +608,19 @@ export default function LearningJourneyPage() {
                               width: 32, height: 32, borderRadius: '50%',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               background: cfg.dot,
-                              boxShadow: status === 'in_progress' ? `0 0 0 4px ${cfg.color}30` : 'none',
+                              boxShadow: cfg.glow,
                               transition: 'box-shadow 0.3s',
                             }}
                           >
                             <Icon style={{
                               fontSize: 14,
-                              color: status === 'locked' ? '#bfbfbf' : '#fff',
+                              color: status === 'locked' ? 'var(--stage-locked)' : '#fff',
                             }} />
                           </div>
                           {!isLast && (
                             <div style={{
                               flex: 1, width: 2, minHeight: 24,
-                              background: status === 'completed' ? '#52c41a' : 'var(--border)',
+                              background: status === 'completed' ? 'var(--stage-completed)' : 'var(--border)',
                               margin: '4px 0',
                             }} />
                           )}
@@ -653,7 +652,7 @@ export default function LearningJourneyPage() {
                                   <Text strong style={{ fontSize: 15, color: status === 'locked' ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                                     第{stage.stage_id}阶段：{stage.title}
                                   </Text>
-                                  <Tag color={cfg.color}>{cfg.label}</Tag>
+                                  <Tag color={cfg.tagColor}>{cfg.label}</Tag>
                                 </Space>
                                 <Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 13 }}>
                                   {stage.description}
@@ -722,8 +721,8 @@ export default function LearningJourneyPage() {
                                             style={{
                                               display: 'flex', alignItems: 'center', gap: 8,
                                               padding: '5px 10px', borderRadius: 6,
-                                              background: isCompleted ? '#f6ffed' : 'var(--surface-secondary)',
-                                              border: `1px solid ${isCompleted ? '#b7eb8f' : 'var(--border)'}`,
+                                              background: isCompleted ? 'var(--stage-completed-bg)' : 'var(--surface-secondary)',
+                                              border: `1px solid ${isCompleted ? 'var(--stage-completed-border)' : 'var(--border)'}`,
                                               fontSize: 13,
                                               opacity: isCompleted ? 0.85 : 1,
                                             }}
@@ -732,7 +731,7 @@ export default function LearningJourneyPage() {
                                             <span style={{
                                               flex: 1,
                                               textDecoration: isCompleted ? 'line-through' : 'none',
-                                              color: isCompleted ? '#999' : 'var(--text-primary)',
+                                              color: isCompleted ? 'var(--color-text-disabled)' : 'var(--text-primary)',
                                             }}>
                                               {task.description}
                                             </span>
@@ -742,7 +741,7 @@ export default function LearningJourneyPage() {
                                                 ⏱ {task.estimated_hours}h
                                               </Text>
                                             )}
-                                            {isCompleted && <CheckCircleFilled style={{ color: '#52c41a', fontSize: 12 }} />}
+                                            {isCompleted && <CheckCircleFilled style={{ color: 'var(--color-success)', fontSize: 12 }} />}
                                           </div>
                                         )
                                       })}
@@ -752,7 +751,7 @@ export default function LearningJourneyPage() {
                                         percent={Math.round((stageCompleted / stageTotal) * 100)}
                                         size="small"
                                         style={{ marginTop: 8 }}
-                                        strokeColor={stageCompleted === stageTotal ? '#52c41a' : '#1677ff'}
+                                        strokeColor={stageCompleted === stageTotal ? 'var(--color-success)' : 'var(--color-primary)'}
                                       />
                                     )}
                                   </div>
@@ -779,7 +778,7 @@ export default function LearningJourneyPage() {
                                               display: 'flex', alignItems: 'center', gap: 8,
                                               padding: '6px 10px', borderRadius: 6,
                                               background: 'var(--surface-secondary)',
-                                              border: `1px solid ${hasError ? '#ff4d4f' : 'var(--border)'}`,
+                                              border: `1px solid ${hasError ? 'var(--color-danger)' : 'var(--border)'}`,
                                               cursor: 'pointer',
                                               transition: 'border-color 0.2s',
                                             }}
@@ -797,7 +796,7 @@ export default function LearningJourneyPage() {
                                             )}
                                             {hasError ? (
                                               <Tooltip title="加载失败">
-                                                <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: 13 }} />
+                                                <ExclamationCircleOutlined style={{ color: 'var(--color-danger)', fontSize: 13 }} />
                                               </Tooltip>
                                             ) : (
                                               <ExpandOutlined style={{ color: 'var(--text-muted)', fontSize: 12 }} />
@@ -825,7 +824,7 @@ export default function LearningJourneyPage() {
             <Card
               title={
                 <Space>
-                  <ClockCircleOutlined style={{ color: '#fa8c16' }} />
+                  <ClockCircleOutlined style={{ color: 'var(--color-warning)' }} />
                   <Text strong style={{ fontSize: 16 }}>📝 复习计划</Text>
                   {reviewPlan.length > 0 && (
                     <Tag color="orange">{reviewPlan.length} 项</Tag>
@@ -837,7 +836,7 @@ export default function LearningJourneyPage() {
             >
               {reviewPlan.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-                  <CheckCircleOutlined style={{ fontSize: 36, color: '#d9d9d9', marginBottom: 12 }} />
+                  <CheckCircleOutlined style={{ fontSize: 36, color: 'var(--stage-locked-dot)', marginBottom: 12 }} />
                   <Paragraph type="secondary" style={{ margin: 0 }}>
                     暂无复习计划
                   </Paragraph>
@@ -861,7 +860,7 @@ export default function LearningJourneyPage() {
                         {/* 优先级标签 + 主题 */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                           <Text strong style={{ fontSize: 14 }}>{item.topic}</Text>
-                          <Tag color={uc.color} icon={uc.icon} style={{ margin: 0 }}>
+                          <Tag color={uc.tagColor} icon={uc.icon} style={{ margin: 0 }}>
                             {uc.label}
                           </Tag>
                         </div>
@@ -892,7 +891,7 @@ export default function LearningJourneyPage() {
                               <Text
                                 type="secondary"
                                 style={{
-                                  color: item.retention < 0.5 ? '#ff4d4f' : item.retention < 0.7 ? '#fa8c16' : '#52c41a',
+                                  color: item.retention < 0.5 ? 'var(--color-danger)' : item.retention < 0.7 ? 'var(--color-warning)' : 'var(--color-success)',
                                 }}
                               >
                                 🧠 {Math.round(item.retention * 100)}%
@@ -932,19 +931,19 @@ export default function LearningJourneyPage() {
               <Statistic
                 title="累计学习时长"
                 value={formatMinutes(Math.round(totalTime / 60))}
-                prefix={<ClockCircleOutlined style={{ color: '#1677ff' }} />}
+                prefix={<ClockCircleOutlined style={{ color: 'var(--color-primary)' }} />}
               />
             </Card>
           </Col>
           <Col xs={24} sm={12}>
             <Card size="small" style={{ borderRadius: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <BookOutlined style={{ fontSize: 24, color: '#722ed1' }} />
+                <BookOutlined style={{ fontSize: 24, color: 'var(--color-purple)' }} />
                 <div style={{ flex: 1 }}>
                   <Text type="secondary" style={{ fontSize: 12 }}>整体进度</Text>
                   <Progress
                     percent={totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0}
-                    strokeColor={{ '0%': '#1677ff', '100%': '#52c41a' }}
+                    strokeColor={{ '0%': 'var(--color-primary)', '100%': 'var(--color-success)' }}
                     style={{ marginBottom: 0 }}
                   />
                 </div>
