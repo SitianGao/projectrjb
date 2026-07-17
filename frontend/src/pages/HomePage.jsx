@@ -1,96 +1,159 @@
+<<<<<<< Updated upstream
 import { useState, useEffect, useMemo } from 'react'
 import { Card, Typography, Space, Tag, Avatar, Button, Result, Popover, Empty } from 'antd'
+=======
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+>>>>>>> Stashed changes
 import {
-  UserOutlined,
+  Avatar,
+  Button,
+  Card,
+  Dropdown,
+  Empty,
+  Progress,
+  Skeleton,
+  Space,
+  Statistic,
+  Tag,
+  Typography,
+  message,
+} from 'antd'
+import {
+  AppstoreOutlined,
   BookOutlined,
-  TrophyOutlined,
-  RiseOutlined,
-  ClockCircleOutlined,
+  BranchesOutlined,
   CheckCircleOutlined,
+  CodeOutlined,
+  FileTextOutlined,
+  MessageOutlined,
+  PlayCircleOutlined,
+  PlusOutlined,
+  ProfileOutlined,
+  ReadOutlined,
   ReloadOutlined,
-  DownloadOutlined,
+  RightOutlined,
+  SwapOutlined,
   ThunderboltOutlined,
-  FieldTimeOutlined,
-  EditOutlined,
-  CloseCircleOutlined,
-  IdcardOutlined,
 } from '@ant-design/icons'
-import { getProfile } from '../api/profile'
+import { getCourseDashboard } from '../api/courses'
 import { useAuth } from '../contexts/AuthContext'
-import { getEvaluation, getProgressStats } from '../api/evaluate'
-import LoadingSkeleton from '../components/LoadingSkeleton'
-import RadarChart from '../components/RadarChart'
-import MultiLineChart from '../components/MultiLineChart'
-import DonutChart from '../components/DonutChart'
+import './HomePage.css'
 
-const { Title, Text } = Typography
+const { Title, Text, Paragraph } = Typography
 
-// ==================== 常量 ====================
+// ── helpers ──
 
-const SUBJECT_COLORS = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de']
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 6) return '夜深了'
+  if (hour < 12) return '早上好'
+  if (hour < 18) return '下午好'
+  return '晚上好'
+}
 
-const ABILITY_DIMS = [
-  { key: 'memory',     label: '记忆能力',   icon: '🧠', color: '#5470c6' },
-  { key: 'understand', label: '理解能力',   icon: '💡', color: '#91cc75' },
-  { key: 'apply',      label: '应用能力',   icon: '🔧', color: '#fac858' },
-  { key: 'analyze',    label: '分析能力',   icon: '🔍', color: '#ee6666' },
-  { key: 'evaluate',   label: '评价能力',   icon: '⚖️', color: '#73c0de' },
-  { key: 'create',     label: '创造能力',   icon: '✨', color: '#8b5cf6' },
-]
+function isMeaningfulCourse(course) {
+  const title = String(course?.title || '').trim().toLowerCase()
+  if (!title) return false
+  if (title === 'shux' || title === 'vjg') return false
+  if (/^待命名课程/.test(course?.title || '')) return false
+  return true
+}
 
-// ==================== 子组件 ====================
+function uniqueCourses(courses = []) {
+  const seen = new Set()
+  return courses.filter((course) => {
+    if (!isMeaningfulCourse(course)) return false
+    const key = `${String(course.title || '').trim()}::${String(course.goal || '').trim()}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
 
-function StatCard({ title, value, icon, color, suffix }) {
+// ── button config by course status ──
+
+const STATUS_ACTIONS = {
+  path_not_generated: {
+    primary: { text: '完善课程画像', icon: <ThunderboltOutlined /> },
+    secondary: { text: '问 AI 导师', icon: <MessageOutlined /> },
+    primaryRoute: (course) => `/course/${course.id}/profile/setup`,
+    secondaryRoute: (course) => `/course/${course.id}/ai-workspace`,
+  },
+  not_started: {
+    primary: { text: '开始学习', icon: <PlayCircleOutlined /> },
+    secondary: { text: '查看学习路径', icon: <BranchesOutlined /> },
+    primaryRoute: (course) => `/course/${course.id}/path`,
+    secondaryRoute: (course) => `/course/${course.id}/path`,
+  },
+  in_progress: {
+    primary: { text: '继续学习', icon: <PlayCircleOutlined /> },
+    secondary: { text: '问 AI 导师', icon: <MessageOutlined /> },
+    primaryRoute: (course, dash) => dash?.current_task?.task_id
+      ? `/course/${course.id}/learn/${encodeURIComponent(dash.current_task.task_id)}`
+      : `/course/${course.id}/path`,
+    secondaryRoute: (course) => `/course/${course.id}/ai-workspace`,
+  },
+  completed: {
+    primary: { text: '查看课程总结', icon: <CheckCircleOutlined /> },
+    secondary: { text: '复习错题', icon: <ReloadOutlined /> },
+    primaryRoute: (course) => `/course/${course.id}/assessment/report`,
+    secondaryRoute: (course) => `/course/${course.id}/wrongbook`,
+  },
+}
+
+// ── status descriptions ──
+
+function getStatusDescription(status, stage) {
+  switch (status) {
+    case 'path_not_generated':
+      return '完成目标和基础设置后，AI 将为你生成专属的学习阶段、任务、资源和测评计划。'
+    case 'not_started':
+      return `学习路径已就绪，从「${stage?.title || '第一阶段'}」开始你的学习之旅。`
+    case 'in_progress':
+      return `当前章节：${stage?.title || '学习中'}。建议本次学习 25 分钟，完成一份讲义和一组练习后再进入测评。`
+    case 'completed':
+      return '恭喜！你已完成本课程全部学习内容。查看总结或开始复习巩固。'
+    default:
+      return ''
+  }
+}
+
+// ── sub-components ──
+
+function CourseShortcut({ icon, title, desc, color, onClick }) {
   return (
-    <Card
-      hoverable
-      style={{
-        flex: '1 1 160px', minWidth: 0, borderRadius: 10,
-        border: '1px solid var(--border)', background: 'var(--bg-card)',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)', overflow: 'hidden', position: 'relative',
-        transition: 'transform 0.25s, box-shadow 0.25s, border-color 0.25s',
-      }}
-    >
-      <div style={{
-        position: 'absolute', left: 0, top: '15%', height: '70%', width: 3,
-        borderRadius: '0 3px 3px 0', background: color, opacity: 0.8,
-      }} />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <Card className="dashboard-shortcut" hoverable onClick={onClick}>
+      <div className="shortcut-inner">
+        <span className="shortcut-icon" style={{ color, background: `${color}14` }}>{icon}</span>
         <div>
-          <Text style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{title}</Text>
-          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-            {value}{suffix && <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-secondary)' }}>{suffix}</span>}
-          </div>
+          <Text strong>{title}</Text>
+          <Paragraph>{desc}</Paragraph>
         </div>
-        <div style={{
-          width: 44, height: 44, borderRadius: 10,
-          background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {icon}
-        </div>
+        <RightOutlined className="shortcut-arrow" />
       </div>
     </Card>
   )
 }
 
-function CognitiveBar({ name, score, color }) {
+/** Hero stat item — shows value or a friendly placeholder when data is absent. */
+function HeroStat({ title, value, suffix, prefix, emptyLabel }) {
+  const hasValue = value !== null && value !== undefined && value !== '--' && value !== 0
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <Text style={{ fontSize: 13, color: 'var(--text-primary)' }}>{name}</Text>
-        <Text strong style={{ fontSize: 13, color }}>{score}</Text>
-      </div>
-      <div style={{ height: 8, borderRadius: 4, background: 'var(--surface-secondary)', overflow: 'hidden' }}>
-        <div style={{
-          height: '100%', width: `${Math.min(score, 100)}%`, borderRadius: 4,
-          background: `linear-gradient(90deg, ${color}, ${color}cc)`,
-          transition: 'width 0.8s cubic-bezier(0.25, 0.8, 0.25, 1.2)',
-        }} />
-      </div>
+    <div className="hero-stat-item">
+      {hasValue ? (
+        <Statistic title={title} value={value} suffix={suffix} prefix={prefix} />
+      ) : (
+        <div className="hero-stat-empty">
+          <Text type="secondary" style={{ fontSize: 12 }}>{title}</Text>
+          <Text type="secondary" style={{ fontSize: 13 }}>{emptyLabel || '暂无记录'}</Text>
+        </div>
+      )}
     </div>
   )
 }
 
+<<<<<<< Updated upstream
 // ==================== 数据转换工具 ====================
 
 /** 从 topics 数组构建知识趋势折线数据 */
@@ -139,24 +202,37 @@ function buildAnswerStats(evaluation) {
 }
 
 // ==================== 主组件 ====================
+=======
+// ── main page ──
+>>>>>>> Stashed changes
 
 export default function HomePage() {
-  const { user } = useAuth()
-  const [profile, setProfile] = useState(null)
-  const [evaluation, setEvaluation] = useState(null)
-  const [progressStats, setProgressStats] = useState(null)
+  const navigate = useNavigate()
+  const { user, courses, activeCourse, activateCourse, createCourse } = useAuth()
+
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [introVisible, setIntroVisible] = useState(false)
+  const [switching, setSwitching] = useState(false)
+  const [dashboard, setDashboard] = useState(null)
 
+<<<<<<< Updated upstream
   const studentId = user?.id || user?.student_id || ''
+=======
+  const cleanCourses = useMemo(() => uniqueCourses(courses), [courses])
+  const currentCourse = useMemo(() => {
+    if (activeCourse && isMeaningfulCourse(activeCourse)) return activeCourse
+    return cleanCourses[0] || null
+  }, [activeCourse, cleanCourses])
+>>>>>>> Stashed changes
 
-  useEffect(() => {
-    let cancelled = false
-    if (!studentId) {
+  // ── load dashboard for current course ──
+
+  const loadDashboard = useCallback(async () => {
+    if (!currentCourse?.id) {
+      setDashboard(null)
       setLoading(false)
       return
     }
+<<<<<<< Updated upstream
 
     async function load() {
       setError(null)
@@ -196,33 +272,52 @@ export default function HomePage() {
       if (profileData) setProfile(profileData)
       if (evalData) setEvaluation(evalData)
       if (statsData) setProgressStats(statsData)
+=======
+    setLoading(true)
+    try {
+      const data = await getCourseDashboard(currentCourse.id)
+      setDashboard(data)
+    } catch {
+      setDashboard(null)
+>>>>>>> Stashed changes
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentCourse])
 
-  async function handleGenerate() {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadDashboard()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadDashboard])
+
+  // ── course switching ──
+
+  const handleSwitchCourse = useCallback(async (course) => {
+    if (!course || course.id === currentCourse?.id) return
+    setSwitching(true)
     try {
-      const data = await getEvaluation(studentId)
-      setEvaluation(data)
-      const stats = await getProgressStats(studentId)
-      if (stats) setProgressStats(stats)
+      await activateCourse(course.id)
+      // Dashboard will reload via the useEffect since currentCourse changes
+      message.success(`已切换到「${course.title}」`)
     } catch {
-      // 静默失败
+      message.error('课程切换失败')
+    } finally {
+      setSwitching(false)
     }
-  }
+  }, [activateCourse, currentCourse?.id])
 
-  // ---------- 从 API 数据计算展示值 ----------
-  const displayData = useMemo(() => {
-    const topics = profile?.topics || []
-    return {
-      knowledgeTrend: buildKnowledgeTrend(topics),
-      cognitiveData: buildCognitiveData(topics),
-      timeDist: buildTimeDist(topics),
-      answerStats: buildAnswerStats(evaluation),
+  const handleCreateCourse = useCallback(async () => {
+    try {
+      const title = `新课程 ${cleanCourses.length + 1}`
+      await createCourse(title, '')
+    } catch {
+      // createCourse already shows error toast
     }
-  }, [profile, evaluation])
+  }, [cleanCourses.length, createCourse])
 
+<<<<<<< Updated upstream
   // 能力评估雷达图数据（从 profile.dimensions 映射）
   const abilityData = useMemo(() => {
     const dims = profile?.dimensions || {}
@@ -245,235 +340,277 @@ export default function HomePage() {
   const completedTasks = evaluation?.completedTasks || 0
   const totalTopics = progressStats?.totalTopics || (profile?.topics?.length || 0)
   const masteredTopics = progressStats?.masteredTopics || 0
+=======
+  // ── derived state ──
 
-  if (loading) return <LoadingSkeleton type="detail" />
+  const courseStatus = dashboard?.course?.status || 'path_not_generated'
+  const action = STATUS_ACTIONS[courseStatus] || STATUS_ACTIONS.path_not_generated
+  const progress = dashboard?.progress || {}
+  const currentStage = dashboard?.current_stage
 
-  if (error) {
-    return (
-      <div style={{ maxWidth: 600, margin: '60px auto', padding: 24 }}>
-        <Result
-          status="error" title="加载失败" subTitle={error}
-          extra={
-            <Space>
-              <Button type="primary" icon={<ReloadOutlined />} onClick={handleRefresh}>重新加载</Button>
-              <Button icon={<DownloadOutlined />} onClick={handleGenerate}>生成新评估</Button>
-            </Space>
-          }
-        />
-      </div>
-    )
-  }
+  // ── course switcher dropdown items ──
+>>>>>>> Stashed changes
+
+  const courseMenuItems = [
+    ...cleanCourses.map((course) => ({
+      key: course.id,
+      label: (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minWidth: 180 }}>
+          <Space>
+            <Avatar size={24} style={{ background: course.id === currentCourse?.id ? '#6C5CE7' : '#D1D5DB', fontSize: 12 }}>
+              {course.title?.slice(0, 1)}
+            </Avatar>
+            <span style={{ fontWeight: course.id === currentCourse?.id ? 600 : 400 }}>
+              {course.title}
+            </span>
+          </Space>
+          {course.id === currentCourse?.id && (
+            <CheckCircleOutlined style={{ color: '#6C5CE7', fontSize: 14 }} />
+          )}
+        </div>
+      ),
+      onClick: () => handleSwitchCourse(course),
+    })),
+    { type: 'divider' },
+    {
+      key: 'all-courses',
+      icon: <AppstoreOutlined />,
+      label: '查看全部课程',
+      onClick: () => navigate('/courses'),
+    },
+    {
+      key: 'create-course',
+      icon: <PlusOutlined />,
+      label: '创建新课程',
+      onClick: handleCreateCourse,
+    },
+  ]
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 24px 48px' }}>
-      {/* ========== 页面标题 ========== */}
-      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* 个人介绍弹窗 */}
-          <Popover
-            content={
-              <div style={{ maxWidth: 300, padding: '8px 4px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-                  <Avatar size={56} icon={<UserOutlined />} src={user?.avatar}
-                    style={{
-                      border: '2px solid rgba(139,92,246,0.5)',
-                      boxShadow: '0 0 16px rgba(139,92,246,0.25)',
-                      backgroundColor: '#1677ff', flexShrink: 0,
-                    }} />
-                  <div>
-                    <Text strong style={{ fontSize: 16, color: 'var(--text-primary)' }}>
-                      {profile?.name || user?.name || user?.username || '同学'}
-                    </Text>
-                    <br />
-                    <Tag color="purple" style={{ marginTop: 4, borderRadius: 4 }}>
-                      {profile?.level || '新手'} 学者
-                    </Tag>
-                  </div>
-                </div>
+    <div className="dashboard-page">
+      <div className="dashboard-container">
+        {loading && !dashboard ? (
+          <Skeleton active paragraph={{ rows: 10 }} />
+        ) : (
+          <>
+            {/* ── Hero Section ── */}
+            <section className="dashboard-hero">
+              <div className="hero-copy">
+                <Tag color="purple">个性化学习首页</Tag>
+                <Title level={1}>{getGreeting()}，{user?.name || user?.username || '同学'}</Title>
 
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(99,102,241,0.04) 100%)',
-                  borderRadius: 8, padding: '12px 14px', marginBottom: 14,
-                  border: '1px solid rgba(139,92,246,0.12)',
-                }}>
-                  <Text style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                    {user?.bio || '这个同学很懒，还没有填写个人简介~'}
-                  </Text>
-                </div>
-
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {[
-                    { label: '掌握专题', value: masteredTopics, color: '#8b5cf6' },
-                    { label: '完成任务', value: completedTasks, color: '#00b894' },
-                    { label: '综合评分', value: `${overallScore}分`, color: '#0984e3' },
-                  ].map((stat) => (
-                    <div key={stat.label} style={{
-                      flex: 1, textAlign: 'center', padding: '8px 4px',
-                      background: `${stat.color}08`, borderRadius: 8,
-                      border: `1px solid ${stat.color}18`,
-                    }}>
-                      <Text strong style={{ fontSize: 18, color: stat.color, display: 'block' }}>
-                        {stat.value}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>{stat.label}</Text>
+                {currentCourse ? (
+                  <>
+                    <Text className="hero-meta">当前课程</Text>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0' }}>
+                      <Title level={3} style={{ margin: 0 }}>{currentCourse.title}</Title>
+                      <Dropdown menu={{ items: courseMenuItems }} trigger={['click']} placement="bottomLeft">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={switching ? undefined : <SwapOutlined />}
+                          loading={switching}
+                          style={{ color: '#6C5CE7', fontWeight: 600, fontSize: 13 }}
+                        >
+                          切换课程
+                        </Button>
+                      </Dropdown>
                     </div>
-                  ))}
-                </div>
-
-                <div style={{ marginTop: 14 }}>
-                  <Text style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    🎯 学习风格：{profile?.style || '未评估'}
-                  </Text>
-                  {profile?.strengths?.length > 0 && (
-                    <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {profile.strengths.map((s) => (
-                        <Tag key={s} color="purple" style={{ borderRadius: 4, margin: 0, fontSize: 11 }}>
-                          👍 {s}
-                        </Tag>
-                      ))}
-                      {profile?.weaknesses?.map((w) => (
-                        <Tag key={w} color="gold" style={{ borderRadius: 4, margin: 0, fontSize: 11 }}>
-                          💪 {w}
-                        </Tag>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            }
-            title={null}
-            trigger="click"
-            open={introVisible}
-            onOpenChange={setIntroVisible}
-            placement="bottomLeft"
-            overlayStyle={{ maxWidth: 340 }}
-          >
-            <div
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
-                userSelect: 'none', padding: '4px 10px', borderRadius: 8,
-                background: introVisible ? 'rgba(139,92,246,0.08)' : 'transparent',
-                transition: 'background 0.2s',
-              }}
-              onClick={(e) => { e.stopPropagation(); setIntroVisible(!introVisible) }}
-            >
-              <Avatar size={32} icon={<UserOutlined />} src={user?.avatar}
-                style={{ backgroundColor: '#1677ff', flexShrink: 0 }} />
-              <div>
-                <Text strong style={{ fontSize: 14, color: 'var(--text-primary)', lineHeight: 1.1, display: 'block' }}>
-                  {profile?.name || user?.name || user?.username || '同学'}
-                </Text>
-                <Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  <IdcardOutlined style={{ marginRight: 4 }} />个人介绍
-                </Text>
-              </div>
-            </div>
-          </Popover>
-
-          <RiseOutlined style={{ fontSize: 22, color: '#8b5cf6' }} />
-          <Title level={4} style={{ margin: 0 }}>学习数据</Title>
-        </div>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={handleRefresh}>刷新</Button>
-          <Button type="primary" icon={<DownloadOutlined />} onClick={handleGenerate}
-            style={{ borderRadius: 6 }}>
-            生成新评估
-          </Button>
-        </Space>
-      </div>
-
-      {/* ========== 主内容 + 右侧面板 ========== */}
-      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-        {/* ===== 左侧主内容区 ===== */}
-        <div style={{ flex: '1 1 600px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-          {/* ---------- 统计卡片 ---------- */}
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <StatCard title="学习次数" value={completedTasks}
-              icon={<ThunderboltOutlined style={{ color: '#8b5cf6', fontSize: 20 }} />} color="#8b5cf6" />
-            <StatCard title="学习时长" value={totalTimeHours} suffix="h"
-              icon={<FieldTimeOutlined style={{ color: '#00b894', fontSize: 20 }} />} color="#00b894" />
-            <StatCard title="掌握专题" value={masteredTopics}
-              icon={<EditOutlined style={{ color: '#0984e3', fontSize: 20 }} />} color="#0984e3" />
-            <StatCard title="待学习" value={totalTopics - masteredTopics}
-              icon={<CloseCircleOutlined style={{ color: '#e17055', fontSize: 20 }} />} color="#e17055" />
-          </div>
-
-          {/* ---------- 知识掌握变化 ---------- */}
-          <Card
-            title={<><RiseOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />知识掌握变化</>}
-            style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
-          >
-            {displayData.knowledgeTrend.series.length > 0 ? (
-              <MultiLineChart series={displayData.knowledgeTrend.series} xLabels={displayData.knowledgeTrend.xLabels} />
-            ) : (
-              <Empty description="暂无知识掌握数据" />
-            )}
-          </Card>
-
-          {/* ---------- 能力评估 + 认知能力评估 ---------- */}
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 320px', minWidth: 300 }}>
-              <Card
-                title={<><TrophyOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />能力评估</>}
-                style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)', height: '100%' }}
-                styles={{ body: { display: 'flex', justifyContent: 'center' } }}
-              >
-                <RadarChart dimensionDefs={ABILITY_DIMS} dimensions={abilityData} size={280} />
-              </Card>
-            </div>
-
-            <div style={{ flex: '1 1 300px', minWidth: 280 }}>
-              <Card
-                title={<><CheckCircleOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />认知能力评估</>}
-                style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)', height: '100%' }}
-              >
-                {displayData.cognitiveData.length > 0 ? (
-                  displayData.cognitiveData.map((item) => (
-                    <CognitiveBar key={item.name} name={item.name} score={item.score} color={item.color} />
-                  ))
+                    <Paragraph style={{ minHeight: 44, marginBottom: 12 }}>
+                      {getStatusDescription(courseStatus, currentStage)}
+                    </Paragraph>
+                  </>
                 ) : (
-                  <Empty description="暂无认知评估数据" />
+                  <>
+                    <Paragraph style={{ marginBottom: 12 }}>
+                      还没有可学习课程。创建课程后，AI 会根据你的目标生成专属路径和资源。
+                    </Paragraph>
+                    <Space wrap size={12}>
+                      <Button type="primary" size="large" icon={<PlusOutlined />} onClick={handleCreateCourse}>
+                        创建第一门课程
+                      </Button>
+                      <Button size="large" icon={<AppstoreOutlined />} onClick={() => navigate('/courses')}>
+                        浏览课程
+                      </Button>
+                    </Space>
+                  </>
+                )}
+
+                {currentCourse && (
+                  <Space wrap size={12}>
+                    <Button type="primary" size="large" icon={action.primary.icon}
+                      onClick={() => navigate(action.primaryRoute(currentCourse, dashboard))}>
+                      {action.primary.text}
+                    </Button>
+                    {action.secondary && (
+                      <Button size="large" icon={action.secondary.icon}
+                        onClick={() => navigate(action.secondaryRoute(currentCourse, dashboard))}>
+                        {action.secondary.text}
+                      </Button>
+                    )}
+                  </Space>
+                )}
+              </div>
+
+              {/* ── Stats Card ── */}
+              <Card className="hero-stats">
+                {currentCourse ? (
+                  courseStatus === 'path_not_generated' ? (
+                    /* Guided empty state when no path exists */
+                    <div className="hero-guided-empty">
+                      <BookOutlined style={{ fontSize: 36, color: '#D1D5DB', marginBottom: 12 }} />
+                      <Text strong style={{ fontSize: 15, color: '#374151' }}>还没有开始这门课程</Text>
+                      <Paragraph type="secondary" style={{ fontSize: 13, margin: '8px 0 16px' }}>
+                        完成目标设置后，系统将生成：
+                      </Paragraph>
+                      <ul style={{ paddingLeft: 20, color: '#6B7280', fontSize: 13, lineHeight: 2, margin: 0 }}>
+                        <li>个性化学习路径</li>
+                        <li>阶段任务</li>
+                        <li>学习资源</li>
+                        <li>初始测评</li>
+                      </ul>
+                      <Button type="primary" size="small" icon={<ThunderboltOutlined />}
+                        onClick={() => navigate(`/course/${currentCourse.id}/profile/setup`)}
+                        style={{ marginTop: 16, borderRadius: 8 }}>
+                        开始设置
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="hero-progress">
+                        <Text>学习进度</Text>
+                        <strong>{progress.percentage || 0}%</strong>
+                      </div>
+                      <Progress
+                        percent={progress.percentage || 0}
+                        showInfo={false}
+                        strokeColor="#6C5CE7"
+                        trailColor="#ECEEF5"
+                      />
+                      <div className="hero-stat-grid">
+                        <HeroStat
+                          title="学习时长"
+                          value={progress.learning_minutes || 0}
+                          suffix="分钟"
+                          prefix={<ReadOutlined />}
+                          emptyLabel="暂无记录"
+                        />
+                        <HeroStat
+                          title="正确率"
+                          value={progress.accuracy || 0}
+                          suffix="%"
+                          prefix={<CheckCircleOutlined />}
+                          emptyLabel="暂无记录"
+                        />
+                        <HeroStat
+                          title="连续学习"
+                          value={progress.streak_days || 0}
+                          suffix="天"
+                          prefix={<ThunderboltOutlined />}
+                          emptyLabel="暂无记录"
+                        />
+                        <HeroStat
+                          title="完成任务"
+                          value={`${progress.completed_tasks || 0}/${progress.total_tasks || 0}`}
+                          prefix={<BookOutlined />}
+                          emptyLabel="尚未开始"
+                        />
+                      </div>
+                    </>
+                  )
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="创建课程后查看学习数据"
+                    style={{ margin: '32px 0' }}
+                  />
                 )}
               </Card>
-            </div>
-          </div>
+            </section>
 
-          {/* ---------- 学习建议 ---------- */}
-          <Card
-            title={<><BookOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />学习建议</>}
-            style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
-          >
-            {suggestions.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {suggestions.map((s, idx) => (
-                  <div key={s.id || idx} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
-                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 13, fontWeight: 700, flexShrink: 0, marginTop: 2,
-                    }}>
-                      {idx + 1}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <Text strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{s.title}</Text>
-                        {s.tag && <Tag color={s.tagColor || 'purple'} style={{ borderRadius: 4, fontSize: 11, lineHeight: '18px' }}>{s.tag}</Tag>}
+            {/* ── Six Feature Cards ── */}
+            <section className="dashboard-shortcuts">
+              <CourseShortcut
+                icon={<AppstoreOutlined />}
+                title="AI 学习工作台"
+                desc="课程答疑、资源生成和路径调整"
+                color="#6C5CE7"
+                onClick={() => navigate(currentCourse ? `/course/${currentCourse.id}/ai-workspace` : '/courses')}
+              />
+              <CourseShortcut
+                icon={<CheckCircleOutlined />}
+                title="在线测评"
+                desc="按当前课程生成评估报告"
+                color="#4F8CFF"
+                onClick={() => navigate(currentCourse ? `/course/${currentCourse.id}/assessment/report` : '/assessment/tests')}
+              />
+              <CourseShortcut
+                icon={<FileTextOutlined />}
+                title="学习资源"
+                desc="讲义、导图、PPT 和练习题"
+                color="#20C7B7"
+                onClick={() => navigate(currentCourse ? `/resources?courseId=${currentCourse.id}` : '/resources')}
+              />
+              <CourseShortcut
+                icon={<CodeOutlined />}
+                title="代码挑战"
+                desc="用编程题验证掌握程度"
+                color="#F59E0B"
+                onClick={() => navigate('/code-practice')}
+              />
+              <CourseShortcut
+                icon={<ProfileOutlined />}
+                title="学习画像"
+                desc="调整目标、基础和学习偏好"
+                color="#EF5DA8"
+                onClick={() => navigate(currentCourse ? `/course/${currentCourse.id}/profile/update` : '/profile')}
+              />
+              <CourseShortcut
+                icon={<BranchesOutlined />}
+                title="学习路径"
+                desc="查看当前课程阶段路线"
+                color="#7C3AED"
+                onClick={() => navigate(currentCourse ? `/course/${currentCourse.id}/path` : '/courses')}
+              />
+            </section>
+
+            {/* ── Lower Grid ── */}
+            <section className="dashboard-lower-grid">
+              <Card className="dashboard-panel" title="个性化学习路径">
+                {(() => {
+                  const stages = dashboard?.stages || []
+                  if (stages.length > 0) {
+                    return (
+                      <div className="path-preview">
+                        {stages.slice(0, 5).map((stage, index) => (
+                          <div className="path-preview-row" key={stage.stage_id || index}>
+                            <span className={String(stage.stage_id) === String(currentStage?.stage_id) ? 'active' : ''}>
+                              {index + 1}
+                            </span>
+                            <div>
+                              <Text strong>{stage.title}</Text>
+                              <Paragraph>{stage.description || (stage.topics || []).join('、')}</Paragraph>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <Text style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                        {s.content}
-                      </Text>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Empty description="暂无学习建议" />
-            )}
-          </Card>
-        </div>
+                    )
+                  }
+                  if (courseStatus === 'path_not_generated') {
+                    return (
+                      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未生成学习路径">
+                        <Button type="primary" size="small" icon={<ThunderboltOutlined />}
+                          onClick={() => navigate(currentCourse ? `/course/${currentCourse.id}/profile/setup` : '/courses')}>
+                          完善画像
+                        </Button>
+                      </Empty>
+                    )
+                  }
+                  return <Empty description="暂无学习路径" />
+                })()}
+              </Card>
 
+<<<<<<< Updated upstream
         {/* ===== 右侧面板 ===== */}
         <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* 用户卡片 */}
@@ -525,59 +662,76 @@ export default function HomePage() {
               </div>
             </div>
           </Card>
+=======
+              <div className="dashboard-side">
+                <Card className="dashboard-panel" title="AI 学习建议">
+                  {courseStatus === 'path_not_generated' ? (
+                    <Space direction="vertical" size={12}>
+                      <Text>先创建学习路径，AI 将根据你的目标和基础给出个性化建议。</Text>
+                      <Text type="secondary">完成后你可以在这里看到每日学习建议、薄弱点提醒和复习计划。</Text>
+                    </Space>
+                  ) : courseStatus === 'not_started' ? (
+                    <Space direction="vertical" size={12}>
+                      <Text>路径已生成！从第一阶段开始，每天完成 25 分钟学习任务。</Text>
+                      <Text type="secondary">建议先浏览阶段目标，再按顺序完成每项任务。</Text>
+                    </Space>
+                  ) : courseStatus === 'completed' ? (
+                    <Space direction="vertical" size={12}>
+                      <Text>🎉 课程已全部完成！建议安排定期复习，巩固薄弱知识点。</Text>
+                      <Text type="secondary">你可以查看课程总结报告，或开始新一轮学习。</Text>
+                    </Space>
+                  ) : (
+                    <Space direction="vertical" size={12}>
+                      <Text>今天优先完成当前章节的核心讲义，再做 3 道检索自测题。</Text>
+                      <Text type="secondary">如果正确率低于 70%，建议回到知识图谱查看前置知识点。</Text>
+                    </Space>
+                  )}
+                </Card>
+>>>>>>> Stashed changes
 
-          {/* 答题情况 — 环形图 */}
-          <Card
-            title="答题情况"
-            style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
-            styles={{ body: { display: 'flex', flexDirection: 'column', alignItems: 'center' } }}
-          >
-            {displayData.answerStats.length > 0 ? (
-              <>
-                <DonutChart data={displayData.answerStats} size={180}
-                  centerLabel={`${displayData.answerStats[0]?.value || 0}%`} centerSub="正确率" />
-                <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
-                  {displayData.answerStats.map((d) => (
-                    <span key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 3, background: d.color, display: 'inline-block' }} />
-                      {d.label} {d.value}%
-                    </span>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <Empty description="暂无答题数据" />
-            )}
-          </Card>
-
-          {/* 学习时长分布 */}
-          <Card
-            title={<><ClockCircleOutlined style={{ color: '#8b5cf6', marginRight: 8 }} />学习时长分布</>}
-            style={{ borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-card)' }}
-          >
-            {displayData.timeDist.length > 0 ? (
-              displayData.timeDist.map((d) => (
-                <div key={d.label} style={{ marginBottom: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{d.label}</Text>
-                    <Text strong style={{ fontSize: 12, color: 'var(--text-primary)' }}>{d.hours}h</Text>
-                  </div>
-                  <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-secondary)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${d.maxHours > 0 ? (d.hours / d.maxHours) * 100 : 0}%`,
-                      borderRadius: 3,
-                      background: d.color,
-                      transition: 'width 0.6s ease',
-                    }} />
-                  </div>
-                </div>
-              ))
-            ) : (
-              <Empty description="暂无学习时长数据" />
-            )}
-          </Card>
-        </div>
+                <Card className="dashboard-panel" title="我的课程">
+                  {cleanCourses.length ? (
+                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                      {cleanCourses.slice(0, 4).map((course) => (
+                        <button
+                          className={`recent-course${course.id === currentCourse?.id ? ' recent-course--active' : ''}`}
+                          key={course.id}
+                          onClick={() => {
+                            if (course.id !== currentCourse?.id) {
+                              handleSwitchCourse(course)
+                            } else {
+                              navigate(`/course/${course.id}`)
+                            }
+                          }}
+                        >
+                          <Avatar style={{ background: course.id === currentCourse?.id ? '#6C5CE7' : '#D1D5DB' }}>
+                            {course.title?.slice(0, 1)}
+                          </Avatar>
+                          <span>
+                            <strong>{course.title}</strong>
+                            <Text type="secondary">{course.goal || '继续完善学习目标'}</Text>
+                          </span>
+                          {course.id === currentCourse?.id ? (
+                            <Tag color="purple" style={{ borderRadius: 8, margin: 0 }}>当前</Tag>
+                          ) : (
+                            <RightOutlined />
+                          )}
+                        </button>
+                      ))}
+                      {cleanCourses.length > 4 && (
+                        <Button type="link" block onClick={() => navigate('/courses')}>
+                          查看全部 {cleanCourses.length} 门课程
+                        </Button>
+                      )}
+                    </Space>
+                  ) : (
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无课程" />
+                  )}
+                </Card>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </div>
   )

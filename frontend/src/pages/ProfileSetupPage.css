@@ -1,0 +1,236 @@
+.profile-setup-page {
+  min-height: 100%;
+  background: #F6F7FB;
+  color: #111827;
+  padding: 24px;
+}
+
+.profile-setup-container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.profile-setup-header,
+.profile-conversation-card,
+.profile-live-panel,
+.profile-confirm-card,
+.profile-summary-card,
+.agent-workflow-card,
+.learning-path-result-card {
+  border-radius: 16px;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 10px 28px rgba(17, 24, 39, 0.04);
+}
+
+.profile-setup-header {
+  border-radius: 24px;
+  margin-bottom: 18px;
+}
+
+.profile-header-top,
+.profile-header-main,
+.profile-completion,
+.profile-dimension-title,
+.profile-chat-input,
+.agent-workflow-step {
+  display: flex;
+  align-items: center;
+}
+
+.profile-header-top {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.profile-header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profile-header-main {
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.profile-kicker {
+  display: block;
+  color: #6C5CE7;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin-bottom: 6px;
+}
+
+.profile-header-steps {
+  width: min(520px, 48%);
+}
+
+.profile-setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  gap: 18px;
+}
+
+.profile-right-stack,
+.agent-workflow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-conversation-card .ant-card-body {
+  display: flex;
+  min-height: 680px;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-quick-actions {
+  padding: 10px 0;
+}
+
+.profile-message-list {
+  flex: 1;
+  min-height: 320px;
+  max-height: 470px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 16px;
+  background: #F8F7FF;
+  border: 1px solid #E8EAF0;
+}
+
+.profile-message {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.profile-message-role {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #F3F0FF;
+  color: #6C5CE7;
+  font-weight: 700;
+}
+
+.profile-message--user .profile-message-role {
+  background: #EAF2FF;
+  color: #4F8CFF;
+}
+
+.profile-message p {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #FFFFFF;
+  border: 1px solid #E8EAF0;
+}
+
+.profile-message-loading {
+  color: #6B7280;
+}
+
+.profile-chat-input {
+  gap: 10px;
+}
+
+.profile-chat-input textarea {
+  border-radius: 14px;
+}
+
+.profile-completion {
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #F3F0FF;
+  margin-bottom: 14px;
+}
+
+.profile-completion > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-dimension-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.profile-dimension-card {
+  border-color: #E8EAF0;
+}
+
+.profile-dimension-card.is-missing {
+  background: #FAFAFB;
+}
+
+.profile-dimension-title {
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.agent-workflow-step {
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #F6F7FB;
+}
+
+.agent-workflow-step span {
+  color: #6C5CE7;
+}
+
+.agent-workflow-step.is-failed span {
+  color: #EF4444;
+}
+
+.agent-workflow-step p {
+  margin: 2px 0 0;
+  color: #6B7280;
+}
+
+.result-stage-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.result-stage-list span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #F3F0FF;
+  color: #6C5CE7;
+  font-size: 12px;
+}
+
+.chat-error-card {
+  border-radius: 16px;
+}
+
+@media (max-width: 1100px) {
+  .profile-setup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-header-main {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .profile-header-steps {
+    width: 100%;
+  }
+}

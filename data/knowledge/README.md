@@ -1,9 +1,10 @@
 # EduAgent 知识库索引
 
-> 整理日期：2026-07-03
-> 用途：RAG 向量检索的知识源，为 TutorAgent、ResourceAgent 等智能体提供专业背景知识
-> RAG 配置：ChromaDB + sentence-transformers (MiniLM-L12-v2, 384-dim)，按 `##`/`###` 分块（800 chars, 100 overlap）
-> 仅索引 `.md` 和 `.json` 文件，PDF 不会被向量化
+> **课程名称**：《人工智能与机器学习》— 高校本科专业课程
+> **整理日期**：2026-07-18
+> **用途**：RAG 向量检索的知识源，为 TutorAgent、ResourceAgent 等智能体提供专业背景知识
+> **RAG 配置**：ChromaDB + sentence-transformers (MiniLM-L12-v2, 384-dim)，按 `##`/`###` 分块（800 chars, 100 overlap）
+> **索引范围**：仅索引 `.md` 和 `.json` 文件，PDF 不会被向量化
 
 ---
 
@@ -11,117 +12,162 @@
 
 ```
 data/knowledge/
-├── README.md                          # 本索引文件
+├── README.md                              # 本索引文件
 │
-├── 📊 核心算法（顶层）
-│   ├── cnn.md                         # 卷积神经网络
-│   ├── gradient_descent.md            # 梯度下降算法
-│   ├── linear_regression.md           # 线性回归
-│   ├── neural_network_basics.md       # 神经网络基础
-│   ├── svm.md                         # 支持向量机
-│   ├── decision_tree.md               # 决策树与随机森林
-│   ├── logistic_regression.md         # 逻辑回归
-│   ├── kmeans_clustering.md           # K-Means 聚类
-│   ├── naive_bayes.md                 # 朴素贝叶斯
-│   ├── ensemble_methods.md            # 集成学习（Bagging/Boosting/Stacking）
-│   ├── pca.md                         # 主成分分析与降维
-│   ├── rnn_lstm.md                    # RNN / LSTM / GRU 详解
-│   ├── transformer_attention.md       # Transformer 与注意力机制
-│   ├── gan.md                         # 生成对抗网络
-│   └── reinforcement_learning_basics.md # 强化学习基础
+├── 00-课程大纲/
+│   └── 00-课程大纲.md                      # 课程信息、章节安排、学习目标
 │
-├── 🛠 实战指南（顶层）
-│   ├── data-preprocessing.md          # 数据预处理完整指南
-│   ├── model-evaluation.md            # 模型评估指标与方法
-│   └── feature-engineering.md         # 特征工程完整指南
+├── 01-AI导论/
+│   ├── 01-人工智能概述.md                   # AI 定义、发展史、三大学派
+│   ├── 02-AI知识体系.md                    # 知识表示、搜索求解、知识图谱
+│   └── 03-人工智能导论课程资源说明.md        # AI 导论外部课程资料与系统功能映射
 │
-├── 📚 知识点/
-│   ├── ai-fundamentals.md             # 人工智能基础概念
-│   ├── ai-algorithms.md               # AI 核心算法总结
-│   ├── ai-knowledge-system.md         # AI 知识体系概述
-│   ├── ai-review.md                   # AI 综合复习
-│   ├── ml_basics.md                   # 机器学习基础
-│   ├── ml_advanced.md                 # 机器学习进阶
-│   ├── ml-review.md                   # 机器学习复习
-│   ├── ml-exam-outline.md             # 机器学习考试大纲
-│   ├── dl_basics.md                   # 深度学习基础（CNN/RNN/Transformer/训练技巧）
-│   ├── nlp-intro.md                   # NLP 入门
-│   ├── nlp-overview.md                # NLP 概述（发展历程/任务体系）
-│   ├── nlp-review.md                  # NLP 复习
-│   ├── calculus-fundamentals.md       # 微积分基础
-│   ├── linear-algebra.md              # 线性代数（含 ML 应用）
-│   ├── probability-statistics.md      # 概率论与数理统计
-│   ├── python-fundamentals.md         # Python 基础
-│   ├── data-structures-fundamentals.md # 数据结构基础
-│   ├── data-structures-algorithms.md  # 数据结构与算法
-│   ├── digital-image-processing-cv.md # 数字图像处理与计算机视觉
-│   └── deep-reinforcement-learning/   # 深度强化学习（李宏毅课程）
-│       ├── overview.md                #   课程总览
-│       ├── 01-qlearning.md            #   Q-Learning / DQN
-│       ├── 02-actor-critic.md         #   Actor-Critic / A3C
-│       ├── 03-ppo.md                  #   PPO 近端策略优化
-│       ├── 04-reward-shaping.md       #   Reward Shaping
-│       ├── 05-inverse-rl.md           #   逆向强化学习 IRL
-│       ├── *.pdf                      #   原始讲义（不会被 RAG 索引）
-│       └── README.md                  #   子目录索引
+├── 02-数学基础/
+│   ├── 01-微积分基础.md                    # 导数、偏导数、链式法则
+│   ├── 02-线性代数.md                      # 矩阵运算、特征值分解、ML 应用
+│   ├── 03-概率统计.md                      # 贝叶斯公式、条件概率、期望方差
+│   ├── 04-数据结构基础.md                  # 基础数据结构
+│   ├── 05-数据结构与算法.md                # 算法分析与设计
+│   ├── 06-Python编程基础.md               # Python 语言基础
+│   ├── 07-NumPy基础.md                    # NumPy 数组操作与计算
+│   ├── 08-Pandas基础.md                   # Pandas 数据处理
+│   ├── 09-Matplotlib基础.md               # Matplotlib 可视化
+│   └── 10-ScikitLearn基础.md              # Scikit-learn 机器学习工具
 │
-├── 🐍 python-libraries/
-│   ├── numpy-basics.md                # NumPy 基础
-│   ├── pandas-basics.md               # Pandas 基础
-│   ├── matplotlib-basics.md           # Matplotlib 基础
-│   └── scikit-learn-basics.md         # Scikit-learn 基础
+├── 03-机器学习基础/
+│   ├── 01-机器学习概述.md                  # 监督/无监督/强化学习、泛化、过拟合
+│   ├── 02-机器学习知识大纲.md             # ML 知识体系全景
+│   ├── 03-机器学习进阶.md                  # 进阶 ML 主题
+│   ├── 04-数据预处理.md                    # 缺失值、归一化、类别编码
+│   ├── 05-特征工程.md                      # 特征选择、特征构造、降维
+│   ├── 06-模型评估.md                      # 分类/回归指标、交叉验证
+│   └── 07-AI搜索算法.md                    # BFS/DFS、A*、遗传算法
 │
-└── ✏️ 习题/
-    ├── README.md                      # 习题索引
-    ├── exercises.json                 # 习题元数据
-    ├── 📝 module1_preprocessing/       # 数据预处理习题 (q01-q14)
-    ├── 📝 module2_training/            # 模型训练习题 (q15-q41)
-    ├── 📝 module3_deployment/          # 模型部署习题 (q42-q49)
-    └── 📝 选择题/                      # 选择题 (4 套)
+├── 04-经典ML算法/
+│   ├── 01-线性回归.md                      # OLS、梯度下降、R^2、假设条件
+│   ├── 02-逻辑回归.md                      # Sigmoid、交叉熵、决策边界
+│   ├── 03-决策树与随机森林.md              # 信息增益、基尼系数、剪枝
+│   ├── 04-朴素贝叶斯.md                    # 贝叶斯定理、特征条件独立
+│   ├── 05-支持向量机.md                    # 最大间隔、核方法、软间隔
+│   ├── 06-KMeans聚类.md                    # 无监督聚类、肘部法则
+│   ├── 07-PCA降维.md                       # 主成分分析、方差解释率
+│   ├── 08-集成学习.md                      # Bagging、Boosting、Stacking
+│   ├── 09-梯度下降.md                      # BGD/SGD/Mini-batch、学习率
+│   └── 10-强化学习基础.md                  # MDP、Q-Learning、策略梯度
+│
+├── 05-深度学习/
+│   ├── 01-神经网络基础.md                  # 神经元、激活函数、前向/反向传播
+│   ├── 02-深度学习基础.md                  # DL 核心概念与训练技巧
+│   ├── 03-CNN卷积神经网络.md               # 卷积、池化、LeNet/VGG/ResNet
+│   ├── 04-RNN与LSTM.md                     # 循环网络、LSTM/GRU、梯度消失
+│   ├── 05-Transformer与注意力.md           # Self-Attention、Multi-Head、位置编码
+│   ├── 06-生成对抗网络GAN.md               # 生成器/判别器对抗训练
+│   └── 深度强化学习/
+│       ├── overview.md                     # 课程总览
+│       ├── 01-qlearning.md                 # Q-Learning / DQN
+│       ├── 02-actor-critic.md              # Actor-Critic / A3C
+│       ├── 03-ppo.md                       # PPO 近端策略优化
+│       ├── 04-reward-shaping.md            # Reward Shaping
+│       ├── 05-inverse-rl.md                # 逆向强化学习 IRL
+│       ├── *.pdf                           # 原始讲义（不会被 RAG 索引）
+│       └── README.md                       # 子目录索引
+│
+├── 06-计算机视觉/
+│   └── 01-图像处理与计算机视觉.md          # 图像滤波、形态学操作、边缘检测
+│
+├── 07-自然语言处理/
+│   ├── 01-NLP基础概念.md                   # NLP 难点、文本预处理、分词
+│   ├── 02-NLP概览.md                       # NLP 发展历程与任务体系
+│   └── 03-NLP进阶.md                       # 词向量、Seq2Seq、BERT/GPT
+│
+├── 08-模型部署/
+│   └── 01-模型部署概述.md                   # ONNX、量化剪枝、推理服务、部署实践
+│
+├── 09-习题库/
+│   ├── exercises.json                      # 习题元数据（9道基础题）
+│   ├── 选择题/
+│   │   ├── 01-人工智能基础概念.md
+│   │   ├── 02-机器学习基础.md
+│   │   ├── 03-深度学习基础.md
+│   │   └── 04-自然语言处理与计算机视觉.md
+│   └── 模块练习/
+│       ├── module1_preprocessing/          # 数据预处理习题 (q01-q14)
+│       ├── module2_training/               # 模型训练习题 (q15-q41)
+│       └── module3_deployment/             # 模型部署习题 (q42-q49)
+│
+├── 10-复习与总结/
+│   ├── 01-AI复习笔记.md                    # AI 核心知识复习（搜索/推理/博弈）
+│   ├── 02-机器学习复习笔记.md              # ML 核心知识复习（模型/评估）
+│   ├── 03-机器学习常见误区.md              # 常见误区汇总与纠正
+│   └── 04-间隔复习策略.md                  # 遗忘曲线驱动的间隔复习方法
+│
+├── 11-编程题库/
+│   ├── prog-01-two-sum.md                  # 哈希表：两数之和
+│   ├── ...
+│   └── prog-15-knapsack-01.md              # 动态规划：01背包
+│
+└── 12-拓展资源与竞赛训练/
+    ├── 01-开源课程资料索引.md              # 外部资料来源与课程模块映射
+    ├── 02-数据结构算法训练路线.md          # 数据结构与算法分阶段训练
+    └── 03-蓝桥杯算法竞赛训练路线.md        # 蓝桥杯/竞赛题型训练路径
 ```
 
 ---
 
-## 知识覆盖矩阵
+## 课程知识覆盖矩阵
 
-| 领域 | 主题 | 文档数 | 状态 |
-|------|------|--------|------|
-| **数学基础** | 微积分、线性代数、概率统计 | 3 | ✅ 完整 |
-| **编程基础** | Python、数据结构 | 2 | ✅ 完整 |
-| **机器学习** | 监督学习、无监督学习、集成学习 | 11 | ✅ 完整 |
-| **深度学习** | CNN、RNN/LSTM、Transformer、GAN、RL | 8 | ✅ 完整 |
-| **NLP** | 文本处理、词嵌入、LLM、RAG | 3 | ✅ 完整 |
-| **计算机视觉** | 图像处理、经典架构 | 1 | ⚠️ 可扩展 |
-| **强化学习** | Q-Learning、Actor-Critic、PPO、IRL | 6 | ✅ 完整 |
-| **Python 工具库** | NumPy、Pandas、Matplotlib、Scikit-learn | 4 | ✅ 完整 |
-| **ML 工程实践** | 预处理、特征工程、模型评估 | 3 | ✅ 完整 |
-| **习题库** | 预处理(14)、训练(27)、部署(8)、选择(4) | 53 | ✅ 完整 |
-
----
-
-## 文档质量说明
-
-### ✅ 格式规范文档
-- 使用 `##`/`###` 进行层次化分段（便于 RAG 分块）
-- 数学公式使用 LaTeX（`$$` 或 `$`）
-- 包含代码示例（Python/C 语法高亮）
-- 有明确的应用场景和学习建议
-
-### ⚠️ 需注意的文档
-- `deep-reinforcement-learning/` 中的 PDF 文件不会被 RAG 索引，仅作人工参考
-- `probability-statistics.md` 原为课堂笔记，已规范化整理
-- `linear-algebra.md` 原为课堂笔记，已规范化整理
+| 章节 | 模块 | 文档数 | 习题数 | 状态 |
+|------|------|--------|--------|------|
+| 第1章 | AI导论 | 3 | 4(选择) | ✅ 完整 |
+| 第2章 | 数学基础 | 10 | — | ✅ 完整 |
+| 第3章 | 机器学习基础 | 7 | 14(练习) | ✅ 完整 |
+| 第4章 | 经典ML算法 | 10 | 27(练习) | ✅ 完整 |
+| 第5章 | 深度学习 | 6+7 | — | ✅ 完整 |
+| 第6章 | 计算机视觉 | 1 | — | ✅ 基础完整，可继续扩展 |
+| 第7章 | 自然语言处理 | 3 | — | ✅ 完整 |
+| 第8章 | 模型部署 | 1 | 8(练习) | ✅ 基础完整，可继续扩展 |
+| 第9章 | 习题库 | — | 53 | ✅ 完整 |
+| 第10章 | 复习与总结 | 4 | — | ✅ 完整 |
+| 第11章 | 编程题库 | 15 | 15(编程) | ✅ 完整 |
+| 第12章 | 拓展资源与竞赛训练 | 3 | — | ✅ 完整 |
+| **总计** | **12个模块** | **125个 Markdown + 1个 JSON + 5个 PDF** | **68+** | |
 
 ---
 
-## 后续扩展计划
+## 文档格式规范
 
-- [ ] 计算机视觉专题：目标检测（YOLO/Faster R-CNN）、图像分割（U-Net/Mask R-CNN）
-- [ ] NLP 专题扩增：BERT 微调实战、Prompt Engineering、RAG 实现详解
-- [ ] 工具库扩展：PyTorch 基础、HuggingFace Transformers、LangChain
-- [ ] MLOps：模型部署（Flask/FastAPI/ONNX）、MLflow 实验管理
-- [ ] 大模型专题：LLM 训练（LoRA/QLoRA）、推理优化、Agent 开发
-- [ ] 更多习题：补充解答与详细解析
+所有知识文档遵循统一的五段式结构：
+1. **概念定义** — 清晰定义主题及其核心术语
+2. **核心原理** — 深入讲解原理、公式推导、算法流程
+3. **示例说明** — 提供具体案例或应用场景
+4. **常见误区** — 列出典型误解及正确理解
+5. **关键要点** — 总结 3-5 个核心 takeaway
+
+数学公式使用 LaTeX（`$$` 或 `$`），代码示例使用 Markdown 代码块（`` ```python ``）。
+
+---
+
+## 注意事项
+
+- `05-深度学习/深度强化学习/` 中的 PDF 文件为原始讲义，不会被 RAG 索引，仅作人工参考
+- 第8章（模型部署）已补充独立知识文档，习题 module3_deployment 可作为实操训练来源
+- 第6章（计算机视觉）已覆盖基础概念，后续可继续扩展目标检测、图像分割、视觉 Transformer 等专题
+- 第12章用于声明和组织外部开源资料来源，便于比赛文档说明知识库构造依据
+
+---
+
+## 外部资料参考
+
+本知识库在原有课程体系基础上，结合以下公开资料进行主题扩展与训练路线设计：
+
+| 来源 | 用途 |
+|------|------|
+| https://github.com/shishujuan/data-structure-algorithms | 数据结构、算法复杂度、基础编程题训练 |
+| https://github.com/HBU/Artificial_Intelligence | 人工智能导论/人工智能基础课程参考 |
+| https://github.com/Qume2005/lanqiaobei_exam | 蓝桥杯算法竞赛训练方向参考 |
+| https://gitcode.com/Open-source-documentation-tutorial/18b66 | 开源文档组织和知识库构造说明参考 |
+
+外部资料已被整理为课程化 Markdown 文档和编程题条目，未将第三方仓库原样复制为系统知识库。
 
 ---
 
@@ -132,4 +178,8 @@ data/knowledge/
 python backend/rag/knowledge_loader.py
 ```
 
-该命令会遍历 `data/knowledge/` 下所有 `.md` 和 `.json` 文件，分块后向量化存入 ChromaDB。
+该命令会遍历 `data/knowledge/` 下所有 `.md` 和 `.json` 文件，按 `##`/`###` 分块后向量化存入 ChromaDB。
+
+---
+
+> **构造声明**：本知识库为 EduAgent 团队根据《人工智能与机器学习》课程体系自行构造，并参考公开开源课程资料、数据结构算法资料与算法竞赛训练资料进行扩展。开发过程中使用了科大讯飞星火 Spark 4.0 大模型作为 AI 辅助工具。

@@ -28,6 +28,7 @@ class ResourceGenerateRequest(BaseModel):
     difficulty: str = Field(default="中级", examples=["初级"])
     count: int = Field(default=1, ge=1, le=5)
     path_id: Optional[str] = None
+    stage_id: Optional[int] = Field(default=None, ge=1)
 
 
 @router.post(
@@ -68,7 +69,7 @@ async def generate_resource(
                 )
 
             update_progress(5, "started", "资源生成任务已开始")
-            result = await resource_service.generate_resources(
+            generation_kwargs = dict(
                 db=db,
                 student_id=request.student_id,
                 topic=request.topic,
@@ -78,6 +79,9 @@ async def generate_resource(
                 path_id=request.path_id,
                 on_progress=update_progress,
             )
+            if request.stage_id is not None:
+                generation_kwargs["stage_id"] = request.stage_id
+            result = await resource_service.generate_resources(**generation_kwargs)
             task_service.update(
                 task["task_id"],
                 status="done",
@@ -117,6 +121,7 @@ async def generate_resource_stream(request: ResourceGenerateRequest):
                 difficulty=request.difficulty,
                 count=request.count,
                 path_id=request.path_id,
+                stage_id=request.stage_id,
             ):
                 yield event
         except Exception:

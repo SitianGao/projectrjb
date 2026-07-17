@@ -1,0 +1,236 @@
+.evaluation-page {
+  min-height: 100%;
+  background: #F6F7FB;
+  padding: 24px;
+  color: #111827;
+}
+
+.evaluation-container {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.evaluation-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px 24px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.evaluation-header h2 {
+  margin: 0 0 6px;
+  color: #111827;
+}
+
+.evaluation-header .ant-tabs {
+  grid-column: 1 / -1;
+}
+
+.evaluation-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  box-shadow: 0 6px 24px rgba(17, 24, 39, 0.05);
+  margin-bottom: 22px;
+}
+
+.evaluation-card .ant-card-body,
+.evaluation-card .ant-card-head {
+  border-color: #E5E7EB;
+}
+
+.context-bar {
+  background: #FFFFFF;
+}
+
+.context-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.context-grid {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  color: #6B7280;
+}
+
+.context-grid span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.low-confidence {
+  margin-top: 12px;
+  color: #F59E0B;
+}
+
+.evaluation-alert {
+  margin-bottom: 20px;
+  border-radius: 16px;
+}
+
+.overall-card .ant-card-body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+}
+
+.overall-score {
+  background: #F3F0FF;
+  border-radius: 16px;
+  padding: 22px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.overall-score h1 {
+  margin: 0;
+  color: #6C5CE7;
+  font-size: 48px;
+}
+
+.overall-score small {
+  font-size: 16px;
+}
+
+.section-kicker {
+  color: #6C5CE7;
+  font-weight: 700;
+}
+
+.dimension-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.dimension-card strong {
+  display: block;
+  font-size: 30px;
+  margin: 8px 0;
+  color: #111827;
+}
+
+.dimension-card p,
+.knowledge-card p {
+  color: #6B7280;
+  margin: 10px 0 0;
+}
+
+.delta-up {
+  color: #22C55E;
+}
+
+.delta-down {
+  color: #EF4444;
+}
+
+.knowledge-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.knowledge-grid h3 {
+  margin: 0 0 12px;
+  color: #111827;
+}
+
+.knowledge-card {
+  border-radius: 16px;
+  border-color: #E5E7EB;
+  margin-bottom: 12px;
+}
+
+.knowledge-card-head,
+.weak-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.weak-score .ant-progress {
+  flex: 1;
+}
+
+.trend-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.course-progress-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+  background: #F3F0FF;
+  border-radius: 16px;
+  margin-bottom: 16px;
+}
+
+.stage-progress-list {
+  display: grid;
+  gap: 12px;
+}
+
+.stage-progress-row {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.stage-progress-row > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.evaluation-empty {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  padding: 80px 20px;
+  box-shadow: 0 6px 24px rgba(17, 24, 39, 0.05);
+}
+
+.evaluation-history-table {
+  overflow-x: auto;
+}
+
+@media (max-width: 1199px) {
+  .dimension-grid,
+  .trend-stats,
+  .course-progress-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .knowledge-grid,
+  .overall-card .ant-card-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .evaluation-page {
+    padding: 14px;
+  }
+
+  .evaluation-header,
+  .dimension-grid,
+  .trend-stats,
+  .course-progress-summary,
+  .stage-progress-row {
+    grid-template-columns: 1fr;
+  }
+}

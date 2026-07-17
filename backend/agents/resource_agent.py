@@ -6,12 +6,44 @@ ResourceAgent —— 学习资源生成智能体
 合同（对齐 docs/design.md §10.4.3）:
     主入口: generate_resources(topic, resource_types, difficulty, profile, knowledge_context)
     返回:   {"resources": [{"type", "title", "topic", "difficulty", "content"}, ...]}
+
+v2 入口: generate_resources_v2(context, topic, resource_types, ...)
+    返回:   ResourceGenerationOutput (Pydantic 校验后的结构化输出)
 """
 import json
 import logging
 from typing import Optional, List, Dict
 
+<<<<<<< Updated upstream
+=======
+try:
+    from config import RESOURCE_STRICT_MODE
+except ModuleNotFoundError:
+    from backend.config import RESOURCE_STRICT_MODE
+
+from core.agent_context import AgentContext
+from core.errors import ResourceSchemaInvalid
+from core.knowledge_service import knowledge_service
+
+>>>>>>> Stashed changes
 from .base_agent import BaseAgent
+
+from .schemas import (
+    ResourceMeta,
+    ResourceGenerationOutput,
+    DocumentContent,
+    SectionData,
+    ExerciseContent,
+    ExerciseQuestion,
+    QuestionOption,
+    MindmapContent,
+    MindmapNode,
+    PptContent,
+    SlideData,
+    SlideElement,
+)
+
+from .prompts.resource_prompts import RESOURCE_SYSTEM_PROMPT, TYPE_PROMPTS
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +54,7 @@ class ResourceAgent(BaseAgent):
     def __init__(self, llm_client=None):
         super().__init__(llm_client)
 
-    # 各资源类型的详细 Prompt 模板
+    # 各资源类型的详细 Prompt 模板 (v1 —— 向后兼容)
     TYPE_PROMPTS = {
         "document": (
             "生成一份结构化 Markdown 讲解文档，要求：\n"
@@ -80,6 +112,7 @@ class ResourceAgent(BaseAgent):
     }
 
     def get_system_prompt(self) -> str:
+<<<<<<< Updated upstream
         return (
             "你是学习资源生成智能体。\n"
             "根据知识点主题、学生画像和资源类型要求，生成个性化、多模态的学习资源。\n\n"
@@ -113,6 +146,9 @@ class ResourceAgent(BaseAgent):
             "严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}\n"
             "content 字段为 Markdown 字符串（exercise 和 code 类型也使用 Markdown 格式排版）。"
         )
+=======
+        return RESOURCE_SYSTEM_PROMPT
+>>>>>>> Stashed changes
 
     def _build_generate_prompt(
         self,
@@ -192,7 +228,7 @@ class ResourceAgent(BaseAgent):
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
-    # 主入口（合同方法）
+    # 主入口（合同方法 —— v1 向后兼容）
     # ------------------------------------------------------------------
     async def generate_resources(
         self,
@@ -226,6 +262,15 @@ class ResourceAgent(BaseAgent):
         Returns:
             {"resources": [{"type", "title", "topic", "difficulty", "content"}, ...]}
         """
+        # 构造 AgentContext（v2 过渡：为 orchestrator 提供统一上下文）
+        course_id = "default_course"
+        if stage_info and isinstance(stage_info, dict):
+            course_id = stage_info.get("course_id", "default_course")
+        context = AgentContext(
+            user_id=profile.get("user_id", "default") if profile else "default",
+            course_id=course_id,
+        )
+
         resource_types = resource_types or ["document"]
         profile = profile or {}
         profile_json = json.dumps(profile, ensure_ascii=False, indent=2)
@@ -314,7 +359,7 @@ class ResourceAgent(BaseAgent):
         return {"resources": normalized}
 
     # ------------------------------------------------------------------
-    # 规则化兜底（无需 LLM）
+    # 规则化兜底（无需 LLM）—— v1
     # ------------------------------------------------------------------
     def _rule_based_resources(
         self,
@@ -680,3 +725,317 @@ class ResourceAgent(BaseAgent):
             return "\n\n".join(slides)
         else:
             return f"# {topic} 学习资源\n\n（内容待生成）\n"
+
+    # ==================================================================
+    # v2 新增方法
+    # ==================================================================
+
+    # ── 类型专用 Pydantic 校验器 ──────────────────────────────────
+
+    @staticmethod
+    def _validate_document(content: dict) -> DocumentContent:
+        """校验 document 类型资源的 content 是否符合 DocumentContent schema。"""
+        try:
+            return DocumentContent.model_validate(content)
+        except Exception as e:
+            raise ResourceSchemaInvalid("document", str(e))
+
+    @staticmethod
+    def _validate_exercise(content: dict) -> ExerciseContent:
+        """校验 exercise 类型资源的 content 是否符合 ExerciseContent schema。"""
+        try:
+            return ExerciseContent.model_validate(content)
+        except Exception as e:
+            raise ResourceSchemaInvalid("exercise", str(e))
+
+    @staticmethod
+    def _validate_mindmap(content: dict) -> MindmapContent:
+        """校验 mindmap 类型资源的 content 是否符合 MindmapContent schema。"""
+        try:
+            return MindmapContent.model_validate(content)
+        except Exception as e:
+            raise ResourceSchemaInvalid("mindmap", str(e))
+
+    @staticmethod
+    def _validate_ppt(content: dict) -> PptContent:
+        """校验 ppt 类型资源的 content 是否符合 PptContent schema。"""
+        try:
+            return PptContent.model_validate(content)
+        except Exception as e:
+            raise ResourceSchemaInvalid("ppt", str(e))
+
+    @staticmethod
+    def _validate_by_type(resource_type: str, content: dict):
+        """分发到对应类型的 Pydantic 校验器。
+
+        Args:
+            resource_type: 资源类型（document / exercise / mindmap / ppt）
+            content: 待校验的 content dict
+
+        Returns:
+            校验后的 Pydantic 模型实例；对于无结构化 schema 的类型返回原始 dict
+
+        Raises:
+            ResourceSchemaInvalid: Schema 校验失败
+        """
+        validators = {
+            "document": ResourceAgent._validate_document,
+            "exercise": ResourceAgent._validate_exercise,
+            "mindmap": ResourceAgent._validate_mindmap,
+            "ppt": ResourceAgent._validate_ppt,
+        }
+        validator = validators.get(resource_type)
+        if validator is None:
+            # 无结构化 schema 的类型（code / reading / audio 等），原样返回
+            return content
+        return validator(content)
+
+    # ── 标题规范化 ──────────────────────────────────────────────
+
+    @staticmethod
+    def _normalize_title(topic: str, resource_type: str) -> str:
+        """根据知识点和资源类型生成规范化标题。
+
+        Args:
+            topic: 知识点名称
+            resource_type: 资源类型
+
+        Returns:
+            规范化后的标题字符串
+        """
+        title_map = {
+            "document": f"{topic}核心讲义",
+            "exercise": f"{topic}专项练习",
+            "mindmap": f"{topic}知识导图",
+            "ppt": f"{topic}教学课件",
+            "code": f"{topic}代码案例",
+        }
+        return title_map.get(resource_type, f"{topic}学习资源")
+
+    # ── 重复检测（占位）─────────────────────────────────────────
+
+    @staticmethod
+    def _check_duplicate_version(topic: str, resource_type: str, course_id: str) -> int:
+        """检测是否存在同 topic + resource_type + course_id 的资源，确定版本号。
+
+        当前为占位实现，始终返回 1。
+        实际 DB 检查在 service 层完成。
+
+        Args:
+            topic: 知识点名称
+            resource_type: 资源类型
+            course_id: 课程 ID
+
+        Returns:
+            版本号（新资源为 1，已存在则为 existing.version + 1）
+        """
+        # TODO: 接入 service 层的 DB 查询
+        # existing = db.query(Resource).filter_by(
+        #     topic=topic, resource_type=resource_type, course_id=course_id
+        # ).first()
+        # if existing:
+        #     return existing.version + 1
+        return 1
+
+    # ── 规则化兜底（v2 返回 ResourceGenerationOutput）────────────
+
+    def _rule_based_resources_v2(
+        self,
+        topic: str,
+        resource_types: list[str],
+        difficulty: str,
+        profile: dict,
+        context: AgentContext,
+        stage_info: dict | None = None,
+        knowledge_context: str = "",
+    ) -> ResourceGenerationOutput:
+        """开发期无 LLM 时的规则化资源生成（v2：返回 ResourceGenerationOutput）。"""
+        resources = []
+        profile_inner = profile.get("profile", profile)
+        cognitive = profile_inner.get("cognitive_style", "")
+
+        for rtype in resource_types:
+            content_str = self._build_content(rtype, topic, difficulty, cognitive, stage_info)
+            resource = ResourceMeta(
+                resource_type=rtype,
+                title=self._normalize_title(topic, rtype),
+                summary=f"{topic} — {rtype} 学习资源（规则生成）",
+                difficulty=difficulty,
+                content={"raw": content_str},
+                course_id=context.course_id,
+                stage_id=context.stage_id or "",
+                task_id=context.task_id or "",
+                user_id=context.user_id,
+                knowledge_point_ids=list(context.knowledge_point_ids),
+            )
+            resources.append(resource)
+
+        return ResourceGenerationOutput(
+            resources=resources,
+            topic=topic,
+            difficulty=difficulty,
+            total=len(resources),
+        )
+
+    # ── v2 Prompt 构建 ──────────────────────────────────────────
+
+    def _build_generate_prompt_v2(
+        self,
+        topic: str,
+        resource_types: list[str],
+        difficulty: str,
+        profile_json: str,
+        knowledge_context: str,
+        context: AgentContext,
+        stage_info: dict | None = None,
+    ) -> str:
+        """为 generate_resources_v2 构建提示词（使用导入的 TYPE_PROMPTS）。"""
+        lines = [
+            f"课程 ID: {context.course_id}",
+            f"知识点: {topic}",
+            f"难度: {difficulty}",
+            f"目标资源类型: {json.dumps(resource_types, ensure_ascii=False)}",
+        ]
+
+        if stage_info and isinstance(stage_info, dict):
+            stage_title = stage_info.get("title", "")
+            if stage_title:
+                lines.append(f"当前关卡: {stage_title}")
+            objectives = stage_info.get("objectives", "")
+            if objectives:
+                lines.append(f"关卡目标: {objectives}")
+
+        lines.append(f"\n学生画像:\n{profile_json}")
+
+        if knowledge_context:
+            lines.append(f"\n{knowledge_context}")
+
+        lines.append("\n## 各类型生成要求")
+        for rtype in resource_types:
+            # 优先使用导入的 TYPE_PROMPTS（v2 结构化 schema），回退到类级 TYPE_PROMPTS（v1）
+            detail = TYPE_PROMPTS.get(rtype) or self.TYPE_PROMPTS.get(rtype, f"请生成 {rtype} 类型的资源。")
+            lines.append(f"\n### {rtype}\n{detail}")
+
+        lines.append(
+            "\n请严格输出符合 ResourceGenerationOutput Schema 的 JSON 对象。"
+        )
+        return "\n".join(lines)
+
+    # ── v2 主入口 ───────────────────────────────────────────────
+
+    async def generate_resources_v2(
+        self,
+        *,
+        context: AgentContext,
+        topic: str,
+        resource_types: list[str] | None = None,
+        difficulty: str = "中级",
+        profile: dict | None = None,
+        stage_info: dict | None = None,
+    ) -> ResourceGenerationOutput:
+        """生成学习资源（v2：Pydantic 结构化输出 + 类型校验）。
+
+        Args:
+            context: 统一 Agent 上下文（包含 course_id, user_id, stage_id, task_id）
+            topic: 知识点主题
+            resource_types: 要生成的资源类型列表，默认 ["document"]
+            difficulty: 难度等级（初级/中级/高级）
+            profile: 学生画像
+            stage_info: 当前关卡信息（可选）
+
+        Returns:
+            ResourceGenerationOutput: Pydantic 校验后的结构化资源列表
+        """
+        resource_types = resource_types or ["document"]
+        profile = profile or {}
+        profile_json = json.dumps(profile, ensure_ascii=False, indent=2)
+
+        # 1. 检索知识库上下文
+        try:
+            knowledge_context = knowledge_service.search_context(context.course_id, topic)
+        except Exception as exc:
+            logger.warning("ResourceAgent: 知识库检索失败，继续生成: %s", exc)
+            knowledge_context = "（资料库中未找到可靠依据）"
+
+        # 2. LLM 路径
+        if self.llm:
+            try:
+                user_prompt = self._build_generate_prompt_v2(
+                    topic=topic,
+                    resource_types=resource_types,
+                    difficulty=difficulty,
+                    profile_json=profile_json,
+                    knowledge_context=knowledge_context,
+                    context=context,
+                    stage_info=stage_info,
+                )
+                result = await self.call_llm_json(
+                    context=context,
+                    user_prompt=user_prompt,
+                    response_model=ResourceGenerationOutput,
+                )
+            except Exception as exc:
+                logger.warning("ResourceAgent v2 LLM 调用失败，回退规则化: %s", exc)
+                result = self._rule_based_resources_v2(
+                    topic=topic,
+                    resource_types=resource_types,
+                    difficulty=difficulty,
+                    profile=profile,
+                    context=context,
+                    stage_info=stage_info,
+                    knowledge_context=knowledge_context,
+                )
+        else:
+            # 3. 规则化兜底
+            logger.info("ResourceAgent v2: 无 LLM，使用规则化资源生成")
+            result = self._rule_based_resources_v2(
+                topic=topic,
+                resource_types=resource_types,
+                difficulty=difficulty,
+                profile=profile,
+                context=context,
+                stage_info=stage_info,
+                knowledge_context=knowledge_context,
+            )
+
+        # 4. 后处理：校验 + 规范化 + 上下文注入
+        valid_resources = []
+        for resource in result.resources:
+            try:
+                # 类型化 Schema 校验
+                validated_content = self._validate_by_type(resource.resource_type, resource.content)
+                if hasattr(validated_content, "model_dump"):
+                    resource.content = validated_content.model_dump()
+
+                # 标题规范化
+                resource.title = self._normalize_title(topic, resource.resource_type)
+
+                # 注入上下文字段
+                resource.course_id = context.course_id
+                resource.stage_id = context.stage_id or ""
+                resource.task_id = context.task_id or ""
+                resource.user_id = context.user_id
+                if not resource.knowledge_point_ids:
+                    resource.knowledge_point_ids = list(context.knowledge_point_ids)
+
+                # 重复检测（占位）
+                resource.version = self._check_duplicate_version(
+                    topic=topic,
+                    resource_type=resource.resource_type,
+                    course_id=context.course_id,
+                )
+
+                valid_resources.append(resource)
+            except ResourceSchemaInvalid as e:
+                logger.warning(
+                    "ResourceAgent v2: 资源校验失败 type=%s title=%s: %s",
+                    resource.resource_type, resource.title, e,
+                )
+                continue
+
+        result.resources = valid_resources
+        result.total = len(valid_resources)
+        result.topic = topic
+        result.difficulty = difficulty
+
+        return result

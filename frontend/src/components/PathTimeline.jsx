@@ -37,10 +37,10 @@ const DIFFICULTY_COLORS = {
 
 // 阶段状态配置
 const statusConfig = {
-  completed: { icon: CheckCircleFilled, color: '#52c41a', bg: '#f6ffed', label: '已完成', dot: '#52c41a' },
-  in_progress: { icon: PlayCircleFilled, color: '#1677ff', bg: '#e6f4ff', label: '进行中', dot: '#1677ff', pulse: true },
-  pending: { icon: ClockCircleFilled, color: '#d9d9d9', bg: '#fafafa', label: '待开始', dot: '#bfbfbf' },
-  locked: { icon: LockFilled, color: '#d9d9d9', bg: '#f5f5f5', label: '未解锁', dot: '#d9d9d9' },
+  completed: { icon: CheckCircleFilled, color: 'var(--stage-completed)', bg: 'var(--stage-completed-bg)', label: '已完成', dot: 'var(--stage-completed)', tagColor: 'green' },
+  in_progress: { icon: PlayCircleFilled, color: 'var(--stage-inprogress)', bg: 'var(--stage-inprogress-bg)', label: '进行中', dot: 'var(--stage-inprogress)', pulse: true, tagColor: 'processing' },
+  pending: { icon: ClockCircleFilled, color: 'var(--stage-locked-dot)', bg: 'var(--stage-locked-bg)', label: '待开始', dot: 'var(--stage-locked)', tagColor: 'default' },
+  locked: { icon: LockFilled, color: 'var(--stage-locked-dot)', bg: 'var(--stage-locked-bg)', label: '未解锁', dot: 'var(--stage-locked-dot)', tagColor: 'default' },
 }
 
 /**
@@ -121,7 +121,7 @@ export default function PathTimeline({
             <Space size={12}>
               <div style={{
                 width: 44, height: 44, borderRadius: 12,
-                background: 'linear-gradient(135deg, #1677ff 0%, #722ed1 100%)',
+                background: isDark ? 'linear-gradient(135deg, #4dabff 0%, #b37feb 100%)' : 'linear-gradient(135deg, #1677ff 0%, #722ed1 100%)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <StarFilled style={{ fontSize: 22, color: '#fff' }} />

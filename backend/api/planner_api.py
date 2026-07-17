@@ -64,3 +64,32 @@ async def get_path(student_id: str, db: Session = Depends(get_db)):
     if not path:
         raise ApiError("PATH_NOT_FOUND")
     return ok(path)
+
+
+@router.get("/{student_id}/all", responses=json_responses("PATH_NOT_FOUND"))
+async def get_all_paths(student_id: str, db: Session = Depends(get_db)):
+    """获取当前课程未归档的全部路径版本。"""
+    return ok(planner_service.get_path_history(db, student_id))
+
+
+@router.get("/{student_id}/path/{path_id}", responses=json_responses("PATH_NOT_FOUND"))
+async def get_path_by_id(
+    student_id: str,
+    path_id: str,
+    db: Session = Depends(get_db),
+):
+    path = planner_service.get_path_by_id(db, student_id, path_id)
+    if not path:
+        raise ApiError("PATH_NOT_FOUND")
+    return ok(path)
+
+
+@router.delete("/{student_id}/{path_id}", responses=json_responses("PATH_NOT_FOUND"))
+async def archive_path(
+    student_id: str,
+    path_id: str,
+    db: Session = Depends(get_db),
+):
+    if not planner_service.archive_path(db, student_id, path_id):
+        raise ApiError("PATH_NOT_FOUND")
+    return ok({"path_id": path_id, "archived": True}, "学习路径已归档")

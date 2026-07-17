@@ -8,6 +8,7 @@
 - POST /api/evaluate/record                 提交学习记录
 """
 import json
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -31,6 +32,13 @@ def _sse_event(event_type: str, **payload) -> str:
 
 class EvaluationStartRequest(BaseModel):
     student_id: str = Field(..., examples=["demo-student-01"])
+    user_id: Optional[str] = None
+    course_id: Optional[str] = None
+    stage_id: Optional[str] = None
+    scope_type: str = Field(default="last_30_days", examples=["last_30_days"])
+    start_at: Optional[datetime] = None
+    end_at: Optional[datetime] = None
+    force: bool = False
 
 
 class LearningRecordRequest(BaseModel):
@@ -48,7 +56,7 @@ async def start_evaluation(
     db: Session = Depends(get_db),
 ):
     """开始学习评估"""
-    return ok(evaluate_service.start_evaluation(db, request.student_id))
+    return ok(evaluate_service.start_evaluation(db, **request.model_dump(exclude={"user_id"})))
 
 
 @router.post("/generate", responses=json_responses())
@@ -57,7 +65,7 @@ async def generate_evaluation(
     db: Session = Depends(get_db),
 ):
     """生成评估报告（前端兼容）"""
-    return ok(evaluate_service.start_evaluation(db, request.student_id))
+    return ok(evaluate_service.start_evaluation(db, **request.model_dump(exclude={"user_id"})))
 
 
 @router.post("/generate/stream", responses=sse_responses("EVALUATE_FAILED"))
@@ -70,7 +78,7 @@ async def generate_evaluation_stream(request: EvaluationStartRequest):
             yield _sse_event("start", message="开始生成学习评估")
 
             # Day 9: 异步 AI 增强评估
-            report = await evaluate_service.start_evaluation_async(db, request.student_id)
+            report = await evaluate_service.start_evaluation_async(db, **request.model_dump(exclude={"user_id"}))
 
             # 逐维度发送 delta（前端可逐步渲染雷达图）
             for dim in report.get("dimensions", []):
@@ -122,9 +130,92 @@ async def generate_evaluation_stream(request: EvaluationStartRequest):
 
 
 @router.get("/report/{student_id}", responses=json_responses())
-async def get_report(student_id: str, db: Session = Depends(get_db)):
+async def get_report(
+    student_id: str,
+    course_id: Optional[str] = None,
+    scope_type: str = "last_30_days",
+    stage_id: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+):
     """获取评估报告"""
-    return ok(evaluate_service.build_report(db, student_id))
+    return ok(evaluate_service.build_report(
+        db,
+        student_id,
+        course_id=course_id,
+        scope_type=scope_type,
+        stage_id=stage_id,
+        start_at=start_at,
+        end_at=end_at,
+    ))
+
+
+@router.get("/reports/{report_id}", responses=json_responses("RESOURCE_NOT_FOUND"))
+async def get_report_by_id(report_id: str, db: Session = Depends(get_db)):
+    report = evaluate_service.get_report_by_id(db, report_id)
+    if not report:
+        from api.response import fail
+        return fail("RESOURCE_NOT_FOUND", "评估报告不存在")
+    return ok(report)
+
+
+@router.get("/history/{student_id}", responses=json_responses())
+async def list_reports(
+    student_id: str,
+    course_id: Optional[str] = None,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    return ok(evaluate_service.list_reports(db, student_id, course_id=course_id, limit=limit))
+
+
+@router.get("/courses/{course_id}/latest", responses=json_responses())
+async def get_course_latest_report(
+    course_id: str,
+    student_id: str,
+    scope_type: str = "last_30_days",
+    stage_id: Optional[str] = None,
+    start_at: Optional[datetime] = None,
+    end_at: Optional[datetime] = None,
+    db: Session = Depends(get_db),
+):
+    return ok(evaluate_service.build_report(
+        db,
+        student_id,
+        course_id=course_id,
+        scope_type=scope_type,
+        stage_id=stage_id,
+        start_at=start_at,
+        end_at=end_at,
+    ))
+
+
+@router.post("/reports/{report_id}/path-adjustments/preview", responses=json_responses("RESOURCE_NOT_FOUND"))
+async def preview_path_adjustment(report_id: str, db: Session = Depends(get_db)):
+    report = evaluate_service.get_report_by_id(db, report_id)
+    if not report:
+        from api.response import fail
+        return fail("RESOURCE_NOT_FOUND", "评估报告不存在")
+    return ok({
+        "evaluation_id": report_id,
+        "status": "preview",
+        "adjustments": report.get("path_adjustments") or report.get("pathAdjustments") or [],
+        "message": "这是路径调整草案，尚未修改学习路径。",
+    })
+
+
+@router.post("/reports/{report_id}/path-adjustments/apply", responses=json_responses("RESOURCE_NOT_FOUND"))
+async def apply_path_adjustment(report_id: str, db: Session = Depends(get_db)):
+    report = evaluate_service.get_report_by_id(db, report_id)
+    if not report:
+        from api.response import fail
+        return fail("RESOURCE_NOT_FOUND", "评估报告不存在")
+    return ok({
+        "evaluation_id": report_id,
+        "status": "pending_planner",
+        "message": "已确认调整建议；当前版本先返回确认结果，后续由 PlannerAgent 生成路径变更草案。",
+    })
 
 
 @router.get("/progress/{student_id}", responses=json_responses())

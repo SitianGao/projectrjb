@@ -26,6 +26,51 @@ export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate, 
   const [messages, setMessages] = useState(initialMessages)
   const [displayedMessages, setDisplayedMessages] = useState(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
+<<<<<<< Updated upstream
+=======
+
+  // ── 画像相关状态 ──
+  const [profile, setProfile] = useState(null)
+  const [completeness, setCompleteness] = useState(initialCompleteness)
+  const [nextQuestions, setNextQuestions] = useState([])
+  const [error, setError] = useState(null)
+
+  // ── 阶段状态机 ──
+  const [phase, setPhase] = useState(initialPhase)
+  const phaseRef = useRef(initialPhase)
+  // 标记用户是否已经确认过（避免 ready 状态被后续对话覆盖为 collecting）
+  const userConfirmedRef = useRef(initialPhase === PHASE.READY || initialPhase === PHASE.PLANNING || initialPhase === PHASE.GENERATING || initialPhase === PHASE.ACTIVE)
+
+  // 包装 setPhase，同步更新 ref 并通知外部
+  const updatePhase = useCallback((newPhase) => {
+    setPhase(newPhase)
+    phaseRef.current = newPhase
+    onPhaseChange?.(newPhase)
+  }, [onPhaseChange])
+
+  // ── 画像达到后端统一门槛后自动进入 ready ──
+  // 与 backend/config.py 的 PROFILE_READY_THRESHOLD 保持一致，避免过早
+  // 展示“开启学习之旅”，随后又被后端以画像不完整拒绝。
+  useEffect(() => {
+    if (userConfirmedRef.current) return
+    if (phaseRef.current !== PHASE.COLLECTING) return
+
+    const hasUserMsg = messages.some(m => m.role === 'user')
+    const hasRealReply = messages.some(
+      m => m.role === 'assistant' && m.content && !m.id?.startsWith('welcome'),
+    )
+
+    if (
+      hasUserMsg &&
+      hasRealReply &&
+      !isLoading &&
+      Number(completeness || 0) >= 0.85
+    ) {
+      updatePhase(PHASE.READY)
+    }
+  }, [messages, isLoading, completeness, updatePhase])
+
+>>>>>>> Stashed changes
   const abortRef = useRef(null)
   const idCounter = useRef(0)
   const typewriterTimerRef = useRef(null)

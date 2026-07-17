@@ -6,15 +6,31 @@ ProfileAgent v01 —— 基于 LLM 的学生画像构建智能体
 - 支持增量更新（多轮对话画像逐步完善）
 - 提供非流式 build_profile() 供编排器使用
 - 提供流式 chat() 供 SSE 端点使用
+- v2: 提供 AgentContext 驱动的 build_profile_v2() 和 update_from_evaluation()
 
 设计依据：docs/ai/agent-io.md §5 + docs/requirement.md §2.1(1)
 """
 import json
+import logging
 import re
+from datetime import datetime, timezone
 from typing import AsyncIterator, Optional, List, Dict
 
 from .base_agent import BaseAgent
+from core.agent_context import AgentContext
+from agents.schemas import ProfileOutput, CourseProfile, KnowledgeFoundation, WeakPoint
+from agents.prompts.profile_prompts import PROFILE_SYSTEM_PROMPT, PROFILE_UPDATE_PROMPT
 
+<<<<<<< Updated upstream
+=======
+try:
+    from config import LLM_STRICT_MODE, PROFILE_READY_THRESHOLD
+except ModuleNotFoundError:
+    from backend.config import LLM_STRICT_MODE, PROFILE_READY_THRESHOLD
+
+logger = logging.getLogger(__name__)
+
+>>>>>>> Stashed changes
 
 class ProfileAgent(BaseAgent):
     """学生画像构建智能体 —— LLM prompt v01"""
@@ -24,6 +40,7 @@ class ProfileAgent(BaseAgent):
         self.name = "ProfileAgent"
 
     def get_system_prompt(self) -> str:
+<<<<<<< Updated upstream
         """
         v01 prompt：指导学生画像提取
 
@@ -105,6 +122,10 @@ class ProfileAgent(BaseAgent):
             "4. 不生成违规、敏感或不安全的内容。\n"
             "5. 若学生输入超出学习范围（如闲聊、攻击性言论），礼貌引导回画像构建。\n"
         )
+=======
+        """返回标准化系统提示词（由 prompts 模块统一管理）。"""
+        return PROFILE_SYSTEM_PROMPT
+>>>>>>> Stashed changes
 
     # ---- 非流式：供编排器 pipeline 使用 ----
 
@@ -114,6 +135,7 @@ class ProfileAgent(BaseAgent):
         message: str,
         history: Optional[List[str]] = None,
         current_profile: Optional[Dict] = None,
+        context: Optional[AgentContext] = None,
     ) -> Dict:
         """
         构建/更新学生画像（非流式，返回完整 dict）。
@@ -123,6 +145,7 @@ class ProfileAgent(BaseAgent):
             message: 当前轮用户消息
             history: 历史对话消息列表
             current_profile: 已有画像（增量更新时传入）
+            context: 可选 AgentContext；未提供时自动从 student_id 构造
 
         Returns:
             dict: {
@@ -134,6 +157,17 @@ class ProfileAgent(BaseAgent):
                 "next_questions": [...]
             }
         """
+        if context is None:
+            course_id = "default"
+            if current_profile:
+                cp = current_profile.get("profile", current_profile)
+                course_id = cp.get("course_id", "default") if isinstance(cp, dict) else "default"
+            context = AgentContext(user_id=student_id, course_id=course_id)
+        logger.info(
+            "[ProfileAgent] build_profile user_id=%s course_id=%s",
+            context.user_id, context.course_id,
+        )
+
         # ---- Day 10: 安全过滤 ----
         from safety.content_filter import check_safety
         filter_result = check_safety(message, context="profile_message")
@@ -170,6 +204,196 @@ class ProfileAgent(BaseAgent):
         # 降级：关键字规则兜底
         return self._keyword_fallback(student_id, message, history or [])
 
+    # ---- v2: AgentContext 驱动的结构化输出 ----
+
+    async def build_profile_v2(
+        self,
+        *,
+        context: AgentContext,
+        message: str,
+        history: list[str] | None = None,
+        current_profile: dict | None = None,
+    ) -> ProfileOutput:
+        """
+        构建/更新学生画像 —— v2 结构化版本。
+
+        使用 call_llm_json 获取 Pydantic 校验后的 ProfileOutput。
+        LLM 不可用或失败时，降级到关键字规则提取。
+
+        Args:
+            context: 统一 Agent 上下文（包含 user_id / course_id）
+            message: 当前轮用户消息
+            history: 历史对话消息列表
+            current_profile: 已有画像 dict（增量更新时传入）
+
+        Returns:
+            ProfileOutput: 通过 Pydantic 校验的画像输出
+        """
+        logger.info(
+            "[ProfileAgent] build_profile_v2 user_id=%s course_id=%s",
+            context.user_id, context.course_id,
+        )
+
+        # ---- 安全过滤 ----
+        try:
+            from safety.content_filter import check_safety
+        except ModuleNotFoundError:
+            from backend.safety.content_filter import check_safety
+        filter_result = check_safety(message, context="profile_message")
+        if not filter_result["safe"]:
+            if not LLM_STRICT_MODE:
+                fallback_data = self._keyword_fallback(
+                    context.user_id,
+                    "请介绍你的学习情况",
+                    history or [],
+                    current_profile,
+                )
+                return self._legacy_dict_to_profile_output(context, fallback_data)
+            raise ValueError(filter_result.get("reason") or "画像输入未通过安全检查")
+
+        user_prompt = self._build_user_prompt(message, history, current_profile)
+
+        # 尝试 LLM 结构化调用
+        try:
+            result = await self.call_llm_json(
+                context=context,
+                user_prompt=user_prompt,
+                response_model=ProfileOutput,
+            )
+            # 确保 can_start_journey 与 completeness 一致
+            if result.completeness >= PROFILE_READY_THRESHOLD:
+                result.can_start_journey = True
+                result.next_questions = []
+            logger.info(
+                "[ProfileAgent] build_profile_v2 LLM success user_id=%s course_id=%s completeness=%.2f",
+                context.user_id, context.course_id, result.completeness,
+            )
+            return result
+        except Exception as e:
+            logger.warning(
+                "[ProfileAgent] build_profile_v2 LLM failed user_id=%s course_id=%s: %s",
+                context.user_id, context.course_id, e,
+            )
+            if LLM_STRICT_MODE:
+                raise
+
+        # 降级：关键字规则兜底 → ProfileOutput
+        fallback_data = self._keyword_fallback(
+            context.user_id, message, history or [], current_profile,
+        )
+        return self._legacy_dict_to_profile_output(context, fallback_data)
+
+    async def update_from_evaluation(
+        self,
+        *,
+        context: AgentContext,
+        evaluation: dict,
+        current_profile: dict,
+    ) -> ProfileOutput:
+        """
+        根据评估结果更新课程画像。
+
+        使用 PROFILE_UPDATE_PROMPT 指导 LLM 更新 weak_points 和
+        knowledge_foundation。LLM 失败时降级为规则化更新。
+
+        Args:
+            context: 统一 Agent 上下文
+            evaluation: 评估报告 dict（来自 EvaluateAgent）
+            current_profile: 当前画像 dict
+
+        Returns:
+            ProfileOutput: 更新后的画像
+        """
+        logger.info(
+            "[ProfileAgent] update_from_evaluation user_id=%s course_id=%s",
+            context.user_id, context.course_id,
+        )
+
+        evaluation_json = json.dumps(evaluation, ensure_ascii=False, indent=2)
+        current_profile_json = json.dumps(current_profile, ensure_ascii=False, indent=2)
+
+        user_prompt = PROFILE_UPDATE_PROMPT.format(
+            evaluation_json=evaluation_json,
+            current_profile_json=current_profile_json,
+        )
+
+        try:
+            result = await self.call_llm_json(
+                context=context,
+                user_prompt=user_prompt,
+                response_model=ProfileOutput,
+            )
+            # 版本号递增
+            result.profile.version = (current_profile.get("profile", {}).get("version", 0) if isinstance(current_profile, dict) else 0) + 1
+            result.profile.updated_at = datetime.now(timezone.utc).isoformat()
+            logger.info(
+                "[ProfileAgent] update_from_evaluation LLM success user_id=%s course_id=%s",
+                context.user_id, context.course_id,
+            )
+            return result
+        except Exception as e:
+            logger.warning(
+                "[ProfileAgent] update_from_evaluation LLM failed user_id=%s course_id=%s: %s",
+                context.user_id, context.course_id, e,
+            )
+            if LLM_STRICT_MODE:
+                raise
+
+        # 降级：规则化更新
+        cp = current_profile.get("profile", current_profile) if isinstance(current_profile, dict) else {}
+        if not isinstance(cp, dict):
+            cp = {}
+        existing_weak_points = cp.get("weak_points") or []
+        existing_knowledge = cp.get("knowledge_foundation") or {}
+
+        # 从评估中提取薄弱点并合并
+        eval_weaknesses = evaluation.get("weaknesses") or []
+        new_weak_points = list(existing_weak_points)
+        existing_names = {wp.get("name", "") if isinstance(wp, dict) else getattr(wp, "name", "") for wp in existing_weak_points}
+        for w in eval_weaknesses:
+            if isinstance(w, dict):
+                wname = w.get("name", "")
+                if wname and wname not in existing_names:
+                    new_weak_points.append({
+                        "knowledge_point_id": w.get("knowledge_point_id", f"kp_eval_{len(new_weak_points)}"),
+                        "name": wname,
+                        "score": w.get("score", 50),
+                    })
+                    existing_names.add(wname)
+
+        # 更新 knowledge_foundation
+        dimensions = evaluation.get("dimensions") or {}
+        kf = KnowledgeFoundation()
+        if existing_knowledge:
+            for key in ["python", "linear_algebra", "calculus", "machine_learning", "deep_learning"]:
+                setattr(kf, key, existing_knowledge.get(key, getattr(kf, key)))
+        if dimensions:
+            mastery = dimensions.get("knowledge_mastery", kf.machine_learning)
+            kf.machine_learning = max(kf.machine_learning, int(mastery) if mastery else kf.machine_learning)
+
+        fallback_profile = CourseProfile(
+            user_id=context.user_id,
+            course_id=context.course_id,
+            version=cp.get("version", 0) + 1,
+            knowledge_foundation=kf,
+            learning_goal=cp.get("learning_goal", ""),
+            cognitive_style=cp.get("cognitive_style", "案例驱动型"),
+            preferred_resources=cp.get("preferred_resources") or ["mindmap", "exercise", "document"],
+            weak_points=[WeakPoint(**wp) if isinstance(wp, dict) else wp for wp in new_weak_points],
+            interest_directions=cp.get("interest_directions") or [],
+            update_reason="rule_based_evaluation_update",
+            updated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+        return ProfileOutput(
+            profile=fallback_profile,
+            completeness=cp.get("completeness", 0.3) if isinstance(cp, dict) else 0.3,
+            confidence=0.4,
+            sources=["rule_based_evaluation_update"],
+            next_questions=[],
+            can_start_journey=False,
+        )
+
     # ---- 流式：供 /api/profile/chat SSE 端点使用 ----
 
     async def chat(
@@ -178,6 +402,7 @@ class ProfileAgent(BaseAgent):
         message: str,
         history: Optional[List[str]] = None,
         current_profile: Optional[Dict] = None,
+        context: Optional[AgentContext] = None,
     ) -> AsyncIterator[str]:
         """
         对话式画像构建（流式，SSE 事件）。
@@ -192,7 +417,34 @@ class ProfileAgent(BaseAgent):
             message: 当前用户消息
             history: 历史对话消息
             current_profile: 已有画像
+            context: 可选 AgentContext；未提供时自动从 student_id 构造
         """
+<<<<<<< Updated upstream
+=======
+        if context is None:
+            course_id = "default"
+            if current_profile:
+                cp = current_profile.get("profile", current_profile)
+                course_id = cp.get("course_id", "default") if isinstance(cp, dict) else "default"
+            context = AgentContext(user_id=student_id, course_id=course_id)
+        logger.info(
+            "[ProfileAgent] chat user_id=%s course_id=%s",
+            context.user_id, context.course_id,
+        )
+
+        try:
+            from safety.content_filter import check_safety
+        except ModuleNotFoundError:
+            from backend.safety.content_filter import check_safety
+
+        filter_result = check_safety(message, context="profile_message")
+        if not filter_result["safe"]:
+            reply = filter_result.get("reason") or "该内容无法用于学习画像，请重新描述你的学习情况。"
+            yield f'data: {{"type":"chat","content":{json.dumps(reply, ensure_ascii=False)}}}\n\n'
+            yield f'data: {{"type":"done"}}\n\n'
+            return
+
+>>>>>>> Stashed changes
         user_prompt = self._build_user_prompt(message, history, current_profile)
 
         full_response = []
@@ -397,9 +649,171 @@ class ProfileAgent(BaseAgent):
             "completeness": 0.5 if (weaknesses or interests) else 0.3,
             "confidence": 0.4,  # 规则匹配置信度低
             "sources": ["keyword_fallback"],
+<<<<<<< Updated upstream
             "next_questions": [
                 "你希望通过本课程达到什么目标？",
                 "你更偏好视频、图文还是动手代码示例？",
                 "你在学习中最容易卡住的地方是什么？",
             ],
         }
+=======
+            "next_questions": next_questions,
+        })
+
+    def _legacy_dict_to_profile_output(
+        self,
+        context: AgentContext,
+        data: dict,
+    ) -> ProfileOutput:
+        """
+        将旧版 _keyword_fallback 返回的 dict 转换为 ProfileOutput Pydantic 模型。
+
+        旧 dict 格式 → 新 CourseProfile 映射：
+        - knowledge_level → 无直接对应，体现在 learning_goal 描述中
+        - weakness (list[str]) → weak_points (list[WeakPoint])
+        - interest (list[str]) → interest_directions (list[str])
+        """
+        profile_data = data.get("profile", {}) if isinstance(data, dict) else {}
+        if not isinstance(profile_data, dict):
+            profile_data = {}
+
+        # 转换 old weakness strings → WeakPoint objects
+        old_weakness = profile_data.get("weakness") or []
+        weak_points = [
+            WeakPoint(
+                knowledge_point_id=f"kp_legacy_{i}",
+                name=w,
+                score=50,
+            )
+            for i, w in enumerate(old_weakness) if w
+        ]
+
+        # 转换 old interest strings → interest_directions
+        interest_directions = list(profile_data.get("interest") or [])
+
+        # 构造 learning_goal（融入 knowledge_level 信息）
+        knowledge_level = profile_data.get("knowledge_level", "")
+        learning_goal = profile_data.get("learning_goal", "")
+        if knowledge_level and knowledge_level not in learning_goal:
+            learning_goal = f"[{knowledge_level}] {learning_goal}".strip()
+
+        course_profile = CourseProfile(
+            user_id=context.user_id,
+            course_id=context.course_id,
+            version=1,
+            knowledge_foundation=KnowledgeFoundation(),
+            learning_goal=learning_goal,
+            cognitive_style=profile_data.get("cognitive_style", "案例驱动型"),
+            preferred_resources=["mindmap", "exercise", "document"],
+            weak_points=weak_points,
+            interest_directions=interest_directions,
+            update_reason="keyword_fallback",
+            updated_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+        completeness = data.get("completeness", 0.0)
+        return ProfileOutput(
+            profile=course_profile,
+            completeness=max(0.0, min(1.0, float(completeness))),
+            confidence=data.get("confidence", 0.4),
+            sources=data.get("sources", ["keyword_fallback"]),
+            next_questions=data.get("next_questions") or [],
+            can_start_journey=completeness >= PROFILE_READY_THRESHOLD,
+        )
+
+    @staticmethod
+    def _finalize_result(result: Dict) -> Dict:
+        """Clamp readiness fields so every ProfileAgent path follows one contract."""
+        try:
+            completeness = max(0.0, min(1.0, float(result.get("completeness", 0.0))))
+        except (TypeError, ValueError):
+            completeness = 0.0
+        result["completeness"] = completeness
+        result["can_start_journey"] = completeness >= PROFILE_READY_THRESHOLD
+        if result["can_start_journey"]:
+            result["next_questions"] = []
+        return result
+
+    @staticmethod
+    def _calc_completeness(
+        knowledge_level: str,
+        learning_goal: str,
+        cognitive_style: str,
+        weaknesses: List[str],
+        interests: List[str],
+        pace_preference: str,
+    ) -> float:
+        """基于各维度信息覆盖情况计算 completeness (0.0~1.0)。
+
+        评分逻辑（关键字降级路径偏保守，LLM 路径由模型自行判定）：
+        - knowledge_level: 非默认（非"中级"）= +0.15
+        - learning_goal: 非默认（非"掌握课程核心概念"）= +0.20
+        - cognitive_style: 非默认（非"偏好图解与案例"）= +0.12
+        - weakness: 有内容 = +0.10
+        - interest: 有内容 = +0.10
+        - pace_preference: 非默认（非"中速均衡型"）= +0.08
+        上限 0.90；六个维度通过多轮对话补齐后，降级路径也能达到 0.85 解锁线。
+        """
+        score = 0.15  # base: 至少有一定信息
+
+        if knowledge_level and knowledge_level != "中级":
+            score += 0.15
+        if learning_goal and learning_goal != "掌握课程核心概念":
+            score += 0.20
+        if cognitive_style and cognitive_style != "偏好图解与案例":
+            score += 0.12
+        if weaknesses:
+            score += 0.10
+        if interests:
+            score += 0.10
+        if pace_preference and pace_preference != "中速均衡型":
+            score += 0.08
+
+        return min(score, 0.90)
+
+    @staticmethod
+    def _gen_next_questions(
+        knowledge_level: str,
+        learning_goal: str,
+        cognitive_style: str,
+        weaknesses: List[str],
+        interests: List[str],
+        pace_preference: str,
+    ) -> List[str]:
+        """生成追问列表：优先询问最缺的维度，最多 2 条。
+
+        优先级：薄弱点 > 学习目标 > 认知风格 > 兴趣 > 学习节奏
+        不重复询问已有明确信息的维度。
+        """
+        questions: List[str] = []
+
+        # 1. 薄弱点 — 最高优先级
+        if not weaknesses:
+            questions.append("你在学习中最容易卡住的地方是什么？（比如数学推导、代码实现等）")
+
+        # 2. 学习目标
+        if len(questions) < 2 and (not learning_goal or learning_goal == "掌握课程核心概念"):
+            questions.append("你希望通过本课程达到什么具体目标？（比如掌握某个算法、完成一个项目等）")
+
+        # 3. 认知风格
+        if len(questions) < 2 and (
+            not cognitive_style or cognitive_style == "偏好图解与案例"
+        ):
+            questions.append("你更偏好哪种学习方式？视频讲解、图文教程还是动手代码示例？")
+
+        # 4. 兴趣方向
+        if len(questions) < 2 and not interests:
+            questions.append("你对哪些技术方向或应用领域比较感兴趣？")
+
+        # 5. 知识水平
+        if len(questions) < 2 and (not knowledge_level or knowledge_level == "中级"):
+            questions.append("你目前的基础大概在什么水平？零基础/入门/中级/进阶？")
+
+        # 6. 学习节奏
+        if len(questions) < 2 and (
+            not pace_preference or pace_preference == "中速均衡型"
+        ):
+            questions.append("你偏好快节奏速成还是慢节奏深入的学习方式？")
+
+        return questions[:2]
+>>>>>>> Stashed changes

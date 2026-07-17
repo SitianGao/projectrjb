@@ -20,9 +20,35 @@ export async function getEvaluation(studentId) {
   return client.get(`/evaluate/report/${studentId}`)
 }
 
+export async function getCourseEvaluation({ student_id, course_id, scope_type = 'last_30_days', stage_id, start_at, end_at }) {
+  return client.get(`/evaluate/courses/${course_id}/latest`, {
+    params: { student_id, scope_type, stage_id, start_at, end_at },
+  })
+}
+
+export async function getEvaluationReport(reportId) {
+  return client.get(`/evaluate/reports/${reportId}`)
+}
+
 // 获取评估历史 / 记录
 export async function getEvaluationHistory(studentId) {
   return client.get('/evaluate/record', { params: { student_id: studentId } })
+}
+
+export async function getEvaluationReports({ student_id, course_id, limit = 20 }) {
+  return client.get(`/evaluate/history/${student_id}`, { params: { course_id, limit } })
+}
+
+export async function regenerateEvaluation(data) {
+  return client.post('/evaluate/start', data)
+}
+
+export async function previewPathAdjustment(evaluationId) {
+  return client.post(`/evaluate/reports/${evaluationId}/path-adjustments/preview`)
+}
+
+export async function applyPathAdjustment(evaluationId) {
+  return client.post(`/evaluate/reports/${evaluationId}/path-adjustments/apply`)
 }
 
 // 获取学习进度统计（保留兼容，后端可能合并入 report 接口）

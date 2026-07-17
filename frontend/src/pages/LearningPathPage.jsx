@@ -16,6 +16,7 @@ import ProgressBar from '../components/ProgressBar'
 import ForgettingCurve from '../components/ForgettingCurve'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { getLearningPath, generateLearningPath } from '../api/planner'
+import { useAuth } from '../contexts/AuthContext'
 
 /**
  * SSE 事件类型：start | delta | data | error | done
@@ -57,6 +58,7 @@ function stagesToNodes(stages, currentStage) {
  * 学习路径页 — 时间线展示 + AI 生成
  */
 export default function LearningPathPage() {
+  const { studentId } = useAuth()
   const [pathData, setPathData] = useState(null)   // { student_id, title, stages, ... }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -65,13 +67,13 @@ export default function LearningPathPage() {
 
   useEffect(() => {
     loadPath()
-  }, [])
+  }, [studentId])
 
   async function loadPath() {
     setError(null)
     setLoading(true)
     try {
-      const data = await getLearningPath('demo-student-01')
+      const data = await getLearningPath(studentId)
       setPathData(data)
     } catch (err) {
       setError(err.message || '获取学习路径失败')
@@ -87,10 +89,14 @@ export default function LearningPathPage() {
   async function handleGenerate() {
     setGenerating(true)
     try {
+<<<<<<< Updated upstream
       const response = await generateLearningPath({
         student_id: 'demo-student-01',
         goal: '掌握高中数学核心知识',
       })
+=======
+      const response = await generateLearningPath({ student_id: studentId })
+>>>>>>> Stashed changes
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
@@ -122,7 +128,7 @@ export default function LearningPathPage() {
               case 'data':
                 // 结构化阶段数据到达
                 setPathData({
-                  student_id: 'demo-student-01',
+                  student_id: studentId,
                   title: event.title || '新学习路径',
                   stages: event.stages || [],
                 })

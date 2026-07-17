@@ -3,5 +3,6 @@
 asyncio_mode = "auto"
 # 测试发现路径
 testpaths = ["test"]
+pythonpath = ["backend"]
 # 默认异步 fixture 作用域
 asyncio_default_fixture_loop_scope = "function"

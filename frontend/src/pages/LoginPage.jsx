@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Form, Input, Button, Typography, Divider, Alert } from 'antd'
 import { UserOutlined, LockOutlined } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
+import { getSessionBootstrap, resolveLoginTarget } from '../services/sessionService'
 import CharacterGroup from '../components/AnimatedCharacter'
 
 const { Title, Text } = Typography
@@ -20,7 +21,10 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const ok = await login(values.username, values.password)
-      if (ok) { navigate('/', { replace: true }) }
+      if (ok) {
+        const bootstrap = await getSessionBootstrap().catch(() => null)
+        navigate(resolveLoginTarget(bootstrap), { replace: true })
+      }
     } catch (err) {
       setError(err.message || '登录失败，请重试')
     } finally {

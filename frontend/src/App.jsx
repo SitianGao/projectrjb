@@ -1,8 +1,7 @@
-import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate, useParams } from 'react-router-dom'
 import { Typography, Dropdown, Avatar } from 'antd'
 import {
-  HomeOutlined,
   UserOutlined,
   LogoutOutlined,
   KeyOutlined,
@@ -11,6 +10,11 @@ import {
   MoonOutlined,
   DesktopOutlined,
   ReadOutlined,
+  CodeOutlined,
+  BookOutlined,
+  BranchesOutlined,
+  CheckCircleOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import LoadingSkeleton from './components/LoadingSkeleton'
 import NotificationCenter from './components/NotificationCenter'
@@ -21,16 +25,27 @@ import './App.css'
 // 页面组件懒加载
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
+const StudyHomePage = lazy(() => import('./pages/StudyHomePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+<<<<<<< Updated upstream
+=======
+const ProfileSetupPage = lazy(() => import('./pages/ProfileSetupPage'))
+const AIWorkspacePage = lazy(() => import('./pages/AIWorkspacePage'))
+const CourseEntryPage = lazy(() => import('./pages/CourseEntryPage'))
+const ResourceGenerationPage = lazy(() => import('./pages/ResourceGenerationPage'))
+>>>>>>> Stashed changes
 
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const ResourcePage = lazy(() => import('./pages/ResourcePage'))
+const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'))
 const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
+const CodePracticePage = lazy(() => import('./pages/CodePracticePage'))
+const EvaluatePage = lazy(() => import('./pages/EvaluatePage'))
 
 const { Text } = Typography
 
@@ -38,8 +53,17 @@ const { Text } = Typography
 function AuthLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, activeCourse } = useAuth()
   const { mode, setMode, resolved } = useTheme()
+  const activeCoursePath = activeCourse?.id ? `/course/${activeCourse.id}` : '/courses'
+  const navItems = [
+    { label: '学习首页', path: '/home', match: (p) => p === '/home', icon: <ReadOutlined /> },
+    { label: '我的课程', path: '/courses', match: (p) => p === '/' || p === '/courses' || (p.startsWith('/course/') && !p.includes('/path') && !p.includes('/stage/') && !p.includes('/task/') && !p.includes('/test') && !p.includes('/assessment')), icon: <BookOutlined /> },
+    { label: '学习路径', path: activeCourse?.id ? `/course/${activeCourse.id}/path` : '/courses', match: (p) => p.includes('/path') || p.includes('/stage/') || p.includes('/task/'), icon: <BranchesOutlined /> },
+    { label: '资源中心', path: '/resources', match: (p) => p === '/resources' || p.startsWith('/resources?') || p.startsWith('/resources/'), icon: <FileTextOutlined /> },
+    { label: '在线测评', path: '/assessment/tests', match: (p) => p.startsWith('/assessment') || p.includes('/assessment') || p.includes('/test') || p === '/evaluate', icon: <CheckCircleOutlined /> },
+    { label: '代码练习', path: '/code-practice', match: (p) => p.startsWith('/code-practice'), icon: <CodeOutlined /> },
+  ]
 
   // 用户下拉菜单项
   const userMenuItems = [
@@ -85,40 +109,31 @@ function AuthLayout() {
       {/* 顶部导航栏 */}
       <div className="top-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <Text strong style={{ color: 'var(--text-primary)', fontSize: 18, cursor: 'pointer' }} onClick={() => navigate('/')}>
+          <Text strong style={{ color: 'var(--text-primary)', fontSize: 18, cursor: 'pointer' }} onClick={() => navigate('/home')}>
             🤖 智能学习平台
           </Text>
-          <span
-            onClick={() => navigate('/landing')}
-            style={{
-              fontSize: 14,
-              color: location.pathname === '/landing' ? '#8b5cf6' : 'var(--text-secondary)',
-              fontWeight: location.pathname === '/landing' ? 600 : 400,
-              cursor: 'pointer',
-              transition: 'color 0.2s',
-              userSelect: 'none',
-            }}
-            onMouseEnter={(e) => { if (location.pathname !== '/landing') e.target.style.color = '#8b5cf6' }}
-            onMouseLeave={(e) => { if (location.pathname !== '/landing') e.target.style.color = 'var(--text-secondary)' }}
-          >
-            主页
-          </span>
-          <span
-            onClick={() => navigate('/docs')}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 14,
-              color: location.pathname === '/docs' ? '#8b5cf6' : 'var(--text-secondary)',
-              fontWeight: location.pathname === '/docs' ? 600 : 400,
-              cursor: 'pointer',
-              transition: 'color 0.2s',
-              userSelect: 'none',
-            }}
-            onMouseEnter={(e) => { if (location.pathname !== '/docs') e.target.style.color = '#8b5cf6' }}
-            onMouseLeave={(e) => { if (location.pathname !== '/docs') e.target.style.color = 'var(--text-secondary)' }}
-          >
-            <ReadOutlined /> 文档
-          </span>
+          {navItems.map((item) => {
+            const active = item.match(location.pathname)
+            return (
+              <span
+                key={item.label}
+                onClick={() => navigate(item.path)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 14,
+                  color: active ? '#6C5CE7' : 'var(--text-secondary)',
+                  fontWeight: active ? 700 : 500,
+                  cursor: 'pointer',
+                  transition: 'color 0.2s',
+                  userSelect: 'none',
+                }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = '#6C5CE7' }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)' }}
+              >
+                {item.icon} {item.label}
+              </span>
+            )
+          })}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* 通知 */}
@@ -153,13 +168,13 @@ function AuthLayout() {
           {/* 个人中心 */}
           <div
             className="top-home-btn"
-            title="个人中心"
-            onClick={() => navigate('/home')}
+            title="当前课程"
+            onClick={() => navigate(activeCoursePath)}
             style={{
-              color: location.pathname === '/home' ? '#8b5cf6' : undefined,
+              color: location.pathname.startsWith('/course/') ? '#6C5CE7' : undefined,
             }}
           >
-            <HomeOutlined />
+            <BookOutlined />
           </div>
 
           {/* 用户头像下拉 */}
@@ -176,15 +191,47 @@ function AuthLayout() {
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <Suspense fallback={<LoadingSkeleton type="detail" />}>
           <Routes>
+<<<<<<< Updated upstream
             <Route path="/" element={<ProfilePage />} />
+=======
+            <Route path="/" element={<Navigate to="/home" replace />} />
+>>>>>>> Stashed changes
             <Route path="/home" element={<HomePage />} />
+            <Route path="/courses" element={<CourseEntryPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/onboarding/profile" element={<ProfileSetupPage mode="setup" />} />
+            <Route path="/ai-workspace" element={<AIWorkspacePage />} />
+            <Route path="/generating" element={<ResourceGenerationPage />} />
+            <Route path="/study" element={<Navigate to="/home" replace />} />
+            <Route path="/course/:courseId" element={<StudyHomePage />} />
+            <Route path="/course/:courseId/learn/:taskId" element={<StudyHomePage />} />
+            <Route path="/course/:courseId/profile/setup" element={<CourseScopedRoute><ProfileSetupPage mode="setup" /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/profile" element={<CourseScopedRoute><ProfileSetupPage mode="view" /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/profile/update" element={<CourseScopedRoute><ProfileSetupPage mode="update" /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/path/generating" element={<CourseScopedRoute><ProfileSetupPage mode="setup" /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/ai-workspace" element={<CourseScopedRoute><AIWorkspacePage /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/path" element={<CourseScopedRoute><LearningJourneyPage /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/graph" element={<CourseScopedRoute><LearningJourneyPage /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/stage/:stageId" element={<CourseScopedRoute><StageResourcePage /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/chat" element={<CourseScopedRoute><AIWorkspacePage /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/test" element={<CourseScopedRoute><EvaluatePage /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/assessment/report" element={<CourseScopedRoute><EvaluatePage /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/wrongbook" element={<CourseScopedRoute><WrongBookPage /></CourseScopedRoute>} />
             <Route path="/landing" element={<LandingPage />} />
 
             <Route path="/docs" element={<DocsPage />} />
+            <Route path="/assessment/tests" element={<EvaluatePage />} />
+            <Route path="/assessment/report" element={<EvaluatePage />} />
+            <Route path="/assessment/report/:reportId" element={<EvaluatePage />} />
+            <Route path="/assessment/history" element={<EvaluatePage />} />
+            <Route path="/evaluate" element={<Navigate to="/assessment/tests" replace />} />
+            <Route path="/resources/:resourceId" element={<ResourceDetailPage />} />
             <Route path="/resources" element={<ResourcePage />} />
             <Route path="/learning-path/:pathId" element={<LearningPathPage />} />
             <Route path="/edit-profile" element={<EditProfilePage />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
+            <Route path="/code-practice" element={<CodePracticePage />} />
+            <Route path="/code-practice/:problemId" element={<CodePracticePage />} />
           </Routes>
         </Suspense>
       </div>
@@ -196,6 +243,19 @@ function AuthLayout() {
 function RequireAuth({ children }) {
   const { isLoggedIn } = useAuth()
   if (!isLoggedIn) return <Navigate to="/login" replace />
+  return children
+}
+
+function CourseScopedRoute({ children }) {
+  const { courseId } = useParams()
+  const { activeCourse, activateCourse } = useAuth()
+
+  useEffect(() => {
+    if (!courseId) return
+    if (String(activeCourse?.id || '') === String(courseId)) return
+    activateCourse(courseId).catch(() => {})
+  }, [activateCourse, activeCourse?.id, courseId])
+
   return children
 }
 

@@ -32,6 +32,11 @@ class ResourceService:
         difficulty: str = "中级",
         count: int = 1,
         path_id: Optional[str] = None,
+<<<<<<< Updated upstream
+=======
+        stage_id: Optional[int] = None,
+        is_review: bool = False,
+>>>>>>> Stashed changes
         on_progress: Optional[Callable[[int, str, str], None]] = None,
     ) -> Dict:
         """Generate resources with the agent and persist the result."""
@@ -39,6 +44,11 @@ class ResourceService:
         self.profile_service.get_or_create_student(db, student_id)
         self.validate_path_ownership(db, student_id, path_id)
         profile = self.profile_service.get_profile(db, student_id)
+<<<<<<< Updated upstream
+=======
+        stage_info = _build_stage_info(path, topic, stage_id=stage_id) if path else None
+        knowledge_sources = self._retrieve_knowledge(topic, stage_info)
+>>>>>>> Stashed changes
 
         _emit_progress(on_progress, 35, "generating", "正在调用资源生成逻辑")
         if self.resource_agent:
@@ -53,6 +63,7 @@ class ResourceService:
             result = _template_resources(topic, types, difficulty, count)
 
         _emit_progress(on_progress, 75, "persisting", "正在保存学习资源")
+<<<<<<< Updated upstream
         saved = []
         for item in result.get("resources", []):
             resource = Resource(
@@ -72,6 +83,18 @@ class ResourceService:
         db.commit()
         for resource in saved:
             db.refresh(resource)
+=======
+        items = self.persist_generated_resources(
+            db=db,
+            student_id=student_id,
+            generated=result,
+            path_id=path_id,
+            stage_id=stage_info.get("stage_id") if stage_info else stage_id,
+            default_topic=topic,
+            default_difficulty=difficulty,
+            is_review=is_review,
+        )
+>>>>>>> Stashed changes
 
         _emit_progress(on_progress, 90, "formatting", "正在整理资源结果")
         items = [self._resource_to_dict(resource) for resource in saved]
@@ -85,6 +108,86 @@ class ResourceService:
             "generated_at": result.get("generated_at") or _now_iso(),
         }
 
+<<<<<<< Updated upstream
+=======
+    def _retrieve_knowledge(self, topic: str, stage_info: Optional[Dict]) -> List[Dict]:
+        if not self.retriever:
+            return []
+        query_parts = [topic]
+        if stage_info:
+            query_parts.extend(stage_info.get("topics") or [])
+            query_parts.append(stage_info.get("title") or "")
+        query = " ".join(str(value) for value in query_parts if value)
+        try:
+            rows = self.retriever.retrieve(query, top_k=5, min_similarity=0.15)
+            if RAG_STRICT_MODE and not rows:
+                raise RuntimeError(f"严格模式：知识库未命中主题“{topic}”")
+            logger.info(
+                "资源生成知识库命中: topic=%s sources=%s",
+                topic,
+                [row.get("source") for row in rows],
+            )
+            return rows
+        except Exception as exc:
+            if RAG_STRICT_MODE:
+                raise RuntimeError(f"严格模式：资源知识库检索失败：{exc}") from exc
+            logger.warning("资源知识库检索失败，继续使用画像生成: %s", exc)
+            return []
+
+    def persist_generated_resources(
+        self,
+        db: Session,
+        student_id: str,
+        generated: Dict,
+        path_id: Optional[str] = None,
+        stage_id: Optional[int] = None,
+        default_topic: str = "当前关卡",
+        default_difficulty: str = "中级",
+        is_review: bool = False,
+    ) -> List[Dict]:
+        """Persist an already generated ResourceAgent result (used by the pipeline)."""
+        saved = []
+        source_refs = generated.get("knowledge_sources") or []
+        for item in generated.get("resources", []):
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content") or ""
+            output_check = check_safety(content, context="resource_output")
+            if not output_check["safe"]:
+                raise ValueError(output_check.get("reason") or "生成内容未通过安全检查")
+            resource_id = str(uuid.uuid4())
+            resource_type = item.get("type") or "document"
+            title = item.get("title") or f"{default_topic} 学习资源"
+            artifact_url, mime_type = artifact_service.create(
+                resource_id,
+                resource_type,
+                title,
+                content,
+            )
+            resource = Resource(
+                id=resource_id,
+                student_id=student_id,
+                path_id=path_id,
+                stage_id=stage_id,
+                type=resource_type,
+                title=title,
+                content=content,
+                topic=item.get("topic") or default_topic,
+                difficulty=item.get("difficulty") or default_difficulty,
+                is_review=is_review,
+                source_refs=json.dumps(source_refs, ensure_ascii=False),
+                artifact_url=artifact_url,
+                mime_type=mime_type,
+            )
+            db.add(resource)
+            saved.append(resource)
+
+        db.commit()
+        for resource in saved:
+            db.refresh(resource)
+        return [self._resource_to_dict(resource) for resource in saved]
+
+>>>>>>> Stashed changes
     async def generate_stream(
         self,
         db: Session,
@@ -94,6 +197,7 @@ class ResourceService:
         difficulty: str = "中级",
         count: int = 1,
         path_id: Optional[str] = None,
+        stage_id: Optional[int] = None,
     ):
         """Generate resources and expose the result as SSE events."""
         yield f'data: {{"type":"start","message":"开始生成{topic}学习资源"}}\n\n'
@@ -106,6 +210,7 @@ class ResourceService:
             difficulty=difficulty,
             count=count,
             path_id=path_id,
+            stage_id=stage_id,
         )
         yield f'data: {{"type":"data","data":{_json_dumps(result)}}}\n\n'
         yield f'data: {{"type":"done"}}\n\n'
@@ -187,6 +292,7 @@ class ResourceService:
             "id": resource.id,
             "student_id": resource.student_id,
             "path_id": resource.path_id,
+            "stage_id": resource.stage_id,
             "type": resource.type,
             "title": resource.title,
             "topic": resource.topic,
@@ -295,6 +401,95 @@ def _normalize_types(types: Optional[List[str]]) -> List[str]:
     return normalized or defaults
 
 
+<<<<<<< Updated upstream
+=======
+def _build_stage_info(
+    path: LearningPath,
+    topic: str,
+    stage_id: Optional[int] = None,
+) -> Optional[Dict]:
+    stages = _safe_json_loads(path.stages, [])
+    if not isinstance(stages, list) or not stages:
+        return None
+
+    normalized_topic = (topic or "").strip().lower()
+
+    def topic_matches(stage: Dict) -> bool:
+        for value in stage.get("topics") or []:
+            candidate = str(value).strip().lower()
+            if candidate and (candidate in normalized_topic or normalized_topic in candidate):
+                return True
+        return False
+
+    stage_index = None
+    if stage_id is not None:
+        stage_index = next(
+            (
+                index
+                for index, stage in enumerate(stages)
+                if isinstance(stage, dict)
+                and str(stage.get("stage_id")) == str(stage_id)
+            ),
+            None,
+        )
+        if stage_index is None:
+            raise ValueError(f"学习路径中不存在阶段 {stage_id}")
+    if stage_index is None:
+        stage_index = next(
+            (
+                index
+                for index, stage in enumerate(stages)
+                if isinstance(stage, dict) and topic_matches(stage)
+            ),
+            None,
+        )
+    if stage_index is None:
+        stage_index = next(
+            (
+                index
+                for index, stage in enumerate(stages)
+                if isinstance(stage, dict)
+                and str(stage.get("stage_id")) == str(path.current_stage or 1)
+            ),
+            0,
+        )
+
+    stage = stages[stage_index] if isinstance(stages[stage_index], dict) else {}
+    previous_stage = stages[stage_index - 1] if stage_index > 0 else {}
+    next_stage = stages[stage_index + 1] if stage_index + 1 < len(stages) else {}
+    return {
+        "stage_id": stage.get("stage_id", stage_index + 1),
+        "stage_index": stage_index + 1,
+        "title": stage.get("title", f"阶段 {stage_index + 1}"),
+        "description": stage.get("description", ""),
+        "objectives": _normalize_list(stage.get("objectives")),
+        "topics": _normalize_list(stage.get("topics")),
+        "tasks": stage.get("tasks") if isinstance(stage.get("tasks"), list) else [],
+        "difficulty": stage.get("difficulty", "中级"),
+        "previous_stage_title": previous_stage.get("title", "") if isinstance(previous_stage, dict) else "",
+        "next_stage_title": next_stage.get("title", "") if isinstance(next_stage, dict) else "",
+    }
+
+
+def _safe_json_loads(value: Any, default: Any) -> Any:
+    if not value:
+        return default
+    try:
+        return json.loads(value) if isinstance(value, str) else value
+    except (json.JSONDecodeError, TypeError):
+        return default
+
+
+def _normalize_list(value: Any) -> List[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if value is None:
+        return []
+    text = str(value).strip()
+    return [text] if text else []
+
+
+>>>>>>> Stashed changes
 def _template_resources(
     topic: str,
     types: Optional[List[str]],

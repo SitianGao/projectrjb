@@ -63,12 +63,44 @@ export function AuthProvider({ children }) {
     return true
   }, [])
 
+<<<<<<< Updated upstream
   const register = useCallback(async (username, password, phone) => {
     // 模拟注册 —— 后续替换为 client.post('/auth/register', { username, password, phone })
     const exists = MOCK_USERS.find((u) => u.username === username)
     if (exists) {
       message.error('用户名已存在')
       return false
+=======
+  const createCourse = useCallback(async (title, goal = '') => {
+    const updated = await client.post('/auth/courses', { title, goal })
+    saveUser(updated)
+    return updated.active_course
+  }, [saveUser])
+
+  const activateCourse = useCallback(async (courseId) => {
+    const updated = await client.post(`/auth/courses/${courseId}/activate`)
+    saveUser(updated)
+    return updated.active_course
+  }, [saveUser])
+
+  const updateCourse = useCallback(async (courseId, updates) => {
+    const updated = await client.put(`/auth/courses/${courseId}`, updates)
+    saveUser(updated)
+    return updated.active_course
+  }, [saveUser])
+
+  const refreshCourses = useCallback(async () => {
+    const updated = await client.get('/auth/courses')
+    saveUser(updated)
+    return updated.courses || []
+  }, [saveUser])
+
+  const logout = useCallback(async () => {
+    try {
+      await client.post('/auth/logout')
+    } catch {
+      // 本地令牌仍需清理，服务端过期或离线不应阻止退出。
+>>>>>>> Stashed changes
     }
     const newUser = {
       id: MOCK_USERS.length + 1,
@@ -141,7 +173,27 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
+<<<<<<< Updated upstream
     <AuthContext.Provider value={{ user, login, register, updateProfile, changePassword, resetPasswordByPhone, logout, isLoggedIn: !!user }}>
+=======
+    <AuthContext.Provider value={{
+      user,
+      studentId: user?.student_id || null,
+      courses: user?.courses || [],
+      activeCourse: user?.active_course || null,
+      login,
+      register,
+      updateProfile,
+      changePassword,
+      resetPasswordByPhone,
+      createCourse,
+      activateCourse,
+      updateCourse,
+      refreshCourses,
+      logout,
+      isLoggedIn: !!user,
+    }}>
+>>>>>>> Stashed changes
       {children}
     </AuthContext.Provider>
   )

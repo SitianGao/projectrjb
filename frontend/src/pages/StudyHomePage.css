@@ -1,0 +1,13 @@
+/* StudyHomePage (Course Learn Page) — Minimal styles.
+   Most styling is inline in components per the purple design spec.
+   Page background #F6F7FB, primary #6C5CE7, cards #FFFFFF. */
+
+.study-home-loading,
+.study-home-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  background: #F6F7FB;
+  min-height: 400px;
+}

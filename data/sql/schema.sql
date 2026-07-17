@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS resources (
     id TEXT PRIMARY KEY,
     student_id TEXT NOT NULL,
     path_id TEXT,
+    stage_id INTEGER,
     type TEXT NOT NULL,
     title TEXT NOT NULL,
     content TEXT,

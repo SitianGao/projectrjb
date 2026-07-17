@@ -58,11 +58,65 @@ class PlannerService:
         """获取学生学习路径历史版本列表。"""
         paths = (
             db.query(LearningPath)
-            .filter(LearningPath.student_id == student_id)
+            .filter(
+                LearningPath.student_id == student_id,
+                LearningPath.status != "archived",
+            )
             .order_by(LearningPath.version.asc())
             .all()
         )
         return [self._path_to_dict(p) for p in paths]
+
+    def get_path_by_id(
+        self,
+        db: Session,
+        student_id: str,
+        path_id: str,
+    ) -> Optional[Dict]:
+        """读取属于当前课程的指定路径版本。"""
+        path = (
+            db.query(LearningPath)
+            .filter(
+                LearningPath.id == path_id,
+                LearningPath.student_id == student_id,
+                LearningPath.status != "archived",
+            )
+            .first()
+        )
+        return self._path_to_dict(path) if path else None
+
+    def archive_path(self, db: Session, student_id: str, path_id: str) -> bool:
+        """安全归档路径；不物理删除其资源、记录和评估证据。"""
+        path = (
+            db.query(LearningPath)
+            .filter(
+                LearningPath.id == path_id,
+                LearningPath.student_id == student_id,
+                LearningPath.status != "archived",
+            )
+            .first()
+        )
+        if not path:
+            return False
+
+        was_active = path.status == "active"
+        path.status = "archived"
+        if was_active:
+            previous = (
+                db.query(LearningPath)
+                .filter(
+                    LearningPath.student_id == student_id,
+                    LearningPath.id != path_id,
+                    LearningPath.status == "superseded",
+                )
+                .order_by(LearningPath.version.desc())
+                .first()
+            )
+            if previous:
+                previous.status = "active"
+        db.commit()
+        logger.info("学习路径已安全归档: student=%s path=%s", student_id, path_id)
+        return True
 
     def save_path(
         self,
@@ -168,6 +222,10 @@ class PlannerService:
                 yield _sse_event("delta", content=raw)
 
             path_data = _normalize_path_result(raw, resolved_goal)
+<<<<<<< Updated upstream
+=======
+            self._attach_stage_knowledge_sources(path_data, knowledge_sources)
+>>>>>>> Stashed changes
             record = self.save_path(db, student_id, path_data)
             saved = self._path_to_dict(record)
             yield _sse_event("progress", progress=90, message="学习路径已保存")
@@ -209,6 +267,10 @@ class PlannerService:
 
         raw = await self._generate_with_agent(profile, resolved_goal)
         result = _normalize_path_result(raw, resolved_goal)
+<<<<<<< Updated upstream
+=======
+        self._attach_stage_knowledge_sources(result, knowledge_sources)
+>>>>>>> Stashed changes
         record = self.save_path(db, student_id, result)
         return self._path_to_dict(record)
 
@@ -233,6 +295,76 @@ class PlannerService:
             )
         raise RuntimeError("PlannerAgent 缺少 generate_plan/build_path 方法")
 
+<<<<<<< Updated upstream
+=======
+    def _retrieve_course_knowledge(self, goal: str, profile: Dict) -> list[Dict]:
+        if not self.retriever:
+            return []
+        query = " ".join(
+            str(value)
+            for value in [
+                goal,
+                profile.get("knowledge_level"),
+                " ".join(profile.get("weakness") or []),
+                " ".join(profile.get("interest") or []),
+            ]
+            if value
+        )
+        try:
+            rows = self.retriever.retrieve(query, top_k=8, min_similarity=0.15)
+            if RAG_STRICT_MODE and not rows:
+                raise RuntimeError(f"严格模式：知识库未命中学习目标“{goal}”")
+            logger.info(
+                "路径规划知识库命中: goal=%s sources=%s",
+                goal,
+                [row.get("source") for row in rows],
+            )
+            return rows
+        except Exception as exc:
+            if RAG_STRICT_MODE:
+                raise RuntimeError(f"严格模式：路径知识库检索失败：{exc}") from exc
+            logger.warning("路径知识库检索失败，继续使用画像规划: %s", exc)
+            return []
+
+    def _attach_stage_knowledge_sources(
+        self,
+        path_data: Dict,
+        course_rows: list[Dict],
+    ) -> None:
+        """为每个阶段单独检索 Markdown 依据，避免所有阶段复用同一组宽泛来源。"""
+        if not self.retriever:
+            _attach_knowledge_sources(path_data, course_rows)
+            return
+
+        for stage in path_data.get("stages", []):
+            query = " ".join(
+                str(value)
+                for value in [
+                    stage.get("title"),
+                    " ".join(stage.get("topics") or []),
+                    " ".join(stage.get("objectives") or []),
+                ]
+                if value
+            )
+            try:
+                rows = self.retriever.retrieve(query, top_k=4, min_similarity=0.15)
+            except Exception as exc:
+                if RAG_STRICT_MODE:
+                    raise RuntimeError(
+                        f"严格模式：阶段“{stage.get('title') or stage.get('stage_id')}”知识库检索失败：{exc}"
+                    ) from exc
+                rows = []
+            if RAG_STRICT_MODE and not rows:
+                raise RuntimeError(
+                    f"严格模式：阶段“{stage.get('title') or stage.get('stage_id')}”未命中知识库"
+                )
+            selected = rows or course_rows[:4]
+            stage["knowledge_sources"] = [
+                {key: row.get(key) for key in ("title", "source", "similarity")}
+                for row in selected
+            ]
+
+>>>>>>> Stashed changes
     def _claim_generation(self, student_id: str) -> bool:
         with self._generation_lock:
             if student_id in self._generating_students:

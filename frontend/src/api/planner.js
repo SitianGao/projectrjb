@@ -84,3 +84,17 @@ export async function generateLearningPath({ student_id, goal } = {}) {
 export async function getLearningPath(studentId) {
   return client.get(`/planner/${studentId}`)
 }
+
+// 队员 A 的“我的课程/路径历史”页面需要读取全部路径版本。
+export async function getAllLearningPaths(studentId) {
+  return client.get(`/planner/${studentId}/all`)
+}
+
+export async function getLearningPathById(studentId, pathId) {
+  return client.get(`/planner/${studentId}/path/${pathId}`)
+}
+
+// 后端实现为安全归档，不直接物理删除关联资源与学习记录。
+export async function deleteLearningPath(studentId, pathId) {
+  return client.delete(`/planner/${studentId}/${pathId}`)
+}

@@ -317,6 +317,8 @@ class ProfileService:
             record.interest = json.dumps(p["interest"], ensure_ascii=False)
         if "pace_preference" in p:
             record.pace_preference = p["pace_preference"]
+        if "memory_strength" in p:
+            record.memory_strength = json.dumps(p["memory_strength"], ensure_ascii=False)
 
         # learning_history 可能在 profile 内或 meta 中
         if "learning_history" in p or "learning_history" in meta:

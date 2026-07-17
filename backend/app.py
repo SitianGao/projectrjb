@@ -2,6 +2,11 @@
 EduAgent FastAPI 入口
 """
 import logging
+<<<<<<< Updated upstream
+=======
+import json
+import os
+>>>>>>> Stashed changes
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -54,6 +59,13 @@ from api.resource_api import router as resource_router
 from api.tutor_api import router as tutor_router
 from api.evaluate_api import router as evaluate_router
 from api.task_api import router as task_router
+<<<<<<< Updated upstream
+=======
+from api.auth_api import router as auth_router
+from api.judge_api import router as judge_router
+from api.session_api import router as session_router
+from api.course_profile_api import router as course_profile_router
+>>>>>>> Stashed changes
 
 app.include_router(profile_router, prefix="/api/profile", tags=["画像"])
 app.include_router(planner_router, prefix="/api/planner", tags=["规划"])
@@ -63,6 +75,13 @@ app.include_router(resource_router, prefix="/api/resources", tags=["资源兼容
 app.include_router(tutor_router, prefix="/api/tutor", tags=["辅导"])
 app.include_router(evaluate_router, prefix="/api/evaluate", tags=["评估"])
 app.include_router(task_router, prefix="/api/task", tags=["任务"])
+<<<<<<< Updated upstream
+=======
+app.include_router(auth_router, prefix="/api/auth", tags=["账号与课程"])
+app.include_router(judge_router, prefix="/api/judge", tags=["在线判题"])
+app.include_router(session_router, prefix="/api/session", tags=["会话启动"])
+app.include_router(course_profile_router, prefix="/api", tags=["课程画像"])
+>>>>>>> Stashed changes
 
 
 # ---- 启动事件 ----
@@ -75,9 +94,30 @@ async def startup():
 
     # 2. RAG 组件状态检查（Day 13: 确保知识库可连通）
     try:
+<<<<<<< Updated upstream
         from rag.vector_store import default_store
         count = default_store.count()
         logger.info(f"RAG 向量库就绪: collection='{default_store.collection_name}', 文档数={count}")
+=======
+        auth_service.seed_demo_users(db)
+    finally:
+        db.close()
+
+    # 1.5 演示课程初始化（幂等）
+    if os.getenv("INIT_DEMO_COURSE", "true").lower() not in ("0", "false", "no", "off"):
+        try:
+            from scripts.init_demo_course import init_demo_course
+            init_demo_course()
+            logger.info("演示课程初始化完成")
+        except Exception as e:
+            logger.warning("演示课程初始化失败（不影响正常使用）: %s", e)
+
+    # 2. RAG 自动初始化：空向量库会导入 data/knowledge；失败则可解释降级。
+    try:
+        from rag.bootstrap import initialize_rag
+        rag_status = initialize_rag()
+        logger.info("RAG 状态: %s", rag_status)
+>>>>>>> Stashed changes
     except Exception as e:
         logger.warning(f"RAG 向量库未就绪（首次请求时将自动初始化）: {e}")
 
@@ -89,7 +129,6 @@ async def startup():
 
     try:
         from rag.knowledge_loader import DEFAULT_KNOWLEDGE_DIR
-        import os
         if os.path.isdir(DEFAULT_KNOWLEDGE_DIR):
             files = [f for f in os.listdir(DEFAULT_KNOWLEDGE_DIR)
                      if f.endswith(('.md', '.json'))]
