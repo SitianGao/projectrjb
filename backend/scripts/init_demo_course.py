@@ -692,11 +692,7 @@ def init_demo_course(db: Session | None = None) -> dict:
                     topic=res_data["topic"],
                     difficulty=res_data.get("difficulty", "中级"),
                     stage_id=res_data.get("stage_id", ""),
-                    summary=res_data.get("summary", ""),
-                    estimated_minutes=res_data.get("estimated_minutes", 30),
                     content=json.dumps(res_data["content"], ensure_ascii=False),
-                    status="completed",
-                    version=1,
                 )
                 db.add(resource_obj)
                 resource_count += 1
@@ -724,12 +720,14 @@ def init_demo_course(db: Session | None = None) -> dict:
                     question_id=wq_data["question_id"],
                     topic=wq_data["topic"],
                     question=wq_data["question"],
-                    options=wq_data["options"],
+                    question_text=wq_data["question"],
+                    options=json.dumps(wq_data["options"], ensure_ascii=False),
                     user_answer=wq_data["user_answer"],
                     correct_answer=wq_data["correct_answer"],
                     explanation=wq_data["explanation"],
                     wrong_count=wq_data.get("wrong_count", 1),
                     status=wq_data.get("status", "unmastered"),
+                    last_wrong_at=datetime.datetime.utcnow(),
                 )
                 db.add(wq)
                 wq_count += 1

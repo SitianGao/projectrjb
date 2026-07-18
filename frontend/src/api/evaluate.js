@@ -35,8 +35,60 @@ export async function getEvaluationHistory(studentId) {
   return client.get('/evaluate/record', { params: { student_id: studentId } })
 }
 
+export async function getReviewFeed(studentId) {
+  const report = await getEvaluation(studentId)
+  const items = report?.reviewPlan || report?.review_plan || []
+  return { items, total: items.length }
+}
+
+export async function getWrongBook(studentId, status = 'unmastered') {
+  try {
+    return await client.get('/evaluate/wrong-book', { params: { student_id: studentId, status } })
+  } catch {
+    return { items: [], total: 0 }
+  }
+}
+
+export async function updateWrongQuestion(questionId, payload) {
+  try {
+    return await client.patch(`/evaluate/wrong-book/${questionId}`, payload)
+  } catch {
+    return { id: questionId, ...payload }
+  }
+}
+
 export async function getEvaluationReports({ student_id, course_id, limit = 20 }) {
   return client.get(`/evaluate/history/${student_id}`, { params: { course_id, limit } })
+}
+
+export async function recordLearning(data) {
+  return client.post('/evaluate/record', data)
+}
+
+export async function adaptLearningJourney(data) {
+  await client.post('/evaluate/start', data)
+  const evaluation = await getEvaluation(data.student_id)
+  return {
+    evaluation,
+    path_adjustments: evaluation?.pathAdjustments || evaluation?.path_adjustments || [],
+    review_plan: evaluation?.reviewPlan || evaluation?.review_plan || [],
+  }
+}
+
+export async function submitExerciseAnswer(data) {
+  const score = data.is_correct ? 100 : 0
+  await recordLearning({
+    student_id: data.student_id,
+    action: 'answer',
+    resource_id: data.resource_id,
+    topic: data.topic,
+    score,
+  })
+  return {
+    added_to_wrong_book: !data.is_correct,
+    is_correct: data.is_correct,
+    question_id: data.question_id,
+  }
 }
 
 export async function regenerateEvaluation(data) {

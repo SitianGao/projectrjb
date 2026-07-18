@@ -16,8 +16,6 @@ from typing import Optional, List, Dict
 
 from .base_agent import BaseAgent
 
-<<<<<<< Updated upstream
-=======
 # ── 新架构导入 ──
 from core.agent_context import AgentContext
 from agents.schemas import TutorResponse
@@ -32,7 +30,6 @@ try:
 except ModuleNotFoundError:
     from backend.config import LLM_STRICT_MODE, RAG_STRICT_MODE
 
->>>>>>> Stashed changes
 logger = logging.getLogger(__name__)
 
 
@@ -180,12 +177,6 @@ class TutorAgent(BaseAgent):
                     top_k=top_k,
                     min_similarity=0.3,
                 )
-<<<<<<< Updated upstream
-            else:
-                logger.info(f"RAG 检索无命中: '{question[:60]}'")
-        except Exception as e:
-            logger.warning(f"RAG 检索失败（降级为空上下文）: {e}")
-=======
                 if rag_results:
                     rag_context_text = knowledge_service.search_context(
                         course_id=course_id,
@@ -222,7 +213,6 @@ class TutorAgent(BaseAgent):
                 if RAG_STRICT_MODE:
                     raise RuntimeError(f"严格模式：辅导知识库检索失败：{e}") from e
                 logger.warning(f"RAG 检索失败（降级为空上下文）: {e}")
->>>>>>> Stashed changes
 
         # ---- 构建 Prompt ----
         profile_inner = (profile or {}).get("profile", profile or {})

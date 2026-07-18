@@ -222,10 +222,7 @@ class PlannerService:
                 yield _sse_event("delta", content=raw)
 
             path_data = _normalize_path_result(raw, resolved_goal)
-<<<<<<< Updated upstream
-=======
             self._attach_stage_knowledge_sources(path_data, knowledge_sources)
->>>>>>> Stashed changes
             record = self.save_path(db, student_id, path_data)
             saved = self._path_to_dict(record)
             yield _sse_event("progress", progress=90, message="学习路径已保存")
@@ -267,10 +264,7 @@ class PlannerService:
 
         raw = await self._generate_with_agent(profile, resolved_goal)
         result = _normalize_path_result(raw, resolved_goal)
-<<<<<<< Updated upstream
-=======
         self._attach_stage_knowledge_sources(result, knowledge_sources)
->>>>>>> Stashed changes
         record = self.save_path(db, student_id, result)
         return self._path_to_dict(record)
 
@@ -295,8 +289,6 @@ class PlannerService:
             )
         raise RuntimeError("PlannerAgent 缺少 generate_plan/build_path 方法")
 
-<<<<<<< Updated upstream
-=======
     def _retrieve_course_knowledge(self, goal: str, profile: Dict) -> list[Dict]:
         if not self.retriever:
             return []
@@ -364,7 +356,6 @@ class PlannerService:
                 for row in selected
             ]
 
->>>>>>> Stashed changes
     def _claim_generation(self, student_id: str) -> bool:
         with self._generation_lock:
             if student_id in self._generating_students:

@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 from api.openapi_examples import TASK_SUCCESS_EXAMPLE, json_responses, sse_responses
 from api.response import ApiError, ok, sse_done, sse_error
 from database import SessionLocal, get_db
-from deps import resource_service, task_service
+from api.auth_api import require_user
+from deps import classroom_service, resource_service, task_service
 
 router = APIRouter()
 
@@ -25,10 +26,13 @@ class ResourceGenerateRequest(BaseModel):
     student_id: str = Field(..., examples=["demo-student-01"])
     topic: str = Field(..., examples=["机器学习入门"])
     types: Optional[List[str]] = Field(default=None, examples=[["document", "exercise", "code"]])
+    resource_type: Optional[str] = None
     difficulty: str = Field(default="中级", examples=["初级"])
     count: int = Field(default=1, ge=1, le=5)
     path_id: Optional[str] = None
-    stage_id: Optional[int] = Field(default=None, ge=1)
+    stage_id: Optional[str] = None
+    course_id: Optional[str] = None
+    task_id: Optional[str] = None
 
 
 @router.post(
@@ -42,9 +46,53 @@ class ResourceGenerateRequest(BaseModel):
 async def generate_resource(
     request: ResourceGenerateRequest,
     background_tasks: BackgroundTasks,
+    user=Depends(require_user),
     db: Session = Depends(get_db),
 ):
     """生成学习资源，返回 task_id；前端轮询 /api/task/{task_id}/status。"""
+    requested_types = set(request.types or [])
+    if request.resource_type:
+        requested_types.add(request.resource_type)
+    if "interactive_classroom" in requested_types:
+        if not request.course_id:
+            raise ApiError("COURSE_SCOPE_MISMATCH", "生成互动课堂需要 course_id", status_code=400)
+        task = task_service.create("互动课堂生成任务已创建")
+
+        async def run_classroom_task():
+            db = SessionLocal()
+            try:
+                def update(progress: int, phase: str, message: str):
+                    task_service.update(task["task_id"], status="running", progress=progress, phase=phase, message=message)
+
+                update(10, "analyzing_goals", "读取阶段学习目标")
+                update(28, "retrieving_knowledge", "检索当前课程知识库")
+                update(46, "planning_scenes", "规划课堂场景")
+                update(68, "generating_content", "生成 PPT、白板、模拟和测验")
+                result = await classroom_service.generate_for_stage(
+                    db,
+                    user=user,
+                    course_id=request.course_id,
+                    stage_id=str(request.stage_id or "stage_gradient_descent"),
+                    task_id=request.task_id or "task_gradient_classroom",
+                    topic=request.topic,
+                )
+                update(88, "validating", "校验课堂内容和课程范围")
+                task_service.update(task["task_id"], status="done", progress=100, phase="completed", message="互动课堂生成完成", result=result)
+            except Exception as exc:
+                task_service.update(
+                    task["task_id"],
+                    status="failed",
+                    progress=100,
+                    phase="failed",
+                    message="互动课堂生成失败",
+                    error={"code": "CLASSROOM_GENERATION_FAILED", "message": str(exc)},
+                )
+            finally:
+                db.close()
+
+        background_tasks.add_task(run_classroom_task)
+        return ok(task, "互动课堂生成任务已创建")
+
     try:
         resource_service.validate_path_ownership(
             db,
@@ -141,16 +189,14 @@ async def generate_resource_stream(request: ResourceGenerateRequest):
     )
 
 
-@router.get("/list", responses=json_responses())
-async def list_resources(
-    student_id: Optional[str] = None,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
-    keyword: Optional[str] = None,
-    type: Optional[str] = None,
-    db: Session = Depends(get_db),
+def _list_resources_payload(
+    db: Session,
+    student_id: Optional[str],
+    page: int,
+    page_size: int,
+    keyword: Optional[str],
+    type: Optional[str],
 ):
-    """获取学生资源列表"""
     return ok(
         resource_service.list_resources(
             db=db,
@@ -163,6 +209,21 @@ async def list_resources(
     )
 
 
+@router.get("", responses=json_responses())
+@router.get("/", responses=json_responses())
+@router.get("/list", responses=json_responses())
+async def list_resources(
+    student_id: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    keyword: Optional[str] = None,
+    type: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """获取学生资源列表"""
+    return _list_resources_payload(db, student_id, page, page_size, keyword, type)
+
+
 @router.get("/types", responses=json_responses())
 async def get_resource_types():
     """获取支持的资源类型"""
@@ -173,6 +234,7 @@ async def get_resource_types():
             {"value": "code", "label": "代码案例"},
             {"value": "mindmap", "label": "思维导图"},
             {"value": "reading", "label": "拓展阅读"},
+            {"value": "interactive_classroom", "label": "AI 互动课堂"},
         ]
     })
 

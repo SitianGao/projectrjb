@@ -1,10 +1,5 @@
-<<<<<<< Updated upstream
-import { useState, useEffect, useMemo } from 'react'
-import { Card, Typography, Space, Tag, Avatar, Button, Result, Popover, Empty } from 'antd'
-=======
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
->>>>>>> Stashed changes
 import {
   Avatar,
   Button,
@@ -153,8 +148,6 @@ function HeroStat({ title, value, suffix, prefix, emptyLabel }) {
   )
 }
 
-<<<<<<< Updated upstream
-// ==================== 数据转换工具 ====================
 
 /** 从 topics 数组构建知识趋势折线数据 */
 function buildKnowledgeTrend(topics) {
@@ -201,10 +194,7 @@ function buildAnswerStats(evaluation) {
   ]
 }
 
-// ==================== 主组件 ====================
-=======
 // ── main page ──
->>>>>>> Stashed changes
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -214,15 +204,11 @@ export default function HomePage() {
   const [switching, setSwitching] = useState(false)
   const [dashboard, setDashboard] = useState(null)
 
-<<<<<<< Updated upstream
-  const studentId = user?.id || user?.student_id || ''
-=======
   const cleanCourses = useMemo(() => uniqueCourses(courses), [courses])
   const currentCourse = useMemo(() => {
     if (activeCourse && isMeaningfulCourse(activeCourse)) return activeCourse
     return cleanCourses[0] || null
   }, [activeCourse, cleanCourses])
->>>>>>> Stashed changes
 
   // ── load dashboard for current course ──
 
@@ -232,54 +218,12 @@ export default function HomePage() {
       setLoading(false)
       return
     }
-<<<<<<< Updated upstream
-
-    async function load() {
-      setError(null)
-      setLoading(true)
-      try {
-        const [profileData, evalData, statsData] = await Promise.all([
-          getProfile(studentId).catch(() => null),
-          getEvaluation(studentId).catch(() => null),
-          getProgressStats(studentId).catch(() => null),
-        ])
-        if (cancelled) return
-
-        setProfile(profileData)
-        setEvaluation(evalData)
-        setProgressStats(statsData)
-
-        if (!profileData && !evalData && !statsData) {
-          setError('无法连接到后端服务，请检查网络连接后重试')
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { cancelled = true }
-  }, [studentId])
-
-  async function handleRefresh() {
-    setLoading(true)
-    try {
-      const [profileData, evalData, statsData] = await Promise.all([
-        getProfile(studentId).catch(() => null),
-        getEvaluation(studentId).catch(() => null),
-        getProgressStats(studentId).catch(() => null),
-      ])
-      if (profileData) setProfile(profileData)
-      if (evalData) setEvaluation(evalData)
-      if (statsData) setProgressStats(statsData)
-=======
     setLoading(true)
     try {
       const data = await getCourseDashboard(currentCourse.id)
       setDashboard(data)
     } catch {
       setDashboard(null)
->>>>>>> Stashed changes
     } finally {
       setLoading(false)
     }
@@ -317,30 +261,6 @@ export default function HomePage() {
     }
   }, [cleanCourses.length, createCourse])
 
-<<<<<<< Updated upstream
-  // 能力评估雷达图数据（从 profile.dimensions 映射）
-  const abilityData = useMemo(() => {
-    const dims = profile?.dimensions || {}
-    return {
-      memory: dims.memory || dims.knowledge || 0,
-      understand: dims.understand || dims.ability || 0,
-      apply: dims.apply || dims.thinking || 0,
-      analyze: dims.analyze || dims.style || 0,
-      evaluate: dims.evaluate || dims.progress || 0,
-      create: dims.create || dims.goalClarity || 0,
-    }
-  }, [profile])
-
-  // 学习建议（从 evaluation）
-  const suggestions = evaluation?.suggestions || []
-
-  // 统计数值
-  const totalTimeHours = evaluation?.totalTime ? Math.round(evaluation.totalTime / 3600) : 0
-  const overallScore = evaluation?.overallScore || 0
-  const completedTasks = evaluation?.completedTasks || 0
-  const totalTopics = progressStats?.totalTopics || (profile?.topics?.length || 0)
-  const masteredTopics = progressStats?.masteredTopics || 0
-=======
   // ── derived state ──
 
   const courseStatus = dashboard?.course?.status || 'path_not_generated'
@@ -349,7 +269,6 @@ export default function HomePage() {
   const currentStage = dashboard?.current_stage
 
   // ── course switcher dropdown items ──
->>>>>>> Stashed changes
 
   const courseMenuItems = [
     ...cleanCourses.map((course) => ({
@@ -610,59 +529,6 @@ export default function HomePage() {
                 })()}
               </Card>
 
-<<<<<<< Updated upstream
-        {/* ===== 右侧面板 ===== */}
-        <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* 用户卡片 */}
-          <Card
-            style={{
-              borderRadius: 10, border: '1px solid var(--border)',
-              background: 'var(--bg-card)', overflow: 'hidden', padding: 0,
-            }}
-            styles={{ body: { padding: 0 } }}
-          >
-            <div style={{
-              background: 'linear-gradient(135deg, #1a1040 0%, #0d1b3e 100%)',
-              padding: '24px 20px 20px', textAlign: 'center', position: 'relative',
-            }}>
-              <div style={{
-                position: 'absolute', top: -30, right: -30, width: 100, height: 100,
-                borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%)',
-              }} />
-              <Avatar size={72} icon={<UserOutlined />} src={user?.avatar}
-                style={{
-                  border: '3px solid rgba(139,92,246,0.6)',
-                  boxShadow: '0 0 20px rgba(139,92,246,0.3)',
-                  backgroundColor: 'transparent',
-                }} />
-              <Title level={5} style={{ color: '#f8f7ff', margin: '12px 0 4px' }}>
-                {profile?.name || user?.name || user?.username || '同学'}
-              </Title>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
-                {profile?.level || '新手'} 学者 · {profile?.style || '未评估'}
-              </Text>
-            </div>
-            <div style={{ padding: '16px 20px' }}>
-              <Text style={{ fontSize: 13, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                "学而不思则罔，思而不学则殆"
-              </Text>
-              <div style={{ marginTop: 12, display: 'flex', gap: 16 }}>
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <Text strong style={{ fontSize: 18, color: '#8b5cf6' }}>{masteredTopics}</Text>
-                  <br /><Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>掌握专题</Text>
-                </div>
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <Text strong style={{ fontSize: 18, color: '#00b894' }}>{completedTasks}</Text>
-                  <br /><Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>完成任务</Text>
-                </div>
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <Text strong style={{ fontSize: 18, color: '#0984e3' }}>{overallScore}</Text>
-                  <br /><Text style={{ fontSize: 11, color: 'var(--text-muted)' }}>综合评分</Text>
-                </div>
-              </div>
-            </div>
-          </Card>
-=======
               <div className="dashboard-side">
                 <Card className="dashboard-panel" title="AI 学习建议">
                   {courseStatus === 'path_not_generated' ? (
@@ -687,7 +553,6 @@ export default function HomePage() {
                     </Space>
                   )}
                 </Card>
->>>>>>> Stashed changes
 
                 <Card className="dashboard-panel" title="我的课程">
                   {cleanCourses.length ? (

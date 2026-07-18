@@ -1,12 +1,7 @@
-"""
-EduAgent FastAPI 入口
-"""
+"""EduAgent FastAPI 入口。"""
+
 import logging
-<<<<<<< Updated upstream
-=======
-import json
 import os
->>>>>>> Stashed changes
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -14,8 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from utils.logger import setup_logging
-from database import SessionLocal, init_db
 from api.openapi_examples import json_responses
 from api.response import (
     ApiError,
@@ -25,8 +18,10 @@ from api.response import (
     ok,
     validation_exception_handler,
 )
+from database import SessionLocal, init_db
+from utils.logger import setup_logging
 
-# ---- 日志系统最先初始化 ----
+
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -36,7 +31,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# ---- CORS 配置 ----
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,13 +53,11 @@ from api.resource_api import router as resource_router
 from api.tutor_api import router as tutor_router
 from api.evaluate_api import router as evaluate_router
 from api.task_api import router as task_router
-<<<<<<< Updated upstream
-=======
 from api.auth_api import router as auth_router
 from api.judge_api import router as judge_router
 from api.session_api import router as session_router
 from api.course_profile_api import router as course_profile_router
->>>>>>> Stashed changes
+from api.classroom_api import router as classroom_router
 
 app.include_router(profile_router, prefix="/api/profile", tags=["画像"])
 app.include_router(planner_router, prefix="/api/planner", tags=["规划"])
@@ -75,80 +67,80 @@ app.include_router(resource_router, prefix="/api/resources", tags=["资源兼容
 app.include_router(tutor_router, prefix="/api/tutor", tags=["辅导"])
 app.include_router(evaluate_router, prefix="/api/evaluate", tags=["评估"])
 app.include_router(task_router, prefix="/api/task", tags=["任务"])
-<<<<<<< Updated upstream
-=======
 app.include_router(auth_router, prefix="/api/auth", tags=["账号与课程"])
 app.include_router(judge_router, prefix="/api/judge", tags=["在线判题"])
 app.include_router(session_router, prefix="/api/session", tags=["会话启动"])
 app.include_router(course_profile_router, prefix="/api", tags=["课程画像"])
->>>>>>> Stashed changes
+app.include_router(classroom_router, prefix="/api/classrooms", tags=["互动课堂"])
 
 
-# ---- 启动事件 ----
 @app.on_event("startup")
 async def startup():
-    """应用启动时自动初始化数据库表 + RAG 组件状态检查"""
-    # 1. 数据库初始化
+    """应用启动时自动初始化数据库表和 RAG 状态。"""
     init_db()
     logger.info("数据库表初始化完成")
 
-    # 2. RAG 组件状态检查（Day 13: 确保知识库可连通）
     try:
-<<<<<<< Updated upstream
-        from rag.vector_store import default_store
-        count = default_store.count()
-        logger.info(f"RAG 向量库就绪: collection='{default_store.collection_name}', 文档数={count}")
-=======
-        auth_service.seed_demo_users(db)
-    finally:
-        db.close()
+        from services.auth_service import auth_service
 
-    # 1.5 演示课程初始化（幂等）
+        db = SessionLocal()
+        try:
+            auth_service.seed_demo_users(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("演示账号初始化失败（不影响已有数据）: %s", exc)
+
     if os.getenv("INIT_DEMO_COURSE", "true").lower() not in ("0", "false", "no", "off"):
         try:
             from scripts.init_demo_course import init_demo_course
+
             init_demo_course()
             logger.info("演示课程初始化完成")
-        except Exception as e:
-            logger.warning("演示课程初始化失败（不影响正常使用）: %s", e)
+        except Exception as exc:
+            logger.warning("演示课程初始化失败（不影响正常使用）: %s", exc)
 
-    # 2. RAG 自动初始化：空向量库会导入 data/knowledge；失败则可解释降级。
     try:
-        from rag.bootstrap import initialize_rag
-        rag_status = initialize_rag()
-        logger.info("RAG 状态: %s", rag_status)
->>>>>>> Stashed changes
-    except Exception as e:
-        logger.warning(f"RAG 向量库未就绪（首次请求时将自动初始化）: {e}")
+        from rag.vector_store import default_store
+
+        count = default_store.count()
+        logger.info("RAG 向量库就绪: collection='%s', 文档数=%s", default_store.collection_name, count)
+    except Exception as exc:
+        logger.warning("RAG 向量库未就绪（首次请求时将自动初始化）: %s", exc)
 
     try:
         from rag.embedding import default_embedding
-        logger.info(f"RAG 嵌入模型已配置: {default_embedding.model_name}（首次使用时加载）")
-    except Exception as e:
-        logger.warning(f"RAG 嵌入模型配置异常: {e}")
+
+        logger.info("RAG 嵌入模型已配置: %s（首次使用时加载）", default_embedding.model_name)
+    except Exception as exc:
+        logger.warning("RAG 嵌入模型配置异常: %s", exc)
 
     try:
         from rag.knowledge_loader import DEFAULT_KNOWLEDGE_DIR
-        if os.path.isdir(DEFAULT_KNOWLEDGE_DIR):
-            files = [f for f in os.listdir(DEFAULT_KNOWLEDGE_DIR)
-                     if f.endswith(('.md', '.json'))]
-            logger.info(f"知识库目录就绪: {DEFAULT_KNOWLEDGE_DIR}（{len(files)} 个文件）")
-        else:
-            logger.warning(f"知识库目录不存在: {DEFAULT_KNOWLEDGE_DIR}")
-    except Exception as e:
-        logger.warning(f"知识库目录检查失败: {e}")
 
-    # 3. 安全过滤模块状态
+        if os.path.isdir(DEFAULT_KNOWLEDGE_DIR):
+            files = [
+                name
+                for name in os.listdir(DEFAULT_KNOWLEDGE_DIR)
+                if name.endswith((".md", ".json"))
+            ]
+            logger.info("知识库目录就绪: %s（%s 个文件）", DEFAULT_KNOWLEDGE_DIR, len(files))
+        else:
+            logger.warning("知识库目录不存在: %s", DEFAULT_KNOWLEDGE_DIR)
+    except Exception as exc:
+        logger.warning("知识库目录检查失败: %s", exc)
+
     try:
-        from safety.content_filter import default_filter
+        from safety.content_filter import default_filter  # noqa: F401
+
         logger.info("内容安全过滤模块已加载")
-    except Exception as e:
-        logger.error(f"内容安全过滤模块加载失败: {e}")
+    except Exception as exc:
+        logger.error("内容安全过滤模块加载失败: %s", exc)
 
 
 @app.get("/")
 async def root():
-    """健康检查"""
+    """健康检查。"""
     logger.info("健康检查请求")
     return ok({"status": "ok", "service": "EduAgent Backend"})
 

@@ -14,6 +14,7 @@ import CourseContextHeader from '../components/CourseContextHeader'
 import CourseTaskSidebar from '../components/CourseTaskSidebar'
 import LearningContentPanel from '../components/LearningContentPanel'
 import AITutorPanel from '../components/AITutorPanel'
+import { InteractiveClassroomTaskContent } from './InteractiveClassroomPage'
 
 // ── Main Component ──────────────────────────────────
 
@@ -180,6 +181,14 @@ export default function StudyHomePage() {
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: '#F6F7FB' }}>
         <Empty description="暂无学习数据" />
       </div>
+    )
+  }
+
+  if (currentTaskFromState?.type === 'interactive_classroom') {
+    return (
+      <InteractiveClassroomTaskContent
+        courseId={course?.id || courseId}
+      />
     )
   }
 

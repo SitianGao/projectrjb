@@ -3,11 +3,6 @@ Agent 基类 —— 统一 LLM 调用、JSON 解析、Pydantic 校验、重试�
 
 所有业务 Agent 继承此类，通过 call_llm_json() 获取结构化输出。
 """
-<<<<<<< Updated upstream
-from abc import ABC, abstractmethod
-from typing import AsyncIterator, Optional
-import asyncio
-=======
 
 from __future__ import annotations
 
@@ -15,13 +10,13 @@ import json
 import re
 import time
 import uuid
->>>>>>> Stashed changes
 import logging
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Optional
 
 from pydantic import BaseModel
 
+import config
 from core.agent_context import AgentContext
 from core.errors import AgentOutputInvalid
 
@@ -55,30 +50,12 @@ class BaseAgent(ABC):
         self,
         user_prompt: str,
         system_prompt: Optional[str] = None,
-<<<<<<< Updated upstream
-=======
         response_format: Optional[dict[str, str]] = None,
         response_schema: Optional[dict[str, Any]] = None,
->>>>>>> Stashed changes
     ) -> AsyncIterator[str]:
         """流式 LLM 调用 + 指数退避重试。"""
         system = system_prompt or self.get_system_prompt()
 
-<<<<<<< Updated upstream
-        for attempt in range(3):
-            try:
-                logger.info(f"[{self.__class__.__name__}] LLM call attempt {attempt + 1}")
-                async for chunk in self.llm.chat_stream(
-                    system=system,
-                    user=user_prompt,
-                ):
-                    yield chunk
-                return
-            except Exception as e:
-                logger.error(f"[{self.__class__.__name__}] Attempt {attempt + 1} failed: {e}")
-                if attempt == 2:
-                    yield f"[提示: 内容生成失败（已重试3次），请稍后重新尝试。错误详情: {str(e)}]"
-=======
         if not self.llm:
             raise RuntimeError("LLM client is not configured")
 
@@ -100,7 +77,6 @@ class BaseAgent(ABC):
                     if config.LLM_STRICT_MODE:
                         raise
                     yield f"[提示: 内容生成失败（已重试{attempts}次），请稍后重新尝试。]"
->>>>>>> Stashed changes
                 else:
                     await __import__("asyncio").sleep(2 ** attempt)
 

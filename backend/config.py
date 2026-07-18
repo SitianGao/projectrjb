@@ -61,3 +61,27 @@ SEED_DEMO_DATA = os.getenv("SEED_DEMO_DATA", "true").lower() not in {
     "no",
     "off",
 }
+
+# ── 严格模式控制 ────────────────────────────────────
+LLM_STRICT_MODE = os.getenv("LLM_STRICT_MODE", "true").lower() not in {
+    "0", "false", "no", "off",
+}
+RAG_STRICT_MODE = os.getenv("RAG_STRICT_MODE", "true").lower() not in {
+    "0", "false", "no", "off",
+}
+RESOURCE_STRICT_MODE = os.getenv("RESOURCE_STRICT_MODE", "true").lower() not in {
+    "0", "false", "no", "off",
+}
+
+# ── RAG 配置 ────────────────────────────────────────
+RAG_AUTO_INIT = os.getenv("RAG_AUTO_INIT", "true").lower() not in {
+    "0", "false", "no", "off",
+}
+
+# ── 认证模式 ────────────────────────────────────────
+AUTH_REQUIRED = os.getenv("AUTH_REQUIRED", "false").lower() in {
+    "1", "true", "yes", "on",
+}
+
+# ── 项目路径 ────────────────────────────────────────
+PROJECT_ROOT = Path(__file__).resolve().parent.parent

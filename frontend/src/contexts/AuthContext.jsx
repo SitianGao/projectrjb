@@ -1,76 +1,88 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { message } from 'antd'
 import client from '../api/client'
 
 const AuthContext = createContext(null)
+const USER_STORAGE_KEY = 'auth_user'
+const TOKEN_STORAGE_KEY = 'auth_token'
 
-// 模拟用户数据（后续替换为真实 API）
-const MOCK_USERS = [
-  {
-    id: 1,
-    username: 'admin',
-    password: 'admin123',
-    name: '管理员',
-    email: 'admin@example.com',
-    phone: '13800138000',
-    bio: '平台管理员，热爱教育技术',
-    avatar: null,
-  },
-  {
-    id: 2,
-    username: 'student',
-    password: 'student123',
-    name: '小明',
-    email: 'student@example.com',
-    phone: '13900139000',
-    bio: '一名正在努力学习的同学',
-    avatar: null,
-  },
-]
-
-const STORAGE_KEY = 'auth_user'
+function readStoredUser() {
+  try {
+    if (!localStorage.getItem(TOKEN_STORAGE_KEY)) return null
+    const saved = localStorage.getItem(USER_STORAGE_KEY)
+    return saved ? JSON.parse(saved) : null
+  } catch {
+    return null
+  }
+}
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      return saved ? JSON.parse(saved) : null
-    } catch {
-      return null
-    }
-  })
+  const [user, setUser] = useState(readStoredUser)
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
-    } else {
-      localStorage.removeItem(STORAGE_KEY)
-    }
-  }, [user])
-
-  const login = useCallback(async (username, password) => {
-    // 模拟登录 —— 后续替换为 client.post('/auth/login', { username, password })
-    const found = MOCK_USERS.find(
-      (u) => u.username === username && u.password === password,
-    )
-    if (!found) {
-      message.error('用户名或密码错误')
-      return false
-    }
-    const { password: _, ...userInfo } = found
-    setUser(userInfo)
-    message.success(`欢迎回来，${userInfo.name || userInfo.username} 同学`)
-    return true
+  const saveUser = useCallback((nextUser) => {
+    setUser(nextUser)
+    if (nextUser) localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser))
+    else localStorage.removeItem(USER_STORAGE_KEY)
   }, [])
 
-<<<<<<< Updated upstream
-  const register = useCallback(async (username, password, phone) => {
-    // 模拟注册 —— 后续替换为 client.post('/auth/register', { username, password, phone })
-    const exists = MOCK_USERS.find((u) => u.username === username)
-    if (exists) {
-      message.error('用户名已存在')
+  useEffect(() => {
+    const token = localStorage.getItem(TOKEN_STORAGE_KEY)
+    if (!token) return
+    client.get('/auth/me').then(saveUser).catch(() => {
+      localStorage.removeItem(TOKEN_STORAGE_KEY)
+      saveUser(null)
+    })
+  }, [saveUser])
+
+  const acceptSession = useCallback((session) => {
+    localStorage.setItem(TOKEN_STORAGE_KEY, session.token)
+    saveUser(session.user)
+  }, [saveUser])
+
+  const login = useCallback(async (username, password) => {
+    try {
+      const session = await client.post('/auth/login', { username, password })
+      acceptSession(session)
+      message.success(`欢迎回来，${session.user.name || session.user.username} 同学`)
+      return true
+    } catch (error) {
+      message.error(error.message || '用户名或密码错误')
       return false
-=======
+    }
+  }, [acceptSession])
+
+  const register = useCallback(async (username, password, phone) => {
+    try {
+      const session = await client.post('/auth/register', { username, password, phone })
+      acceptSession(session)
+      message.success('注册成功，已创建独立课程空间')
+      return true
+    } catch (error) {
+      message.error(error.message || '注册失败')
+      return false
+    }
+  }, [acceptSession])
+
+  const updateProfile = useCallback(async (updates) => {
+    const updated = await client.put('/auth/profile', updates)
+    saveUser(updated)
+    message.success('个人信息已更新')
+    return true
+  }, [saveUser])
+
+  const changePassword = useCallback(async (oldPassword, newPassword) => {
+    await client.put('/auth/password', { old_password: oldPassword, new_password: newPassword })
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    saveUser(null)
+    message.success('密码修改成功，请重新登录')
+    return true
+  }, [saveUser])
+
+  const resetPasswordByPhone = useCallback(async () => {
+    message.error('短信验证服务尚未配置，比赛版本不使用模拟验证码')
+    return false
+  }, [])
+
   const createCourse = useCallback(async (title, goal = '') => {
     const updated = await client.post('/auth/courses', { title, goal })
     saveUser(updated)
@@ -99,83 +111,14 @@ export function AuthProvider({ children }) {
     try {
       await client.post('/auth/logout')
     } catch {
-      // 本地令牌仍需清理，服务端过期或离线不应阻止退出。
->>>>>>> Stashed changes
+      // 本地令牌仍需清理。
     }
-    const newUser = {
-      id: MOCK_USERS.length + 1,
-      username,
-      name: username,
-      email: '',
-      phone: phone || '',
-      bio: '',
-      avatar: null,
-    }
-    MOCK_USERS.push({ ...newUser, password })
-    setUser(newUser)
-    message.success('注册成功')
-    return true
-  }, [])
-
-  const updateProfile = useCallback(async (updates) => {
-    // 模拟更新 —— 后续替换为 client.put('/auth/profile', updates)
-    const mockUser = MOCK_USERS.find((u) => u.id === user?.id)
-    if (mockUser) {
-      Object.assign(mockUser, updates)
-    }
-    setUser((prev) => ({ ...prev, ...updates }))
-    message.success('个人信息已更新')
-    return true
-  }, [user])
-
-  const changePassword = useCallback(async (oldPassword, newPassword) => {
-    // 模拟改密 —— 后续替换为 client.put('/auth/password', { oldPassword, newPassword })
-    const mockUser = MOCK_USERS.find((u) => u.id === user?.id)
-    if (!mockUser) {
-      message.error('用户不存在')
-      return false
-    }
-    if (mockUser.password !== oldPassword) {
-      message.error('原密码不正确')
-      return false
-    }
-    mockUser.password = newPassword
-    message.success('密码修改成功，请重新登录')
-    setUser(null)
-    return true
-  }, [user])
-
-  const resetPasswordByPhone = useCallback(async (phone, code, newPassword) => {
-    // 模拟手机验证码重置密码 —— 后续替换为真实 API
-    const MOCK_CODE = '123456'
-    const mockUser = MOCK_USERS.find((u) => u.id === user?.id)
-    if (!mockUser) {
-      message.error('用户不存在')
-      return false
-    }
-    if (mockUser.phone !== phone) {
-      message.error('手机号与绑定号码不一致')
-      return false
-    }
-    if (code !== MOCK_CODE) {
-      message.error('验证码错误')
-      return false
-    }
-    mockUser.password = newPassword
-    message.success('密码重置成功，请重新登录')
-    setUser(null)
-    return true
-  }, [user])
-
-  const logout = useCallback(() => {
-    setUser(null)
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    saveUser(null)
     message.success('已退出登录')
-  }, [])
+  }, [saveUser])
 
   return (
-<<<<<<< Updated upstream
-    <AuthContext.Provider value={{ user, login, register, updateProfile, changePassword, resetPasswordByPhone, logout, isLoggedIn: !!user }}>
-=======
     <AuthContext.Provider value={{
       user,
       studentId: user?.student_id || null,
@@ -193,7 +136,6 @@ export function AuthProvider({ children }) {
       logout,
       isLoggedIn: !!user,
     }}>
->>>>>>> Stashed changes
       {children}
     </AuthContext.Provider>
   )

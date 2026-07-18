@@ -12,7 +12,8 @@ Base = declarative_base()
 from .student import Student, StudentProfile
 from .learning_path import LearningPath
 from .resource import Resource
-from .evaluation import EvaluationReport, LearningRecord
+from .evaluation import EvaluationReport, LearningRecord, WrongQuestion
+from .auth import User, AuthToken, Course
 
 __all__ = [
     "Base",
@@ -22,4 +23,8 @@ __all__ = [
     "Resource",
     "EvaluationReport",
     "LearningRecord",
+    "WrongQuestion",
+    "User",
+    "AuthToken",
+    "Course",
 ]

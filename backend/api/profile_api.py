@@ -61,6 +61,8 @@ async def profile_chat(request: ProfileChatRequest):
             ):
                 yield event
         except Exception:
+            import traceback
+            traceback.print_exc()
             yield sse_error("PROFILE_CHAT_FAILED", "画像对话失败，请稍后重试")
             yield sse_done()
         finally:
@@ -96,6 +98,8 @@ async def profile_chat_stream_by_student(
             ):
                 yield event
         except Exception:
+            import traceback
+            traceback.print_exc()
             yield sse_error("PROFILE_CHAT_FAILED", "画像对话失败，请稍后重试")
             yield sse_done()
         finally:

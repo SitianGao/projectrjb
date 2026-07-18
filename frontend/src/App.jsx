@@ -27,13 +27,10 @@ const LandingPage = lazy(() => import('./pages/LandingPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
 const StudyHomePage = lazy(() => import('./pages/StudyHomePage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
-<<<<<<< Updated upstream
-=======
 const ProfileSetupPage = lazy(() => import('./pages/ProfileSetupPage'))
 const AIWorkspacePage = lazy(() => import('./pages/AIWorkspacePage'))
 const CourseEntryPage = lazy(() => import('./pages/CourseEntryPage'))
 const ResourceGenerationPage = lazy(() => import('./pages/ResourceGenerationPage'))
->>>>>>> Stashed changes
 
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
@@ -42,6 +39,10 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const ResourcePage = lazy(() => import('./pages/ResourcePage'))
 const ResourceDetailPage = lazy(() => import('./pages/ResourceDetailPage'))
 const LearningPathPage = lazy(() => import('./pages/LearningPathPage'))
+const LearningJourneyPage = lazy(() => import('./pages/LearningJourneyPage'))
+const StageResourcePage = lazy(() => import('./pages/StageResourcePage'))
+const WrongBookPage = lazy(() => import('./pages/WrongBookPage'))
+const InteractiveClassroomPage = lazy(() => import('./pages/InteractiveClassroomPage'))
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
 const CodePracticePage = lazy(() => import('./pages/CodePracticePage'))
@@ -58,8 +59,8 @@ function AuthLayout() {
   const activeCoursePath = activeCourse?.id ? `/course/${activeCourse.id}` : '/courses'
   const navItems = [
     { label: '学习首页', path: '/home', match: (p) => p === '/home', icon: <ReadOutlined /> },
-    { label: '我的课程', path: '/courses', match: (p) => p === '/' || p === '/courses' || (p.startsWith('/course/') && !p.includes('/path') && !p.includes('/stage/') && !p.includes('/task/') && !p.includes('/test') && !p.includes('/assessment')), icon: <BookOutlined /> },
-    { label: '学习路径', path: activeCourse?.id ? `/course/${activeCourse.id}/path` : '/courses', match: (p) => p.includes('/path') || p.includes('/stage/') || p.includes('/task/'), icon: <BranchesOutlined /> },
+    { label: '我的课程', path: '/courses', match: (p) => p === '/' || p === '/courses' || (p.startsWith('/course/') && !p.includes('/path') && !p.includes('/stage/') && !p.includes('/task/') && !p.includes('/learn/') && !p.includes('/classroom/') && !p.includes('/test') && !p.includes('/assessment')), icon: <BookOutlined /> },
+    { label: '学习路径', path: activeCourse?.id ? `/course/${activeCourse.id}/path` : '/courses', match: (p) => p.includes('/path') || p.includes('/stage/') || p.includes('/task/') || p.includes('/learn/') || p.includes('/classroom/'), icon: <BranchesOutlined /> },
     { label: '资源中心', path: '/resources', match: (p) => p === '/resources' || p.startsWith('/resources?') || p.startsWith('/resources/'), icon: <FileTextOutlined /> },
     { label: '在线测评', path: '/assessment/tests', match: (p) => p.startsWith('/assessment') || p.includes('/assessment') || p.includes('/test') || p === '/evaluate', icon: <CheckCircleOutlined /> },
     { label: '代码练习', path: '/code-practice', match: (p) => p.startsWith('/code-practice'), icon: <CodeOutlined /> },
@@ -191,11 +192,7 @@ function AuthLayout() {
       <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
         <Suspense fallback={<LoadingSkeleton type="detail" />}>
           <Routes>
-<<<<<<< Updated upstream
-            <Route path="/" element={<ProfilePage />} />
-=======
             <Route path="/" element={<Navigate to="/home" replace />} />
->>>>>>> Stashed changes
             <Route path="/home" element={<HomePage />} />
             <Route path="/courses" element={<CourseEntryPage />} />
             <Route path="/profile" element={<ProfilePage />} />
@@ -205,6 +202,7 @@ function AuthLayout() {
             <Route path="/study" element={<Navigate to="/home" replace />} />
             <Route path="/course/:courseId" element={<StudyHomePage />} />
             <Route path="/course/:courseId/learn/:taskId" element={<StudyHomePage />} />
+            <Route path="/course/:courseId/classroom/:classroomId" element={<InteractiveClassroomPage />} />
             <Route path="/course/:courseId/profile/setup" element={<CourseScopedRoute><ProfileSetupPage mode="setup" /></CourseScopedRoute>} />
             <Route path="/course/:courseId/profile" element={<CourseScopedRoute><ProfileSetupPage mode="view" /></CourseScopedRoute>} />
             <Route path="/course/:courseId/profile/update" element={<CourseScopedRoute><ProfileSetupPage mode="update" /></CourseScopedRoute>} />

@@ -121,18 +121,20 @@ export function buildStageLearningTasks(stage) {
   const rawTasks = uniqueRawTasks(stage)
   const lectureTasks = pickTasks(rawTasks, (type, task, index) =>
     /document|reading|study|lecture|text|resource/.test(type)
-    || (!/exercise|quiz|test|exam|code|mindmap|diagram/.test(type) && index < Math.max(1, rawTasks.length - 1)),
+    || (!/exercise|quiz|test|exam|code|mindmap|diagram|interactive_classroom|classroom|openmaic/.test(type) && index < Math.max(1, rawTasks.length - 1)),
   )
   const diagramTasks = pickTasks(rawTasks, (type) => /mindmap|diagram|graph|map/.test(type))
+  const classroomTasks = pickTasks(rawTasks, (type) => /interactive_classroom|classroom|openmaic/.test(type))
   const quizTasks = pickTasks(rawTasks, (type) => /exercise|quiz|practice|check/.test(type))
   const examTasks = pickTasks(rawTasks, (type) => /test|exam|assessment/.test(type))
 
   const lectureLines = joinTaskText(lectureTasks)
   const diagramLines = joinTaskText(diagramTasks)
+  const classroomLines = joinTaskText(classroomTasks)
   const quizLines = joinTaskText(quizTasks)
   const examLines = joinTaskText(examTasks)
 
-  return sanitizeSequence([
+  const sequence = [
     {
       id: `${stageId}-goal`,
       type: 'objective',
@@ -172,6 +174,27 @@ export function buildStageLearningTasks(stage) {
       estimatedMinutes: diagramTasks.reduce((sum, task) => sum + toMinutes(task, 15), 0) || 15,
       status: slotStatus(diagramTasks),
     },
+  ]
+
+  if (classroomTasks.length) {
+    const firstClassroomTask = classroomTasks[0]
+    sequence.push({
+      id: String(firstClassroomTask.task_id || firstClassroomTask.id || `${stageId}-interactive-classroom`),
+      type: 'interactive_classroom',
+      title: firstClassroomTask.title || 'OpenMAIC 在线课堂',
+      objective: firstClassroomTask.description || `通过互动课堂掌握${stage.title || '当前阶段'}的关键过程`,
+      content: [
+        `### 互动课堂任务`,
+        classroomLines.length
+          ? classroomLines.map((item) => `- ${item}`).join('\n')
+          : '- 进入 OpenMAIC 在线课堂完成讲授、模拟实验、AI 提问和知识检查。',
+      ].join('\n'),
+      estimatedMinutes: classroomTasks.reduce((sum, task) => sum + toMinutes(task, 25), 0) || 25,
+      status: slotStatus(classroomTasks),
+    })
+  }
+
+  sequence.push(
     {
       id: `${stageId}-check`,
       type: 'quiz',
@@ -196,7 +219,9 @@ export function buildStageLearningTasks(stage) {
       estimatedMinutes: examTasks.reduce((sum, task) => sum + toMinutes(task, 30), 0) || 30,
       status: slotStatus(examTasks, 'locked'),
     },
-  ])
+  )
+
+  return sanitizeSequence(sequence)
 }
 
 export function getCurrentStage(path) {

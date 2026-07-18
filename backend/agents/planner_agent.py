@@ -22,8 +22,6 @@ from typing import Optional, List, Dict
 
 from .base_agent import BaseAgent
 
-<<<<<<< Updated upstream
-=======
 # ── 新架构导入 ──
 from core.agent_context import AgentContext
 from agents.schemas import (
@@ -43,7 +41,6 @@ try:
 except ModuleNotFoundError:
     from backend.config import LLM_STRICT_MODE
 
->>>>>>> Stashed changes
 
 class PlannerAgent(BaseAgent):
     """根据画像规划个性化学习路径"""
@@ -343,6 +340,20 @@ class PlannerAgent(BaseAgent):
                         status="not_started",
                     ),
                 ]
+                if i == 2 or "梯度" in topic or "模型训练" in topic:
+                    tasks.insert(2, LearningTask(
+                        task_id="task_gradient_classroom",
+                        task_type="interactive_classroom",
+                        title="梯度下降与学习率沉浸式课堂",
+                        description="通过 AI 教师讲解、白板推导、学习率模拟、即时测验和代码案例理解模型训练过程",
+                        estimated_minutes=25,
+                        difficulty="中级",
+                        status="not_started",
+                        prerequisite_task_ids=[
+                            f"{stage_id}_task_1",
+                            f"{stage_id}_task_2",
+                        ],
+                    ))
             else:
                 tasks = [
                     LearningTask(
@@ -405,6 +416,7 @@ class PlannerAgent(BaseAgent):
                 estimated_days=3,
                 unlock_conditions=[] if i == 1 else [f"完成阶段{i - 1}所有任务"],
                 tasks=tasks,
+                resource_blueprint=_interactive_classroom_blueprint(topic) if (i == 2 or "梯度" in topic or "模型训练" in topic) else [],
             )
             stages.append(stage)
 
@@ -486,11 +498,7 @@ class PlannerAgent(BaseAgent):
         goal_override: Optional[str] = None,
         course_outline: Optional[List[str]] = None,
     ) -> str:
-<<<<<<< Updated upstream
-        """开发期无 API Key 时使用的规则化路径生成"""
-=======
         """开发期无 API Key 时使用的规则化路径生成（v2: 画像驱动 + 丰富字段）"""
->>>>>>> Stashed changes
         profile_inner = profile.get("profile", profile)
         knowledge = profile_inner.get("knowledge_level", "初级")
         goal = goal_override or profile_inner.get("learning_goal", "掌握课程核心知识")
@@ -505,21 +513,6 @@ class PlannerAgent(BaseAgent):
             tasks = []
             if i == 1:
                 tasks = [
-<<<<<<< Updated upstream
-                    {"task": f"浏览{topic}大纲与前置要求", "resource_type": "document", "estimated_hours": 0.5},
-                    {"task": f"完成{topic}预习阅读", "resource_type": "reading", "estimated_hours": 1.5},
-                ]
-            elif i < len(topics):
-                tasks = [
-                    {"task": f"学习{topic}核心讲解", "resource_type": "document", "estimated_hours": 2.0},
-                    {"task": f"完成{topic}思维导图整理", "resource_type": "mindmap", "estimated_hours": 1.0},
-                    {"task": f"练习{topic}基础习题", "resource_type": "exercise", "estimated_hours": 1.5},
-                ]
-            else:
-                tasks = [
-                    {"task": f"{topic}综合实践", "resource_type": "code", "estimated_hours": 3.0},
-                    {"task": "撰写学习总结", "resource_type": "document", "estimated_hours": 1.0},
-=======
                     {
                         "task_id": f"{stage_id}_task_1",
                         "task_type": "document",
@@ -589,6 +582,24 @@ class PlannerAgent(BaseAgent):
                         "prerequisite_task_ids": [],
                     },
                 ]
+                if i == 2 or "梯度" in topic or "模型训练" in topic:
+                    tasks.insert(2, {
+                        "task_id": "task_gradient_classroom",
+                        "task_type": "interactive_classroom",
+                        "type": "interactive_classroom",
+                        "title": "梯度下降与学习率沉浸式课堂",
+                        "task": "进入梯度下降与学习率沉浸式课堂",
+                        "description": "通过 AI 教师讲解、参数更新白板、学习率交互模拟、即时测验和代码案例理解模型训练过程",
+                        "resource_type": "interactive_classroom",
+                        "estimated_hours": 0.5,
+                        "estimated_minutes": 25,
+                        "difficulty": "中级",
+                        "status": "not_started",
+                        "prerequisite_task_ids": [
+                            f"{stage_id}_task_1",
+                            f"{stage_id}_task_2",
+                        ],
+                    })
             else:
                 tasks = [
                     {
@@ -617,22 +628,17 @@ class PlannerAgent(BaseAgent):
                         "status": "not_started",
                         "prerequisite_task_ids": [],
                     },
->>>>>>> Stashed changes
                 ]
 
             # 为薄弱点插入额外任务
             for w in weaknesses:
                 if w and w in topic:
                     tasks.insert(1, {
-<<<<<<< Updated upstream
-                        "task": f"重点补习: {w}",
-=======
                         "task_id": f"{stage_id}_task_review_{w[:8].replace(' ', '_')}",
                         "task_type": "exercise",
                         "title": f"重点补习弱项: {w}（完成专项练习）",
                         "task": f"重点补习弱项: {w}（完成专项练习）",
                         "description": f"针对薄弱点「{w}」进行强化练习",
->>>>>>> Stashed changes
                         "resource_type": "exercise",
                         "estimated_hours": 1.0,
                         "estimated_minutes": 60,
@@ -642,10 +648,6 @@ class PlannerAgent(BaseAgent):
                     })
 
             stages.append({
-<<<<<<< Updated upstream
-                "title": f"阶段{i}: {topic}",
-                "objectives": f"学完本阶段，你将能够理解并应用{topic}的核心内容",
-=======
                 "stage_id": stage_id,
                 "order": i,
                 "title": f"阶段{i}: {topic}",
@@ -659,9 +661,9 @@ class PlannerAgent(BaseAgent):
                 "status": "active" if i == 1 else "locked",
                 "estimated_days": 3,
                 "unlock_conditions": [] if i == 1 else [f"完成阶段{i - 1}所有任务"],
->>>>>>> Stashed changes
                 "topics": [topic],
                 "tasks": tasks,
+                "resource_blueprint": _interactive_classroom_blueprint(topic) if (i == 2 or "梯度" in topic or "模型训练" in topic) else [],
             })
 
         # 根据知识水平调整预估天数
@@ -670,8 +672,8 @@ class PlannerAgent(BaseAgent):
         estimated_days = max(1, int(len(stages) * 3 * multiplier))
 
         plan = {
-            "course_id": (current_path or {}).get("course_id", "unknown"),
-            "version": (current_path or {}).get("version", 0) + 1,
+            "course_id": "unknown",
+            "version": 1,
             "goal": goal,
             "stages": stages,
             "current_stage": 1,
@@ -679,3 +681,26 @@ class PlannerAgent(BaseAgent):
         }
 
         return json.dumps(plan, ensure_ascii=False, indent=2)
+
+
+def _interactive_classroom_blueprint(topic: str) -> list[dict]:
+    if not ("梯度" in topic or "模型训练" in topic):
+        topic = "梯度下降与模型训练"
+    return [
+        {"resource_type": "document", "title": "梯度下降核心讲义", "required": True},
+        {"resource_type": "mindmap", "title": "梯度下降知识导图", "required": True},
+        {
+            "resource_type": "interactive_classroom",
+            "title": "梯度下降与学习率沉浸式课堂",
+            "required": False,
+            "featured": True,
+            "learning_goal_ids": ["goal_gradient_update", "goal_learning_rate"],
+            "knowledge_point_ids": [
+                "kp_loss_function",
+                "kp_gradient",
+                "kp_learning_rate",
+                "kp_convergence",
+            ],
+        },
+        {"resource_type": "exercise", "title": "学习率专项练习", "required": True},
+    ]

@@ -89,14 +89,7 @@ export default function LearningPathPage() {
   async function handleGenerate() {
     setGenerating(true)
     try {
-<<<<<<< Updated upstream
-      const response = await generateLearningPath({
-        student_id: 'demo-student-01',
-        goal: '掌握高中数学核心知识',
-      })
-=======
       const response = await generateLearningPath({ student_id: studentId })
->>>>>>> Stashed changes
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()

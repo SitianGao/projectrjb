@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   Typography, Card, Tag, Button, Space, Row, Col, Result, Empty,
-  Progress, message, Spin, Breadcrumb,
+  Progress, message, Spin, Breadcrumb, Modal,
 } from 'antd'
 import {
   ArrowLeftOutlined, AimOutlined, TagsOutlined,
@@ -10,6 +10,7 @@ import {
   TrophyOutlined, FlagFilled, ReloadOutlined, ThunderboltOutlined,
   PlayCircleFilled, LockFilled, CheckCircleFilled,
   FileTextOutlined, RightOutlined, HomeOutlined, BranchesOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import MarkdownRenderer from '../components/MarkdownRenderer'
 import LoadingSkeleton from '../components/LoadingSkeleton'
@@ -19,6 +20,7 @@ import { getResources, getResource } from '../api/resource'
 import { useAuth } from '../contexts/AuthContext'
 import { normalizeStringList, normalizeTasks, getStageStatus, computeStageDays } from '../utils/stageUtils'
 import { safeProgress, dedupeResources } from '../utils/safeClamp'
+import ClassroomResourceCard from '../components/classroom/ClassroomResourceCard'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -30,6 +32,7 @@ const TYPE_CONFIG = {
   ppt: { icon: <FileTextOutlined />, color: 'magenta', label: 'PPT' },
   audio: { icon: <FileTextOutlined />, color: 'geekblue', label: '音频' },
   reading: { icon: <BookOutlined />, color: 'cyan', label: '阅读' },
+  interactive_classroom: { icon: <ExperimentOutlined />, color: 'purple', label: 'AI 互动课堂' },
 }
 
 const STATUS_CONFIG = {
@@ -60,6 +63,7 @@ export default function StageResourcePage() {
   const [stage, setStage] = useState(navState.stage || null)
   const [stageResources, setStageResources] = useState([])
   const [genDrawerOpen, setGenDrawerOpen] = useState(false)
+  const [genContext, setGenContext] = useState({ source: 'stage' })
 
   const [selectedResource, setSelectedResource] = useState(null)
   const [resourceModalVisible, setResourceModalVisible] = useState(false)
@@ -119,6 +123,28 @@ export default function StageResourcePage() {
   const extraTopics = Math.max(0, normalizeStringList(stage?.topics).length - 5)
 
   const pathUrl = courseId ? `/course/${courseId}/path` : '/journey'
+  const classroomTask = tasks.find((task) => (
+    /interactive_classroom|classroom|openmaic/.test(String(task.type || task.resource_type || '').toLowerCase())
+  ))
+  const targetCourseId = courseId || currentCourse?.id
+  const enterClassroom = () => {
+    if (!targetCourseId) {
+      message.warning('请先选择课程')
+      return
+    }
+    navigate(`/course/${targetCourseId}/learn/${encodeURIComponent(classroomTask?.task_id || classroomTask?.id || 'task_gradient_classroom')}`)
+  }
+  const generateClassroom = () => {
+    setGenContext({
+      source: 'stage',
+      courseId: targetCourseId,
+      stageId: stage?.stage_id,
+      taskId: classroomTask?.task_id || classroomTask?.id || 'task_gradient_classroom',
+      topic: normalizeStringList(stage?.topics)[0] || stage?.title || '梯度下降',
+      types: ['interactive_classroom'],
+    })
+    setGenDrawerOpen(true)
+  }
 
   if (loading) return <div style={{ height: '100%', background: '#F6F7FB' }}><LoadingSkeleton type="detail" /></div>
 
@@ -239,7 +265,11 @@ export default function StageResourcePage() {
                     <span style={{ flex: 1, fontSize: 13, color: '#374151' }}>{task.description}</span>
                     {task.difficulty && <Tag style={{ borderRadius: 6, fontSize: 11 }}>{task.difficulty}</Tag>}
                     {task.estimated_hours != null && <Text type="secondary" style={{ fontSize: 11 }}>⏱ {task.estimated_hours}h</Text>}
-                    {taskStatus === 'completed' ? <CheckCircleFilled style={{ color: '#22C55E' }} /> :
+                    {/interactive_classroom|classroom|openmaic/.test(String(task.type || task.resource_type || '').toLowerCase()) ? (
+                      <Button size="small" type="primary" icon={<ExperimentOutlined />} onClick={enterClassroom} style={{ borderRadius: 6, background: '#6C5CE7' }}>
+                        进入课堂
+                      </Button>
+                    ) : taskStatus === 'completed' ? <CheckCircleFilled style={{ color: '#22C55E' }} /> :
                      taskStatus === 'in_progress' ? <Button size="small" type="primary" style={{ borderRadius: 6, background: '#6C5CE7' }}>进行中</Button> :
                      <Button size="small" style={{ borderRadius: 6 }}>开始任务</Button>}
                   </div>
@@ -250,12 +280,29 @@ export default function StageResourcePage() {
           </Card>
         )}
 
+        <div style={{ marginBottom: 24 }}>
+          <ClassroomResourceCard
+            title="OpenMAIC 梯度下降互动课堂"
+            description="在当前阶段中完成讲授、学习率模拟、TutorAgent 实时讲解、知识检查和课堂总结。"
+            onEnter={enterClassroom}
+            onGenerate={generateClassroom}
+          />
+        </div>
+
         {/* ── Recommended Resources ── */}
         <Card
           title={<Space><BookOutlined /><Text strong>推荐学习资源（{stageResources.length} 项）</Text></Space>}
           extra={<Space>
             <Button icon={<ThunderboltOutlined />} type="primary" size="small"
-              onClick={() => setGenDrawerOpen(true)}
+              onClick={() => {
+                setGenContext({
+                  source: 'stage',
+                  courseId: targetCourseId,
+                  stageId: stage?.stage_id,
+                  topic: normalizeStringList(stage?.topics)[0] || stage?.title || '',
+                })
+                setGenDrawerOpen(true)
+              }}
               style={{ borderRadius: 8, background: '#6C5CE7', borderColor: '#6C5CE7' }}>
               为本阶段生成资源
             </Button>
@@ -272,7 +319,15 @@ export default function StageResourcePage() {
               </Paragraph>
               <Space>
                 <Button type="primary" icon={<ThunderboltOutlined />}
-                  onClick={() => setGenDrawerOpen(true)}
+                  onClick={() => {
+                    setGenContext({
+                      source: 'stage',
+                      courseId: targetCourseId,
+                      stageId: stage?.stage_id,
+                      topic: normalizeStringList(stage?.topics)[0] || stage?.title || '',
+                    })
+                    setGenDrawerOpen(true)
+                  }}
                   style={{ borderRadius: 8, background: '#6C5CE7' }}>为本阶段生成资源</Button>
                 <Button onClick={() => navigate('/resources')} style={{ borderRadius: 8 }}>进入资源中心</Button>
               </Space>
@@ -308,12 +363,7 @@ export default function StageResourcePage() {
         visible={genDrawerOpen}
         onClose={() => setGenDrawerOpen(false)}
         onGenerated={() => { loadData(); setGenDrawerOpen(false) }}
-        context={{
-          source: 'stage',
-          courseId: courseId || currentCourse?.id,
-          stageId: stage?.stage_id,
-          topic: normalizeStringList(stage?.topics)[0] || stage?.title || '',
-        }}
+        context={genContext}
       />
 
       {/* ── Resource Detail Modal ── */}

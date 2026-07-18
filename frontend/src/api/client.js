@@ -12,9 +12,8 @@ const client = axios.create({
 // 请求拦截器
 client.interceptors.request.use(
   (config) => {
-    // 如需 token，从这里注入
-    // const token = localStorage.getItem('token')
-    // if (token) config.headers.Authorization = `Bearer ${token}`
+    const token = localStorage.getItem('auth_token')
+    if (token) config.headers.Authorization = `Bearer ${token}`
     return config
   },
   (error) => Promise.reject(error),

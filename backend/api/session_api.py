@@ -35,8 +35,9 @@ def _first_current_task(path: LearningPath | None):
     stages = _safe_json(path.stages, [])
     if not stages:
         return None
+    current_stage_key = str(path.current_stage or 1)
     current_stage = next(
-        (stage for stage in stages if int(stage.get("stage_id", 0) or 0) == int(path.current_stage or 1)),
+        (stage for stage in stages if str(stage.get("stage_id", 1)) == current_stage_key),
         stages[0],
     )
     tasks = current_stage.get("tasks") or []

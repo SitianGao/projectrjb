@@ -20,6 +20,7 @@ from api.openapi_examples import json_responses, sse_responses
 from api.response import ok, sse_done, sse_error
 from database import SessionLocal, get_db
 from deps import evaluate_service
+from models.evaluation import WrongQuestion
 
 router = APIRouter()
 
@@ -28,6 +29,42 @@ def _sse_event(event_type: str, **payload) -> str:
     """构建 SSE 事件字符串"""
     data = {"type": event_type, **payload}
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _json_loads(value, default):
+    if not value:
+        return default
+    try:
+        return json.loads(value) if isinstance(value, str) else value
+    except (TypeError, json.JSONDecodeError):
+        return default
+
+
+def _wrong_question_to_dict(row: WrongQuestion) -> dict:
+    question_text = row.question_text or row.question
+    options = _json_loads(row.options, [])
+    if isinstance(options, str):
+        options = _json_loads(options, [])
+    return {
+        "id": row.id,
+        "student_id": row.student_id,
+        "question_id": row.question_id,
+        "topic": row.topic,
+        "question": question_text,
+        "question_text": question_text,
+        "options": options,
+        "user_answer": row.user_answer,
+        "correct_answer": row.correct_answer,
+        "explanation": row.explanation,
+        "difficulty": row.difficulty,
+        "tags": _json_loads(row.tags, []),
+        "wrong_count": row.wrong_count or 0,
+        "correct_streak": row.correct_streak or 0,
+        "status": row.status or "unmastered",
+        "last_wrong_at": row.last_wrong_at.isoformat() if row.last_wrong_at else None,
+        "next_review_at": row.next_review_at.isoformat() if row.next_review_at else None,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
 
 
 class EvaluationStartRequest(BaseModel):
@@ -48,6 +85,14 @@ class LearningRecordRequest(BaseModel):
     topic: Optional[str] = Field(default=None, examples=["二次函数"])
     score: Optional[float] = Field(default=None, ge=0, le=100)
     time_spent: Optional[int] = Field(default=None, ge=0)
+
+
+class WrongQuestionUpdateRequest(BaseModel):
+    student_id: Optional[str] = None
+    user_answer: Optional[str] = None
+    status: Optional[str] = None
+    correct_streak: Optional[int] = None
+    wrong_count: Optional[int] = None
 
 
 @router.post("/start", responses=json_responses())
@@ -232,6 +277,44 @@ async def list_learning_records(
 ):
     """获取学习记录列表"""
     return ok(evaluate_service.list_records(db, student_id, limit))
+
+
+@router.get("/wrong-book", responses=json_responses())
+async def list_wrong_book(
+    student_id: str,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(WrongQuestion).filter(WrongQuestion.student_id == student_id)
+    if status:
+        if status == "unmastered":
+            query = query.filter(WrongQuestion.status.in_(["unmastered", "pending", "reviewing"]))
+        else:
+            query = query.filter(WrongQuestion.status == status)
+    rows = query.order_by(WrongQuestion.created_at.desc()).all()
+    items = [_wrong_question_to_dict(row) for row in rows]
+    return ok({"items": items, "total": len(items)})
+
+
+@router.patch("/wrong-book/{question_id}", responses=json_responses())
+async def update_wrong_question(
+    question_id: str,
+    request: WrongQuestionUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    query = db.query(WrongQuestion).filter(WrongQuestion.id == question_id)
+    if request.student_id:
+        query = query.filter(WrongQuestion.student_id == request.student_id)
+    row = query.first()
+    if not row:
+        return ok({"id": question_id, "updated": False})
+    for field in ["user_answer", "status", "correct_streak", "wrong_count"]:
+        value = getattr(request, field)
+        if value is not None:
+            setattr(row, field, value)
+    db.commit()
+    db.refresh(row)
+    return ok(_wrong_question_to_dict(row))
 
 
 @router.get("/{student_id}", responses=json_responses())

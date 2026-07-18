@@ -18,13 +18,9 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from api.response import ApiError
-<<<<<<< Updated upstream
-from models.evaluation import EvaluationReport, LearningRecord
-=======
 from models.auth import Course
 from models.evaluation import EvaluationReport, LearningRecord, WrongQuestion
 from models.learning_path import LearningPath
->>>>>>> Stashed changes
 from models.resource import Resource
 
 logger = logging.getLogger(__name__)

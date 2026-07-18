@@ -10,8 +10,15 @@ from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from config import RAG_STRICT_MODE
 from models.learning_path import LearningPath
 from models.resource import Resource
+from safety.content_filter import check_safety
+
+try:
+    from rag.retriever import default_retriever
+except Exception:  # pragma: no cover - RAG optional in local demo
+    default_retriever = None
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +29,7 @@ class ResourceService:
     def __init__(self, resource_agent, profile_service):
         self.resource_agent = resource_agent
         self.profile_service = profile_service
+        self.retriever = default_retriever
 
     async def generate_resources(
         self,
@@ -32,23 +40,17 @@ class ResourceService:
         difficulty: str = "中级",
         count: int = 1,
         path_id: Optional[str] = None,
-<<<<<<< Updated upstream
-=======
-        stage_id: Optional[int] = None,
+        stage_id: Optional[str] = None,
         is_review: bool = False,
->>>>>>> Stashed changes
         on_progress: Optional[Callable[[int, str, str], None]] = None,
     ) -> Dict:
         """Generate resources with the agent and persist the result."""
         _emit_progress(on_progress, 10, "preparing", "正在准备学生画像和生成参数")
         self.profile_service.get_or_create_student(db, student_id)
-        self.validate_path_ownership(db, student_id, path_id)
+        path = self.validate_path_ownership(db, student_id, path_id)
         profile = self.profile_service.get_profile(db, student_id)
-<<<<<<< Updated upstream
-=======
         stage_info = _build_stage_info(path, topic, stage_id=stage_id) if path else None
         knowledge_sources = self._retrieve_knowledge(topic, stage_info)
->>>>>>> Stashed changes
 
         _emit_progress(on_progress, 35, "generating", "正在调用资源生成逻辑")
         if self.resource_agent:
@@ -61,29 +63,9 @@ class ResourceService:
             result = _coerce_resource_result(raw, topic, types, difficulty, count)
         else:
             result = _template_resources(topic, types, difficulty, count)
+        result["knowledge_sources"] = knowledge_sources
 
         _emit_progress(on_progress, 75, "persisting", "正在保存学习资源")
-<<<<<<< Updated upstream
-        saved = []
-        for item in result.get("resources", []):
-            resource = Resource(
-                id=str(uuid.uuid4()),
-                student_id=student_id,
-                path_id=path_id,
-                type=item.get("type") or "document",
-                title=item.get("title") or f"{topic} 学习资源",
-                content=item.get("content") or "",
-                topic=item.get("topic") or topic,
-                difficulty=item.get("difficulty") or difficulty,
-                is_review=False,
-            )
-            db.add(resource)
-            saved.append(resource)
-
-        db.commit()
-        for resource in saved:
-            db.refresh(resource)
-=======
         items = self.persist_generated_resources(
             db=db,
             student_id=student_id,
@@ -94,10 +76,8 @@ class ResourceService:
             default_difficulty=difficulty,
             is_review=is_review,
         )
->>>>>>> Stashed changes
 
         _emit_progress(on_progress, 90, "formatting", "正在整理资源结果")
-        items = [self._resource_to_dict(resource) for resource in saved]
         return {
             "student_id": student_id,
             "topic": result.get("topic", topic),
@@ -108,8 +88,6 @@ class ResourceService:
             "generated_at": result.get("generated_at") or _now_iso(),
         }
 
-<<<<<<< Updated upstream
-=======
     def _retrieve_knowledge(self, topic: str, stage_info: Optional[Dict]) -> List[Dict]:
         if not self.retriever:
             return []
@@ -140,7 +118,7 @@ class ResourceService:
         student_id: str,
         generated: Dict,
         path_id: Optional[str] = None,
-        stage_id: Optional[int] = None,
+        stage_id: Optional[str] = None,
         default_topic: str = "当前关卡",
         default_difficulty: str = "中级",
         is_review: bool = False,
@@ -158,12 +136,7 @@ class ResourceService:
             resource_id = str(uuid.uuid4())
             resource_type = item.get("type") or "document"
             title = item.get("title") or f"{default_topic} 学习资源"
-            artifact_url, mime_type = artifact_service.create(
-                resource_id,
-                resource_type,
-                title,
-                content,
-            )
+            artifact_url, mime_type = _create_artifact(resource_id, resource_type, title, content)
             resource = Resource(
                 id=resource_id,
                 student_id=student_id,
@@ -187,7 +160,6 @@ class ResourceService:
             db.refresh(resource)
         return [self._resource_to_dict(resource) for resource in saved]
 
->>>>>>> Stashed changes
     async def generate_stream(
         self,
         db: Session,
@@ -288,6 +260,8 @@ class ResourceService:
     def _resource_to_dict(resource: Resource, include_content: bool = True) -> Dict:
         content = resource.content or ""
         description = content.replace("\n", " ")[:120]
+        content_payload = _safe_json_loads(content, {}) if resource.type == "interactive_classroom" else {}
+        source_refs = _safe_json_loads(getattr(resource, "source_refs", None), [])
         data = {
             "id": resource.id,
             "student_id": resource.student_id,
@@ -300,6 +274,10 @@ class ResourceService:
             "description": description,
             "tags": [v for v in [resource.topic, resource.difficulty, resource.type] if v],
             "is_review": bool(resource.is_review),
+            "classroom_id": content_payload.get("classroom_id") if isinstance(content_payload, dict) else None,
+            "source_refs": source_refs if isinstance(source_refs, list) else [],
+            "artifact_url": getattr(resource, "artifact_url", None),
+            "mime_type": getattr(resource, "mime_type", None),
             "created_at": resource.created_at.isoformat() if resource.created_at else None,
             "createdAt": resource.created_at.isoformat() if resource.created_at else None,
         }
@@ -324,6 +302,15 @@ def _emit_progress(
 ) -> None:
     if callback:
         callback(progress, phase, message)
+
+
+def _create_artifact(resource_id: str, resource_type: str, title: str, content: str):
+    try:
+        from services.artifact_service import artifact_service
+
+        return artifact_service.create(resource_id, resource_type, title, content)
+    except Exception:
+        return None, "text/markdown"
 
 
 def _coerce_resource_result(
@@ -401,12 +388,10 @@ def _normalize_types(types: Optional[List[str]]) -> List[str]:
     return normalized or defaults
 
 
-<<<<<<< Updated upstream
-=======
 def _build_stage_info(
     path: LearningPath,
     topic: str,
-    stage_id: Optional[int] = None,
+    stage_id: Optional[str] = None,
 ) -> Optional[Dict]:
     stages = _safe_json_loads(path.stages, [])
     if not isinstance(stages, list) or not stages:
@@ -489,7 +474,6 @@ def _normalize_list(value: Any) -> List[str]:
     return [text] if text else []
 
 
->>>>>>> Stashed changes
 def _template_resources(
     topic: str,
     types: Optional[List[str]],

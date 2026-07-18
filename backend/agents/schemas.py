@@ -63,7 +63,7 @@ class ProfileOutput(BaseModel):
 
 class LearningTask(BaseModel):
     task_id: str
-    task_type: str  # document | exercise | mindmap | code | assessment
+    task_type: str  # document | exercise | mindmap | code | assessment | interactive_classroom
     title: str
     description: str = ""
     estimated_minutes: int = Field(default=30, ge=5, le=480)
@@ -84,6 +84,7 @@ class StageData(BaseModel):
     estimated_days: int = 3
     unlock_conditions: list[str] = Field(default_factory=list)
     tasks: list[LearningTask] = Field(default_factory=list)
+    resource_blueprint: list[dict] = Field(default_factory=list)
 
 
 class LearningPathOutput(BaseModel):

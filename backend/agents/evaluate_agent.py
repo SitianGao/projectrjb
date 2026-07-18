@@ -30,8 +30,6 @@ from core.agent_context import AgentContext
 from agents.schemas import EvaluationOutput, EvalDataSummary, EvalOverall, EvalDimensions, WeaknessDetail
 from agents.prompts.evaluation_prompts import EVALUATE_SYSTEM_PROMPT
 
-<<<<<<< Updated upstream
-=======
 try:
     from config import LLM_STRICT_MODE
 except ModuleNotFoundError:
@@ -39,7 +37,6 @@ except ModuleNotFoundError:
 
 logger = logging.getLogger(__name__)
 
->>>>>>> Stashed changes
 
 class EvaluateAgent(BaseAgent):
     """学习效果评估 + 遗忘曲线驱动的间隔复习"""
@@ -50,29 +47,8 @@ class EvaluateAgent(BaseAgent):
         self._memory_decay_threshold = 0.6  # 记忆保留率低于此值触发复习
 
     def get_system_prompt(self) -> str:
-<<<<<<< Updated upstream
-        return (
-            "你是学习效果评估智能体。\n"
-            "根据学生的学习行为记录、练习成绩、资源使用情况，进行多维度评估。\n\n"
-            "## 评估维度\n"
-            "1. 知识掌握度 (knowledge_mastery): 基于练习得分和正确率\n"
-            "2. 学习进度 (progress): 基于已完成阶段数 / 总阶段数\n"
-            "3. 学习效率 (efficiency): 基于单位时间掌握的知识点数\n"
-            "4. 薄弱点分析 (weakness_analysis): 识别易错和高频错误知识点\n\n"
-            "## 防幻觉约束\n"
-            "1. 评分必须基于实际数据（records），不得凭空打分或编造成绩。\n"
-            "2. 薄弱点必须来自学生的错题记录，不猜测、不假设。\n"
-            "3. 建议必须具体到知识点级别，泛泛而谈无效——不能说「多练习」，要说「针对XX知识点做3道推导题」。\n"
-            "4. 复习计划中的 urgency 必须基于遗忘曲线实际计算值，不人为调高或调低。\n"
-            "5. 若数据不足以支撑某个维度的评估，诚实标注 confidence 低，而非编造数值。\n"
-            "6. 不生成违规、敏感或不安全的内容。\n\n"
-            "## 输出格式\n"
-            "严格输出 JSON: {overall_score, dimensions, weak_topics, suggestions, review_plan}"
-        )
-=======
         """返回标准化评估提示词（由 prompts 模块统一管理）。"""
         return EVALUATE_SYSTEM_PROMPT
->>>>>>> Stashed changes
 
     # ------------------------------------------------------------------
     # 同步入口（供 service 层同步端点使用）

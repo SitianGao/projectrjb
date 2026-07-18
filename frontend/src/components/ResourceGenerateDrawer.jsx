@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Button, Drawer, Input, Select, Space, Steps, Tag, Typography, message } from 'antd'
-import { ThunderboltOutlined, FileTextOutlined, EditOutlined, CodeOutlined, FilePptOutlined, BranchesOutlined, SoundOutlined } from '@ant-design/icons'
+import { ThunderboltOutlined, FileTextOutlined, EditOutlined, CodeOutlined, FilePptOutlined, BranchesOutlined, SoundOutlined, ExperimentOutlined } from '@ant-design/icons'
 import { generateResources, getTaskStatus } from '../api/resource'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -14,6 +14,7 @@ const TYPE_OPTIONS = [
   { value: 'ppt', label: 'PPT 课件', icon: <FilePptOutlined /> },
   { value: 'audio', label: '音频讲解', icon: <SoundOutlined /> },
   { value: 'reading', label: '拓展阅读', icon: <FileTextOutlined /> },
+  { value: 'interactive_classroom', label: 'AI 互动课堂', icon: <ExperimentOutlined /> },
 ]
 
 const GENERATE_STEPS = [
@@ -39,7 +40,7 @@ export default function ResourceGenerateDrawer({
   const { studentId, activeCourse, courses } = useAuth()
 
   const [topic, setTopic] = useState(context.topic || '')
-  const [selectedTypes, setSelectedTypes] = useState(['document', 'exercise'])
+  const [selectedTypes, setSelectedTypes] = useState(context.types || ['document', 'exercise'])
   const [difficulty, setDifficulty] = useState('中级')
   const [selectedCourseId, setSelectedCourseId] = useState(context.courseId || activeCourse?.id || '')
   const [selectedStageId, setSelectedStageId] = useState(context.stageId || '')
@@ -61,6 +62,7 @@ export default function ResourceGenerateDrawer({
       setSelectedCourseId(context.courseId || activeCourse?.id || '')
       setSelectedStageId(context.stageId || '')
       setSelectedTaskId(context.taskId || '')
+      setSelectedTypes(context.types || ['document', 'exercise'])
       setGenerating(false)
       setGenStep(0)
       setGenError(null)
@@ -80,9 +82,10 @@ export default function ResourceGenerateDrawer({
         student_id: studentId,
         topic: topic.trim(),
         types: selectedTypes,
+        resource_type: selectedTypes.includes('interactive_classroom') ? 'interactive_classroom' : undefined,
         difficulty,
         course_id: selectedCourseId || undefined,
-        stage_id: selectedStageId ? Number(selectedStageId) : undefined,
+        stage_id: selectedStageId || undefined,
         task_id: selectedTaskId || undefined,
         requirements: requirements.trim() || undefined,
       }

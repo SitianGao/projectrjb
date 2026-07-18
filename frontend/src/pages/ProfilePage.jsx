@@ -1,11 +1,6 @@
-<<<<<<< Updated upstream
-import { useState, useEffect, useCallback } from 'react'
-import { Typography, Space, Tabs, Row, Col, Card, Statistic, Input, Select, Button, Empty, Tag, message } from 'antd'
-=======
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Typography, Space, Row, Col, Card, Statistic, Button, Tag, message, Result, Spin } from 'antd'
->>>>>>> Stashed changes
 import {
   PlusOutlined,
   ReloadOutlined,
@@ -15,27 +10,13 @@ import {
   ThunderboltOutlined,
   FireOutlined,
   ExclamationCircleOutlined,
-<<<<<<< Updated upstream
-=======
   RocketOutlined,
->>>>>>> Stashed changes
 } from '@ant-design/icons'
 import ChatBox from '../components/ChatBox'
 import PathTimeline from '../components/PathTimeline'
 import ForgettingCurve from '../components/ForgettingCurve'
 import FloatingChat from '../components/FloatingChat'
 import LoadingSkeleton from '../components/LoadingSkeleton'
-<<<<<<< Updated upstream
-import { useChat } from '../hooks/useChat'
-import { startProfileChat } from '../api/profile'
-import { getResources } from '../api/resource'
-import { getLearningPath, generateLearningPath } from '../api/planner'
-import ResourcePage from '../pages/ResourcePage'
-import { shouldUseMock } from '../utils/useMock'
-
-const USE_MOCK = shouldUseMock()
-
-=======
 import MyCourses from '../components/MyCourses'
 import { useChat, PHASE } from '../hooks/useChat'
 import { startProfileChat, getProfile } from '../api/profile'
@@ -43,7 +24,6 @@ import { getLearningPath, generateLearningPath } from '../api/planner'
 import { useAuth } from '../contexts/AuthContext'
 
 import StageLineChart from '../components/StageLineChart'
->>>>>>> Stashed changes
 const { Title, Text, Paragraph } = Typography
 
 const SUGGESTIONS = [
@@ -63,8 +43,6 @@ const STYLE_PROMPTS = {
 
 function parseSSEEvent(t) { try { return JSON.parse(t) } catch { return null } }
 
-<<<<<<< Updated upstream
-// ==================== 学习资源面板 ====================
 function ResourcePanel() {
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
@@ -139,11 +117,6 @@ function ResourcePanel() {
   )
 }
 
-// ==================== 学习路径面板 ====================
-function LearningPathPanel() {
-  const [pathData, setPathData] = useState(null)
-  const [loading, setLoading] = useState(true)
-=======
 function courseTitleFromGoal(goal) {
   const title = String(goal || '')
     .replace(/^(我希望|我的目标是|学习目标是|学习|掌握|提升|提高|巩固)/, '')
@@ -155,7 +128,6 @@ function courseTitleFromGoal(goal) {
 function LearningPathPanel({ initialPathData = null, studentId }) {
   const [pathData, setPathData] = useState(initialPathData)
   const [loading, setLoading] = useState(!initialPathData)
->>>>>>> Stashed changes
   const [error, setError] = useState(null)
   const [generating, setGenerating] = useState(false)
 
@@ -177,11 +149,7 @@ function LearningPathPanel({ initialPathData = null, studentId }) {
   async function handleGenerate() {
     setGenerating(true)
     try {
-<<<<<<< Updated upstream
-      const resp = await generateLearningPath({ student_id: 'demo-student-01', goal: '掌握高中数学核心知识' })
-=======
       const resp = await generateLearningPath({ student_id: studentId })
->>>>>>> Stashed changes
       const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = ''
       while (true) {
         const { done, value } = await reader.read(); if (done) break
@@ -250,14 +218,6 @@ function LearningPathPanel({ initialPathData = null, studentId }) {
 }
 
 // ==================== 主页面 ====================
-<<<<<<< Updated upstream
-export default function ProfilePage() {
-  const [activeTab, setActiveTab] = useState('resource')
-  const [profile, setProfile] = useState(null)
-
-  const handleProfileUpdate = useCallback((updatedProfile) => {
-    setProfile(updatedProfile)
-=======
 function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -303,7 +263,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
   }, [studentId])
 
   const handleProfileUpdate = useCallback(() => {
->>>>>>> Stashed changes
     message.success('学习画像已更新 📊')
   }, [])
 
@@ -312,9 +271,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
       const style = options?.style
       const stylePrompt = STYLE_PROMPTS[style]
       const styledMsg = stylePrompt ? `${stylePrompt}\n\n${msg}` : msg
-<<<<<<< Updated upstream
-      return startProfileChat({ student_id: 'demo-student-01', message: styledMsg, style })
-=======
       return startProfileChat({
         student_id: studentId,
         message: styledMsg,
@@ -323,7 +279,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
         history: options?.history,
         current_profile: options?.current_profile,
       })
->>>>>>> Stashed changes
     },
     [studentId],
   )
@@ -336,8 +291,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
       content: '你好！我是你的专属学习助手 🤖\n\n让我们来聊聊你的学习情况吧：\n- 你的年级和目标？\n- 你擅长或不擅长的科目？\n- 你更喜欢的学习方式（看视频📺、读书📖、做题✏️）？\n\n告诉我这些，我会为你定制最佳学习路径！',
     }],
   })
-<<<<<<< Updated upstream
-=======
 
   // 状态恢复后，根据后端数据同步阶段
   useEffect(() => {
@@ -534,11 +487,8 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
     [restoredPath, navigate],
   )
 
->>>>>>> Stashed changes
   const handleSuggestion = useCallback((t, opts) => sendMessage(t, opts), [sendMessage])
 
-<<<<<<< Updated upstream
-=======
   // ── 加载中：等待状态恢复 ──
   if (!stateRestored) {
     return (
@@ -749,7 +699,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
   }
 
   // ── collecting / ready 阶段：显示画像采集 ChatBox ──
->>>>>>> Stashed changes
   return (
     <div style={{ height: '100%', overflow: 'auto', background: 'var(--bg-page)' }}>
       {/* 对话区 */}
@@ -764,8 +713,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
               智能学习平台
             </Title>
             <Text type="secondary" style={{ fontSize: 14 }}>个性化 AI 学习助手</Text>
-<<<<<<< Updated upstream
-=======
             {restoredPath?.stages?.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <Button size="small" onClick={() => navigate(activeCourse?.id ? `/course/${activeCourse.id}` : '/courses')}>
@@ -773,7 +720,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
                 </Button>
               </div>
             )}
->>>>>>> Stashed changes
           </div>
 
           {/* ChatBox 卡片 */}
@@ -800,29 +746,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
             />
           </div>
 
-<<<<<<< Updated upstream
-        </div>
-
-        {/* Tab 区 */}
-        <div style={{ padding: '0 24px 24px' }}>
-          <div style={{
-            maxWidth: 800, margin: '0 auto', width: '100%',
-            padding: '8px 0 20px',
-          }}>
-            <Tabs activeKey={activeTab} onChange={setActiveTab} centered
-              items={[
-                { key: 'resource', label: '📄 学习资源', children: null },
-                { key: 'path', label: '📐 学习路径', children: null },
-              ]} />
-            <div style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
-              {activeTab === 'resource' ? <ResourcePage /> : <LearningPathPanel />}
-            </div>
-          </div>
-        </div>
-
-      {/* 右下角悬浮对话 */}
-      <FloatingChat />
-=======
           <div style={{
             maxWidth: 1060,
             margin: '24px auto 0',
@@ -833,7 +756,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
           </div>
 
     </div>
->>>>>>> Stashed changes
     </div>
   )
 }

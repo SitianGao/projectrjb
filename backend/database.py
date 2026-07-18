@@ -32,11 +32,10 @@ def get_db():
 def init_db():
     """Create all SQLAlchemy tables registered on Base and seed demo data."""
     Base.metadata.create_all(bind=engine)
+    _ensure_sqlite_compat_columns()
     seed_demo_data()
 
 
-<<<<<<< Updated upstream
-=======
 def _ensure_sqlite_compat_columns():
     """为已有比赛演示库补充 create_all 无法新增的列。"""
     if not DATABASE_URL.startswith("sqlite"):
@@ -56,11 +55,37 @@ def _ensure_sqlite_compat_columns():
             conn.execute(text("ALTER TABLE resources ADD COLUMN mime_type VARCHAR(100)"))
             logger.info("数据库迁移完成：resources.mime_type")
         if "stage_id" not in columns:
-            conn.execute(text("ALTER TABLE resources ADD COLUMN stage_id INTEGER"))
+            conn.execute(text("ALTER TABLE resources ADD COLUMN stage_id VARCHAR(64)"))
             logger.info("数据库迁移完成：resources.stage_id")
 
+        wrong_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(wrong_questions)")).fetchall()
+        }
+        if wrong_columns:
+            wrong_migrations = {
+                "resource_id": "VARCHAR(36)",
+                "question": "TEXT DEFAULT ''",
+                "question_text": "TEXT",
+                "options": "TEXT DEFAULT '[]'",
+                "user_answer": "TEXT",
+                "correct_answer": "TEXT",
+                "explanation": "TEXT",
+                "difficulty": "VARCHAR(20)",
+                "tags": "TEXT DEFAULT '[]'",
+                "wrong_count": "INTEGER DEFAULT 1",
+                "correct_streak": "INTEGER DEFAULT 0",
+                "status": "VARCHAR(20) DEFAULT 'unmastered'",
+                "last_wrong_at": "DATETIME",
+                "next_review_at": "DATETIME",
+                "created_at": "DATETIME",
+            }
+            for column, ddl in wrong_migrations.items():
+                if column not in wrong_columns:
+                    conn.execute(text(f"ALTER TABLE wrong_questions ADD COLUMN {column} {ddl}"))
+                    logger.info("数据库迁移完成：wrong_questions.%s", column)
 
->>>>>>> Stashed changes
+
 def seed_demo_data():
     """Import the fixed demo student into an empty SQLite database."""
     if not SEED_DEMO_DATA:

@@ -16,10 +16,6 @@ import asyncio
 from typing import Any, AsyncIterator, Optional
 
 import httpx
-<<<<<<< Updated upstream
-from typing import AsyncIterator, Optional
-=======
->>>>>>> Stashed changes
 
 import config
 
@@ -57,13 +53,9 @@ class LLMClient:
         self.primary = primary or os.getenv("LLM_PRIMARY", "spark")
         self.fallback = fallback
         self.timeout_seconds = max(1, int(config.LLM_TIMEOUT))
-<<<<<<< Updated upstream
-        self.max_retries = max(1, int(config.LLM_MAX_RETRIES))
-=======
         self.max_retries = (
             1 if config.LLM_STRICT_MODE else max(1, int(config.LLM_MAX_RETRIES))
         )
->>>>>>> Stashed changes
         self.retry_base_delay = 0.5
         self._last_usage: Optional[UsageStats] = None
 
@@ -108,11 +100,8 @@ class LLMClient:
         system: str,
         user: str,
         model: Optional[str] = None,
-<<<<<<< Updated upstream
-=======
         response_format: Optional[dict[str, str]] = None,
         response_schema: Optional[dict[str, Any]] = None,
->>>>>>> Stashed changes
     ) -> AsyncIterator[str]:
         """流式对话——根据 LLM_PRIMARY 选择主模型，失败自动切换备选。"""
         start = time.monotonic()
@@ -122,40 +111,6 @@ class LLMClient:
             if self.primary == "deepseek":
                 async for chunk in self._call_deepseek(system, user):
                     yield chunk
-<<<<<<< Updated upstream
-            except Exception as e:
-                logger.warning(f"[LLMClient] DeepSeek 调用失败: {e}")
-                yield f"[提示: DeepSeek 服务暂时不可用，请稍后重试]"
-        else:
-            # 默认：Spark 主，DeepSeek 备
-            spark_failed = False
-            for attempt in range(self.max_retries):
-                try:
-                    async for chunk in self._call_spark(system, user, model):
-                        yield chunk
-                    return
-                except Exception as e:
-                    spark_failed = True
-                    logger.warning(f"[LLMClient] Spark 第{attempt + 1}次尝试失败: {e}")
-                    if attempt < self.max_retries - 1:
-                        yield f"[提示: 讯飞星火响应超时，正在重试（第{attempt + 1}/{self.max_retries}次）...]\n"
-                        await asyncio.sleep(self.retry_base_delay * (2 ** attempt))
-
-            if spark_failed:
-                logger.warning("[LLMClient] Spark 全部重试失败，切换至 DeepSeek 备用模型")
-                yield "[提示: 讯飞星火服务暂时不可用，正在切换至备用模型...]\n"
-                try:
-                    async for chunk in self._call_deepseek(system, user):
-                        yield chunk
-                except Exception as e2:
-                    logger.error(f"[LLMClient] 备用模型也失败: {e2}")
-                    yield "[提示: AI 服务暂时不可用，当前将使用模板资源，建议稍后重新生成。]"
-
-    async def _call_spark(
-        self, system: str, user: str, model: Optional[str] = None
-    ) -> AsyncIterator[str]:
-        """调用讯飞星火 API（HTTP OpenAI 兼容，流式）"""
-=======
                 provider = "deepseek"
             else:
                 spark_failed = False
@@ -205,7 +160,6 @@ class LLMClient:
         response_format: Optional[dict[str, str]] = None,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[str]:
->>>>>>> Stashed changes
         api_password = os.getenv("SPARK_API_PASSWORD", "")
         if not api_password:
             yield "[提示: 讯飞星火 API 未配置，请检查 .env 文件]"
@@ -214,9 +168,6 @@ class LLMClient:
         api_url = os.getenv("SPARK_API_URL", "https://spark-api-open.xf-yun.com/v1/chat/completions")
         model_name = model or os.getenv("SPARK_MODEL", "4.0Ultra")
 
-<<<<<<< Updated upstream
-        async with httpx.AsyncClient(timeout=self._timeout()) as client:
-=======
         payload: dict[str, Any] = {
             "model": model_name,
             "messages": [
@@ -292,7 +243,6 @@ class LLMClient:
                 yield content
                 return
 
->>>>>>> Stashed changes
             async with client.stream(
                 "POST", api_url,
                 headers={

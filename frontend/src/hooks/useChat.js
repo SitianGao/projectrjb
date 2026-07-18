@@ -1,5 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 
+export const PHASE = {
+  COLLECTING: 'collecting',
+  READY: 'ready',
+  PLANNING: 'planning',
+  GENERATING: 'generating',
+  ACTIVE: 'active',
+  FAILED: 'failed',
+}
+
 /**
  * 通用对话 Hook
  *
@@ -22,12 +31,18 @@ import { useState, useCallback, useRef, useEffect } from 'react'
  *   abort: () => void,
  * }}
  */
-export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate, onSSEEvent } = {}) {
+export function useChat({
+  streamFetcher,
+  initialMessages = [],
+  initialCompleteness = 0,
+  initialPhase = PHASE.COLLECTING,
+  onProfileUpdate,
+  onSSEEvent,
+  onPhaseChange,
+} = {}) {
   const [messages, setMessages] = useState(initialMessages)
   const [displayedMessages, setDisplayedMessages] = useState(initialMessages)
   const [isLoading, setIsLoading] = useState(false)
-<<<<<<< Updated upstream
-=======
 
   // ── 画像相关状态 ──
   const [profile, setProfile] = useState(null)
@@ -70,7 +85,6 @@ export function useChat({ streamFetcher, initialMessages = [], onProfileUpdate, 
     }
   }, [messages, isLoading, completeness, updatePhase])
 
->>>>>>> Stashed changes
   const abortRef = useRef(null)
   const idCounter = useRef(0)
   const typewriterTimerRef = useRef(null)
