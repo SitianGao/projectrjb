@@ -33,27 +33,56 @@ class WeakPoint(BaseModel):
 
 
 class CourseProfile(BaseModel):
-    """课程级学习画像。"""
+    """课程级学习画像 —— 至少 10 个维度。"""
     user_id: str
     course_id: str
     version: int = Field(default=1, ge=1)
+
+    # ── 基础信息 ──
+    major: str = ""
+    grade: str = ""
+
+    # ── 知识基础 ──
     knowledge_foundation: KnowledgeFoundation = Field(default_factory=KnowledgeFoundation)
+
+    # ── 学习目标与历史 ──
     learning_goal: str = ""
+    learning_history: list[str] = Field(default_factory=list)
+
+    # ── 认知风格 ──
     cognitive_style: str = "案例驱动型"
-    preferred_resources: list[str] = Field(default_factory=lambda: ["mindmap", "exercise", "document"])
+
+    # ── 薄弱点 ──
     weak_points: list[WeakPoint] = Field(default_factory=list)
+
+    # ── 资源与兴趣 ──
+    preferred_resources: list[str] = Field(default_factory=lambda: ["mindmap", "exercise", "document"])
+    assessment_preference: str = ""
     interest_directions: list[str] = Field(default_factory=list)
+
+    # ── 时间与周期 ──
+    session_duration_minutes: int | None = None
+    sessions_per_week: int | None = None
+    weekly_available_hours: float | None = None
+    target_duration_weeks: int | None = None
+    preferred_study_time: str = ""
+
+    # ── 元数据 ──
+    completeness: float = Field(default=0.0, ge=0.0, le=1.0)
     update_reason: str = ""
     updated_at: str = ""
 
 
 class ProfileOutput(BaseModel):
-    """ProfileAgent build_profile 输出。"""
+    """ProfileAgent build_profile_v2 结构化输出。"""
     profile: CourseProfile
+    profile_patch: dict = Field(default_factory=dict)
     completeness: float = Field(default=0.0, ge=0.0, le=1.0)
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     sources: list[str] = Field(default_factory=lambda: ["dialogue"])
+    missing_dimensions: list[str] = Field(default_factory=list)
     next_questions: list[str] = Field(default_factory=list)
+    assistant_reply: str = ""
     can_start_journey: bool = False
 
 

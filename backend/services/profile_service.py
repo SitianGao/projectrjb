@@ -305,20 +305,56 @@ class ProfileService:
 
     def _apply_profile_fields(self, record: StudentProfile, p: Dict, meta: Dict):
         """将 dict 字段写入 ORM 对象（仅更新显式传入的字段，支持部分更新）。"""
+        extras = _safe_json_loads(record.memory_strength, {})
+        if not isinstance(extras, dict):
+            extras = {}
+
+        if "knowledge_foundation" in p:
+            record.knowledge_level = json.dumps(p["knowledge_foundation"], ensure_ascii=False)
         if "knowledge_level" in p:
             record.knowledge_level = p["knowledge_level"]
         if "learning_goal" in p:
             record.learning_goal = p["learning_goal"]
         if "cognitive_style" in p:
             record.cognitive_style = p["cognitive_style"]
+        if "weak_points" in p:
+            weak_names = []
+            for item in p.get("weak_points") or []:
+                if isinstance(item, dict):
+                    weak_names.append(item.get("name") or item.get("knowledge_point_id"))
+                else:
+                    weak_names.append(str(item))
+            record.weakness = json.dumps([name for name in weak_names if name], ensure_ascii=False)
         if "weakness" in p:
             record.weakness = json.dumps(p["weakness"], ensure_ascii=False)
+        if "interest_directions" in p:
+            record.interest = json.dumps(p["interest_directions"], ensure_ascii=False)
         if "interest" in p:
             record.interest = json.dumps(p["interest"], ensure_ascii=False)
         if "pace_preference" in p:
             record.pace_preference = p["pace_preference"]
-        if "memory_strength" in p:
-            record.memory_strength = json.dumps(p["memory_strength"], ensure_ascii=False)
+
+        for key in (
+            "preferred_resources",
+            "assessment_preference",
+            "session_duration_minutes",
+            "sessions_per_week",
+            "weekly_available_hours",
+            "target_duration_weeks",
+            "preferred_study_time",
+            "major",
+            "grade",
+            "confidence",
+            "missing_dimensions",
+            "next_questions",
+            "can_start_journey",
+        ):
+            if key in p:
+                extras[key] = p[key]
+            if key in meta:
+                extras[key] = meta[key]
+        if "memory_strength" in p and isinstance(p["memory_strength"], dict):
+            extras.update(p["memory_strength"])
 
         # learning_history 可能在 profile 内或 meta 中
         if "learning_history" in p or "learning_history" in meta:
@@ -337,21 +373,42 @@ class ProfileService:
             )
             record.completeness = max(previous, incoming)
 
+        record.memory_strength = json.dumps(extras, ensure_ascii=False)
+
     @staticmethod
     def _profile_to_dict(profile: StudentProfile) -> Dict:
         """将 ORM 对象转为前端友好的 dict。"""
+        extras = _safe_json_loads(profile.memory_strength, {})
+        if not isinstance(extras, dict):
+            extras = {}
+        knowledge_foundation = _safe_json_loads(profile.knowledge_level, None)
         return {
             "id": profile.id,
             "student_id": profile.student_id,
             "version": profile.version,
             "knowledge_level": profile.knowledge_level,
+            "knowledge_foundation": knowledge_foundation if isinstance(knowledge_foundation, dict) else {},
             "learning_goal": profile.learning_goal,
             "learning_history": _safe_json_loads(profile.learning_history, []),
             "cognitive_style": profile.cognitive_style,
             "pace_preference": profile.pace_preference or "",
             "weakness": _safe_json_loads(profile.weakness, []),
+            "weak_points": _safe_json_loads(profile.weakness, []),
             "interest": _safe_json_loads(profile.interest, []),
-            "memory_strength": _safe_json_loads(profile.memory_strength, {}),
+            "interest_directions": _safe_json_loads(profile.interest, []),
+            "preferred_resources": extras.get("preferred_resources") or [],
+            "assessment_preference": extras.get("assessment_preference") or "",
+            "session_duration_minutes": extras.get("session_duration_minutes"),
+            "sessions_per_week": extras.get("sessions_per_week"),
+            "weekly_available_hours": extras.get("weekly_available_hours"),
+            "target_duration_weeks": extras.get("target_duration_weeks"),
+            "preferred_study_time": extras.get("preferred_study_time") or "",
+            "major": extras.get("major") or "",
+            "grade": extras.get("grade") or "",
+            "missing_dimensions": extras.get("missing_dimensions") or [],
+            "next_questions": extras.get("next_questions") or [],
+            "can_start_journey": bool(extras.get("can_start_journey")),
+            "memory_strength": extras,
             "completeness": profile.completeness,
             "created_at": profile.created_at.isoformat() if profile.created_at else None,
             "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,

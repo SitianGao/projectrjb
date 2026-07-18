@@ -1,144 +1,131 @@
 .profile-setup-page {
-  min-height: 100%;
+  height: calc(100vh - 64px);
+  overflow: hidden;
   background: #F6F7FB;
   color: #111827;
-  padding: 24px;
+  padding: 20px;
 }
 
-.profile-setup-container {
+.profile-setup-grid {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr);
+  gap: 20px;
   max-width: 1280px;
   margin: 0 auto;
 }
 
-.profile-setup-header,
 .profile-conversation-card,
-.profile-live-panel,
-.profile-confirm-card,
-.profile-summary-card,
-.agent-workflow-card,
-.learning-path-result-card {
-  border-radius: 16px;
+.profile-live-panel {
+  min-height: 0;
   border: 1px solid #E5E7EB;
+  border-radius: 14px;
   box-shadow: 0 10px 28px rgba(17, 24, 39, 0.04);
 }
 
-.profile-setup-header {
-  border-radius: 24px;
-  margin-bottom: 18px;
-}
-
-.profile-header-top,
-.profile-header-main,
-.profile-completion,
-.profile-dimension-title,
-.profile-chat-input,
-.agent-workflow-step {
-  display: flex;
-  align-items: center;
-}
-
-.profile-header-top {
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.profile-header-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.profile-header-main {
-  justify-content: space-between;
-  gap: 28px;
-}
-
-.profile-kicker {
-  display: block;
-  color: #6C5CE7;
-  font-weight: 700;
-  letter-spacing: 0;
-  margin-bottom: 6px;
-}
-
-.profile-header-steps {
-  width: min(520px, 48%);
-}
-
-.profile-setup-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  gap: 18px;
-}
-
-.profile-right-stack,
-.agent-workflow-list {
+.profile-conversation-card .ant-card-body,
+.profile-live-panel .ant-card-body {
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
 }
 
-.profile-conversation-card .ant-card-body {
-  display: flex;
-  min-height: 680px;
-  flex-direction: column;
-  gap: 14px;
+.profile-chat-header,
+.profile-live-header {
+  flex-shrink: 0;
 }
 
-.profile-quick-actions {
-  padding: 10px 0;
+.profile-chat-header h3,
+.profile-live-header h4 {
+  margin: 0 0 4px;
 }
 
 .profile-message-list {
   flex: 1;
-  min-height: 320px;
-  max-height: 470px;
-  overflow: auto;
-  padding: 12px;
-  border-radius: 16px;
-  background: #F8F7FF;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  margin: 16px 0;
+  border-radius: 14px;
+  background: #FFFFFF;
   border: 1px solid #E8EAF0;
 }
 
 .profile-message {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
-  margin-bottom: 12px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+.profile-message--user {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.profile-message--user .profile-message-role {
+  order: 2;
+  background: #EAF2FF;
+  color: #2563EB;
 }
 
 .profile-message-role {
-  width: 34px;
+  min-width: 34px;
   height: 34px;
+  padding: 0 10px;
   border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: #F3F0FF;
   color: #6C5CE7;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.profile-message--user .profile-message-role {
-  background: #EAF2FF;
-  color: #4F8CFF;
+.profile-message-body {
+  max-width: min(680px, 100%);
 }
 
-.profile-message p {
+.profile-message--user .profile-message-body {
+  justify-self: end;
+}
+
+.profile-message-body .ant-typography {
   margin: 0;
-  padding: 10px 12px;
+  padding: 11px 13px;
   border-radius: 14px;
   background: #FFFFFF;
   border: 1px solid #E8EAF0;
+  white-space: pre-wrap;
+}
+
+.profile-message--user .profile-message-body .ant-typography {
+  background: #EAF2FF;
+  border-color: #BFDBFE;
+}
+
+.profile-agent-run {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 12px;
 }
 
 .profile-message-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: #6B7280;
 }
 
 .profile-chat-input {
+  flex-shrink: 0;
+  display: flex;
   gap: 10px;
+  align-items: flex-end;
 }
 
 .profile-chat-input textarea {
@@ -146,12 +133,15 @@
 }
 
 .profile-completion {
+  flex-shrink: 0;
+  display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 14px;
   padding: 12px;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #F3F0FF;
-  margin-bottom: 14px;
+  margin: 14px 0;
 }
 
 .profile-completion > div:first-child {
@@ -160,78 +150,75 @@
   gap: 4px;
 }
 
+.profile-dimensions {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.profile-dimension-group {
+  margin-bottom: 14px;
+}
+
 .profile-dimension-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-top: 8px;
 }
 
 .profile-dimension-card {
   border-color: #E8EAF0;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
 .profile-dimension-card.is-missing {
   background: #FAFAFB;
 }
 
+.profile-dimension-card.is-updated {
+  border-color: #6C5CE7;
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.14);
+  background: #FBFAFF;
+}
+
 .profile-dimension-title {
+  display: flex;
   gap: 8px;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
 }
 
-.agent-workflow-step {
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: #F6F7FB;
-}
-
-.agent-workflow-step span {
-  color: #6C5CE7;
-}
-
-.agent-workflow-step.is-failed span {
-  color: #EF4444;
-}
-
-.agent-workflow-step p {
-  margin: 2px 0 0;
-  color: #6B7280;
-}
-
-.result-stage-list {
+.profile-confirm-footer {
+  flex-shrink: 0;
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 14px 0;
-}
-
-.result-stage-list span {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #F3F0FF;
-  color: #6C5CE7;
-  font-size: 12px;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid #E5E7EB;
 }
 
 .chat-error-card {
-  border-radius: 16px;
+  border-radius: 14px;
 }
 
 @media (max-width: 1100px) {
+  .profile-setup-page {
+    height: auto;
+    min-height: calc(100vh - 64px);
+    overflow: auto;
+  }
+
   .profile-setup-grid {
     grid-template-columns: 1fr;
   }
 
-  .profile-header-main {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .profile-header-steps {
-    width: 100%;
+  .profile-conversation-card .ant-card-body,
+  .profile-live-panel .ant-card-body {
+    min-height: 620px;
   }
 }
 

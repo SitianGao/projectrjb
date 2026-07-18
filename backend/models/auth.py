@@ -2,7 +2,7 @@
 
 import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text
 
 from . import Base
 
@@ -18,6 +18,7 @@ class User(Base):
     phone = Column(String(30))
     bio = Column(Text)
     avatar = Column(String(500))
+    is_demo = Column(Boolean, default=False, nullable=False)
     active_course_id = Column(String(36))
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

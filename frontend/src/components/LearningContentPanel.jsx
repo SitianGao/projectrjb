@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
-import { Button, Empty, Progress, Space, Tag, Typography, Radio, message, Card } from 'antd'
+import { useState } from 'react'
+import { Button, Empty, Progress, Space, Tag, Typography, Radio, Card } from 'antd'
 import {
   AimOutlined, ArrowLeftOutlined, ArrowRightOutlined,
-  CheckCircleFilled, ClockCircleOutlined, FileTextOutlined,
+  CheckCircleFilled, ClockCircleOutlined,
   SaveOutlined, LockOutlined, BulbOutlined, EditOutlined,
 } from '@ant-design/icons'
 import MarkdownRenderer from './MarkdownRenderer'
@@ -10,9 +10,11 @@ import MarkdownRenderer from './MarkdownRenderer'
 const { Text, Title, Paragraph } = Typography
 
 const TASK_TYPE_LABELS = {
-  goal: '学习目标', document: '核心讲义', video: '视频学习',
-  mindmap: '概念图解', exercise: '练习任务', knowledge_check: '知识检查',
-  assessment: '阶段测评', project: '项目任务', code: '代码挑战',
+  objective: '学习目标', goal: '学习目标', document: '核心讲义', video: '视频学习',
+  lecture: '核心讲义', mindmap: '概念图解', diagram: '概念图解',
+  exercise: '知识检查', quiz: '知识检查', knowledge_check: '知识检查',
+  assessment: '阶段测评', exam: '阶段测评', project: '项目任务',
+  code: '代码实操', ppt: '教学课件', interactive_classroom: 'AI 互动课堂',
 }
 
 function GoalContent({ task }) {
@@ -121,10 +123,11 @@ function AssessmentContent({ task }) {
 }
 
 const CONTENT_MAP = {
-  goal: GoalContent, document: DocumentContent, video: DocumentContent,
+  objective: GoalContent, goal: GoalContent, document: DocumentContent, lecture: DocumentContent, video: DocumentContent,
   mindmap: MindmapContent, exercise: ExerciseContent,
-  knowledge_check: KnowledgeCheckContent, assessment: AssessmentContent,
-  project: DocumentContent, code: DocumentContent,
+  diagram: MindmapContent, quiz: KnowledgeCheckContent,
+  knowledge_check: KnowledgeCheckContent, assessment: AssessmentContent, exam: AssessmentContent,
+  project: DocumentContent, code: DocumentContent, ppt: DocumentContent,
 }
 
 /**
@@ -165,7 +168,7 @@ export default function LearningContentPanel({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <Tag color="purple" style={{ borderRadius: 6, margin: 0 }}>{taskIndex != null ? `任务 ${taskIndex + 1}` : '当前任务'}</Tag>
-            <Tag style={{ borderRadius: 6, margin: 0 }}>{TASK_TYPE_LABELS[taskType] || taskType}</Tag>
+            <Tag style={{ borderRadius: 6, margin: 0 }}>{task.type_label || TASK_TYPE_LABELS[taskType] || '学习任务'}</Tag>
             {isCompleted && <Tag color="success" icon={<CheckCircleFilled />} style={{ borderRadius: 6, margin: 0 }}>已完成</Tag>}
           </div>
           <Title level={4} style={{ margin: '4px 0', color: '#111827', fontSize: 20 }}>{task.title || '学习任务'}</Title>
@@ -202,7 +205,9 @@ export default function LearningContentPanel({
         <Space size={12}>
           {!isCompleted && (
             <>
-              <Button icon={<SaveOutlined />} onClick={() => onSave?.(task)} loading={saving} style={{ borderRadius: 10 }}>保存进度</Button>
+              {onSave && (
+                <Button icon={<SaveOutlined />} onClick={() => onSave(task)} loading={saving} style={{ borderRadius: 10 }}>保存进度</Button>
+              )}
               <Button type="primary" icon={<CheckCircleFilled />}
                 onClick={() => onComplete?.(task)} loading={completing}
                 style={{ borderRadius: 10, background: '#6C5CE7', borderColor: '#6C5CE7', boxShadow: '0 2px 6px rgba(108,92,231,0.3)' }}>

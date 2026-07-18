@@ -4,6 +4,7 @@ import { MessageOutlined, CloseOutlined } from '@ant-design/icons'
 import ChatBox from './ChatBox'
 import { useChat } from '../hooks/useChat'
 import { startProfileChat } from '../api/profile'
+import { useAuth } from '../contexts/AuthContext'
 
 const SUGGESTIONS = [
   '帮我分析一下我的学习情况',
@@ -23,15 +24,17 @@ const STYLE_PROMPTS = {
  */
 export default function FloatingChat() {
   const [open, setOpen] = useState(false)
+  const { activeCourse } = useAuth()
+  const studentId = activeCourse?.student_id || 'demo-student-ai-dl'
 
   const streamFetcher = useCallback(
     (message, signal, options) => {
       const style = options?.style
       const stylePrompt = STYLE_PROMPTS[style]
       const styledMsg = stylePrompt ? `${stylePrompt}\n\n${message}` : message
-      return startProfileChat({ student_id: 'demo-student-01', message: styledMsg, style })
+      return startProfileChat({ student_id: studentId, message: styledMsg, style })
     },
-    [],
+    [studentId],
   )
 
   const { messages, isLoading, sendMessage, abort, setMessages } = useChat({

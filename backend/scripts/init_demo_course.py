@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # ── 演示配置常量 ──
 
-DEMO_USER_ID = "demo_student_user"
+DEMO_USER_ID = "demo_student"
 DEMO_USERNAME = "demo_student"
 DEMO_PASSWORD = "demo123"
 DEMO_STUDENT_ID = "demo-student-ai-dl"
@@ -112,6 +112,16 @@ DEMO_STAGES = [
                 "status": "completed",
                 "prerequisite_task_ids": ["task_ai_basics_exercise"],
             },
+            {
+                "task_id": "task_ai_basics_classroom",
+                "task_type": "interactive_classroom",
+                "title": "AI基础概念互动课堂",
+                "description": "进入沉浸式互动课堂，通过AI教师讲解、白板演示和即时测验理解AI核心概念",
+                "estimated_minutes": 25,
+                "difficulty": "初级",
+                "status": "not_started",
+                "prerequisite_task_ids": ["task_ai_basics_assessment"],
+            },
         ],
     },
     {
@@ -179,6 +189,16 @@ DEMO_STAGES = [
                 "difficulty": "中级",
                 "status": "locked",
                 "prerequisite_task_ids": ["task_gd_exercise", "task_gd_mindmap"],
+            },
+            {
+                "task_id": "task_gradient_classroom",
+                "task_type": "interactive_classroom",
+                "title": "梯度下降与学习率互动课堂",
+                "description": "进入沉浸式互动课堂，通过交互模拟、代码案例和AI讨论理解梯度下降原理",
+                "estimated_minutes": 25,
+                "difficulty": "中级",
+                "status": "not_started",
+                "prerequisite_task_ids": ["task_gd_assessment"],
             },
         ],
     },
@@ -249,6 +269,16 @@ DEMO_STAGES = [
                 "status": "locked",
                 "prerequisite_task_ids": ["task_nn_exercise", "task_nn_mindmap"],
             },
+            {
+                "task_id": "task_neural_network_classroom",
+                "task_type": "interactive_classroom",
+                "title": "神经网络互动课堂",
+                "description": "进入沉浸式互动课堂，学习神经元模型、激活函数和反向传播算法",
+                "estimated_minutes": 25,
+                "difficulty": "中高级",
+                "status": "not_started",
+                "prerequisite_task_ids": ["task_nn_assessment"],
+            },
         ],
     },
     {
@@ -317,6 +347,16 @@ DEMO_STAGES = [
                 "difficulty": "高级",
                 "status": "locked",
                 "prerequisite_task_ids": ["task_cnn_exercise", "task_cnn_mindmap"],
+            },
+            {
+                "task_id": "task_cnn_classroom",
+                "task_type": "interactive_classroom",
+                "title": "CNN图像分类互动课堂",
+                "description": "进入沉浸式互动课堂，通过卷积可视化和代码案例理解图像分类原理",
+                "estimated_minutes": 25,
+                "difficulty": "高级",
+                "status": "not_started",
+                "prerequisite_task_ids": ["task_cnn_assessment"],
             },
         ],
     },
@@ -604,11 +644,13 @@ def init_demo_course(db: Session | None = None) -> dict:
                 username=DEMO_USERNAME,
                 password_hash=_hash_password(DEMO_PASSWORD),
                 name="演示同学",
+                is_demo=True,
             )
             db.add(user)
             db.flush()
             logger.info("演示用户已创建: %s", DEMO_USERNAME)
         else:
+            user.is_demo = True
             logger.info("演示用户已存在: %s", DEMO_USERNAME)
 
         # ── 3. 创建/获取 Student ──
@@ -655,22 +697,39 @@ def init_demo_course(db: Session | None = None) -> dict:
             path = LearningPath(
                 id=str(uuid.uuid4()),
                 student_id=DEMO_STUDENT_ID,
+                user_id=user.id,
+                course_id=COURSE_ID,
                 version=1,
                 goal="掌握深度学习基础并完成简单图像分类项目",
                 stages=json.dumps(DEMO_STAGES, ensure_ascii=False),
                 current_stage=2,  # 当前在阶段二
+                current_stage_id="stage_gradient_descent",
+                estimated_days=sum(stage["estimated_days"] for stage in DEMO_STAGES),
                 status="active",
+                generation_source="seed",
+                generated_by="backend/scripts/init_demo_course.py",
+                fallback_used=False,
+                generated_at=datetime.datetime.utcnow(),
             )
             db.add(path)
             db.flush()
             logger.info("学习路径已创建: 4个阶段")
             result["path"] = {"id": path.id, "stages": 4, "current_stage": 2}
         else:
-            # 幂等更新：确保阶段数据是最新的
-            existing_path.stages = json.dumps(DEMO_STAGES, ensure_ascii=False)
-            existing_path.current_stage = 2
-            logger.info("学习路径已存在并更新")
+            # 启动时不得覆盖真实学习进度；reset_demo_student.py 才负责重置。
+            existing_path.user_id = user.id
+            existing_path.course_id = COURSE_ID
+            existing_path.generation_source = (
+                existing_path.generation_source
+                if existing_path.generation_source not in (None, "", "legacy")
+                else "seed"
+            )
+            if existing_path.generation_source == "seed":
+                existing_path.generated_by = "backend/scripts/init_demo_course.py"
+                existing_path.fallback_used = False
+            logger.info("学习路径已存在，保留当前任务进度")
             result["path"] = {"id": existing_path.id, "stages": 4, "current_stage": 2}
+            path = existing_path
 
         # ── 6. 预置演示资源（幂等：按 title + course_id 去重） ──
         resource_count = 0
@@ -808,6 +867,9 @@ def init_demo_course(db: Session | None = None) -> dict:
                         record_count += 1
 
         db.commit()
+        from deps import planner_service
+
+        planner_service.ensure_normalized_entities(db, path)
         logger.info("演示数据初始化完成（幂等）")
 
         return result

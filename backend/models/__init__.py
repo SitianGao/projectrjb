@@ -9,8 +9,8 @@ from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 # 延迟导入模型类，避免循环引用
-from .student import Student, StudentProfile
-from .learning_path import LearningPath
+from .student import Student, StudentProfile, CourseProfileConversationMessage
+from .learning_path import AgentRun, LearningPath, LearningStage, LearningTask
 from .resource import Resource
 from .evaluation import EvaluationReport, LearningRecord, WrongQuestion
 from .auth import User, AuthToken, Course
@@ -19,7 +19,11 @@ __all__ = [
     "Base",
     "Student",
     "StudentProfile",
+    "CourseProfileConversationMessage",
     "LearningPath",
+    "LearningStage",
+    "LearningTask",
+    "AgentRun",
     "Resource",
     "EvaluationReport",
     "LearningRecord",

@@ -1,4 +1,4 @@
-import { Drawer, Tag, Typography } from 'antd'
+import { Descriptions, Drawer, Tag, Typography } from 'antd'
 import { BookOutlined, BranchesOutlined, BulbOutlined } from '@ant-design/icons'
 
 const { Text, Paragraph } = Typography
@@ -16,31 +16,61 @@ export default function PathReasonDrawer({
   const totalSources = stages.reduce(
     (sum, s) => sum + (Array.isArray(s.knowledge_sources) ? s.knowledge_sources.length : 0), 0,
   )
+  const source = pathData?.generation_source || 'legacy'
+  const sourceLabels = {
+    agent: 'PlannerAgent 个性化生成',
+    seed: '演示预置数据',
+    manual: '人工配置',
+    rule_fallback: '规则降级生成',
+    legacy: '历史路径（来源未记录）',
+  }
 
   return (
     <Drawer
-      title="为什么这样规划？"
+      title="查看生成依据"
       open={visible}
       onClose={onClose}
       width={480}
       styles={{ body: { padding: '20px 24px' } }}
     >
-      {/* How it works */}
       <div style={{ marginBottom: 20 }}>
-        <Text strong style={{ fontSize: 14, color: 'var(--text-primary)', display: 'block', marginBottom: 8 }}>
+        <Text strong style={{ fontSize: 14, color: '#111827', display: 'block', marginBottom: 8 }}>
           <BulbOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />
-          路径生成原理
+          路径来源
         </Text>
-        <Paragraph style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-          系统根据你的学习画像（知识基础、学习目标、薄弱点、兴趣方向、认知风格）、
-          课程知识库结构和学习记录，通过 PlannerAgent 自动规划阶段递进路径。
-          每个阶段遵循"先基础后进阶"的认知逻辑，并参考艾宾浩斯遗忘曲线安排复习节点。
+        <Descriptions size="small" column={1} bordered>
+          <Descriptions.Item label="路径来源">{sourceLabels[source] || source}</Descriptions.Item>
+          <Descriptions.Item label="生成 Agent">{pathData?.generated_by || '未记录'}</Descriptions.Item>
+          <Descriptions.Item label="模型">
+            {pathData?.provider || pathData?.model
+              ? `${pathData.provider || ''}${pathData.model ? ` / ${pathData.model}` : ''}`
+              : '未使用模型'}
+          </Descriptions.Item>
+          <Descriptions.Item label="画像版本">
+            {pathData?.profile_version ? `v${pathData.profile_version}` : '未记录'}
+          </Descriptions.Item>
+          <Descriptions.Item label="路径版本">v{pathData?.version || 1}</Descriptions.Item>
+          <Descriptions.Item label="规则降级">
+            <Tag color={pathData?.fallback_used ? 'orange' : 'green'}>
+              {pathData?.fallback_used ? '是' : '否'}
+            </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="生成时间">{pathData?.generated_at || pathData?.created_at || '未记录'}</Descriptions.Item>
+        </Descriptions>
+        <Paragraph style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.7, marginTop: 12 }}>
+          {source === 'seed'
+            ? '当前路径来自数据库中的演示预置数据，用于稳定展示历史学习记录；它不会被标记为大模型生成。'
+            : source === 'agent'
+              ? '当前路径由 PlannerAgent 基于课程画像、学习目标和课程知识库生成，并已保存到数据库。'
+              : source === 'rule_fallback'
+                ? '模型调用未成功，本路径由开发模式规则生成；严格录制模式下不会允许这种降级。'
+                : '这是一条旧版本路径，历史数据没有记录可靠的生成来源，因此不会推断为 Agent 生成。'}
         </Paragraph>
       </div>
 
       {/* Data sources */}
       <div style={{ marginBottom: 20 }}>
-        <Text strong style={{ fontSize: 14, color: 'var(--text-primary)', display: 'block', marginBottom: 8 }}>
+        <Text strong style={{ fontSize: 14, color: '#111827', display: 'block', marginBottom: 8 }}>
           <BookOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />
           数据来源（{totalSources} 条）
         </Text>
@@ -49,8 +79,8 @@ export default function PathReasonDrawer({
           if (!sources.length) return null
           return (
             <div key={si} style={{ marginBottom: 10 }}>
-              <Text style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
-                阶段{stage.stage_id}：{stage.title}
+              <Text style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginBottom: 4 }}>
+                阶段{stage.order || si + 1}：{stage.title}
               </Text>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {sources.slice(0, 5).map((src, i) => (
@@ -64,19 +94,20 @@ export default function PathReasonDrawer({
         })}
       </div>
 
-      {/* Algorithm */}
-      <div>
-        <Text strong style={{ fontSize: 14, color: 'var(--text-primary)', display: 'block', marginBottom: 8 }}>
+      {source === 'agent' && (
+        <div>
+        <Text strong style={{ fontSize: 14, color: '#111827', display: 'block', marginBottom: 8 }}>
           <BranchesOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />
           规划策略
         </Text>
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+        <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.7 }}>
           <p>• 认知递进：从基础概念到高级应用，避免跳跃式学习</p>
           <p>• 薄弱点优先：评估中发现的薄弱知识点排在路径前列</p>
           <p>• 间隔复习：基于艾宾浩斯遗忘曲线计算记忆保持率</p>
           <p>• 自适应调整：每次评估后动态调整后续阶段安排</p>
         </div>
-      </div>
+        </div>
+      )}
     </Drawer>
   )
 }

@@ -9,14 +9,19 @@
 import json
 import logging
 import threading
+import time
 import uuid
+from datetime import datetime
 from typing import Any, AsyncIterator, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from config import PROFILE_READY_THRESHOLD
 from api.response import sse_done, sse_error
-from models.learning_path import LearningPath
+from config import LLM_STRICT_MODE, PROFILE_READY_THRESHOLD, RAG_STRICT_MODE, SPARK_MODEL
+from core.agent_context import AgentContext
+from models.auth import Course
+from models.learning_path import AgentRun, LearningPath, LearningStage, LearningTask
+from models.student import StudentProfile
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +29,7 @@ logger = logging.getLogger(__name__)
 class PlannerService:
     """学习路径规划业务服务"""
 
-    def __init__(self, planner_agent, db_session_factory, profile_service):
+    def __init__(self, planner_agent, db_session_factory, profile_service, retriever=None):
         """
         Args:
             planner_agent: PlannerAgent 实例
@@ -34,6 +39,7 @@ class PlannerService:
         self.agent = planner_agent
         self.db_session_factory = db_session_factory
         self.profile_service = profile_service
+        self.retriever = retriever
         self._generation_lock = threading.Lock()
         self._generating_students: set[str] = set()
 
@@ -52,6 +58,29 @@ class PlannerService:
         )
         if not path:
             return None
+        return self._path_to_dict(path)
+
+    def get_current_path_for_course(
+        self,
+        db: Session,
+        *,
+        user_id: str,
+        course_id: str,
+    ) -> Optional[Dict]:
+        """按登录用户和课程双重限定读取路径。"""
+        path = (
+            db.query(LearningPath)
+            .filter(
+                LearningPath.user_id == user_id,
+                LearningPath.course_id == course_id,
+                LearningPath.status == "active",
+            )
+            .order_by(LearningPath.version.desc())
+            .first()
+        )
+        if not path:
+            return None
+        self.ensure_normalized_entities(db, path)
         return self._path_to_dict(path)
 
     def get_path_history(self, db: Session, student_id: str) -> list:
@@ -123,44 +152,242 @@ class PlannerService:
         db: Session,
         student_id: str,
         path_data: Dict,
+        *,
+        user_id: Optional[str] = None,
+        course_id: Optional[str] = None,
+        generation_metadata: Optional[Dict] = None,
     ) -> LearningPath:
-        """保存新的学习路径版本。旧 active 路径标记为 superseded。"""
-        # 将旧 active 路径标记为 superseded
-        old_active = (
-            db.query(LearningPath)
-            .filter(
-                LearningPath.student_id == student_id,
-                LearningPath.status == "active",
+        """事务化保存路径、阶段和任务；旧 active 路径标记为 superseded。"""
+        metadata = {
+            "generation_source": "legacy",
+            "generated_by": None,
+            "provider": None,
+            "model": None,
+            "agent_run_id": None,
+            "profile_version": None,
+            "fallback_used": False,
+            "fallback_type": None,
+            **(generation_metadata or {}),
+        }
+        course = self._resolve_course(db, student_id, user_id=user_id, course_id=course_id)
+        if course:
+            user_id = course.user_id
+            course_id = course.id
+
+        stages = _normalized_stage_snapshot(path_data.get("stages", []))
+        if not stages:
+            raise ValueError("学习路径至少需要一个有效阶段")
+        current_order, current_stage_id = _resolve_current_stage(stages, path_data)
+
+        try:
+            old_active = (
+                db.query(LearningPath)
+                .filter(
+                    LearningPath.student_id == student_id,
+                    LearningPath.status == "active",
+                )
+                .order_by(LearningPath.version.desc())
+                .all()
             )
-            .order_by(LearningPath.version.desc())
-            .all()
-        )
-        for old in old_active:
-            old.status = "superseded"
+            for old in old_active:
+                old.status = "superseded"
 
-        # 确定新版本号
-        latest = (
-            db.query(LearningPath)
-            .filter(LearningPath.student_id == student_id)
-            .order_by(LearningPath.version.desc())
-            .first()
-        )
-        new_version = (latest.version + 1) if latest else 1
+            latest = (
+                db.query(LearningPath)
+                .filter(LearningPath.student_id == student_id)
+                .order_by(LearningPath.version.desc())
+                .first()
+            )
+            new_version = (latest.version + 1) if latest else 1
+            estimated_days = _as_positive_int(
+                path_data.get("estimated_days"),
+                sum(_as_positive_int(stage.get("estimated_days"), 1) for stage in stages),
+            )
 
-        record = LearningPath(
-            id=str(uuid.uuid4()),
-            student_id=student_id,
-            version=new_version,
-            goal=path_data.get("goal", ""),
-            stages=json.dumps(path_data.get("stages", []), ensure_ascii=False),
-            current_stage=path_data.get("current_stage", 1),
-            status="active",
+            record = LearningPath(
+                id=str(uuid.uuid4()),
+                student_id=student_id,
+                user_id=user_id,
+                course_id=course_id,
+                version=new_version,
+                goal=path_data.get("goal", ""),
+                stages=json.dumps(stages, ensure_ascii=False),
+                current_stage=current_order,
+                current_stage_id=current_stage_id,
+                estimated_days=estimated_days,
+                status="active",
+                generation_source=metadata["generation_source"],
+                generated_by=metadata["generated_by"],
+                provider=metadata["provider"],
+                model=metadata["model"],
+                agent_run_id=metadata["agent_run_id"],
+                profile_version=metadata["profile_version"],
+                fallback_used=bool(metadata["fallback_used"]),
+                fallback_type=metadata["fallback_type"],
+                generated_at=metadata.get("generated_at") or datetime.utcnow(),
+            )
+            db.add(record)
+            db.flush()
+            self._persist_entities(db, record, stages)
+            db.commit()
+            db.refresh(record)
+            logger.info(
+                "学习路径已事务化保存: user=%s course=%s student=%s v%s source=%s",
+                user_id,
+                course_id,
+                student_id,
+                new_version,
+                record.generation_source,
+            )
+            return record
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _resolve_course(
+        db: Session,
+        student_id: str,
+        *,
+        user_id: Optional[str] = None,
+        course_id: Optional[str] = None,
+    ) -> Optional[Course]:
+        query = db.query(Course).filter(Course.student_id == student_id)
+        if user_id:
+            query = query.filter(Course.user_id == user_id)
+        if course_id:
+            query = query.filter(Course.id == course_id)
+        return query.first()
+
+    @staticmethod
+    def _persist_entities(
+        db: Session,
+        path: LearningPath,
+        stages: list[Dict],
+    ) -> None:
+        """把兼容快照展开为可独立查询和更新的 Stage/Task 行。"""
+        for stage_index, stage in enumerate(stages, 1):
+            stage_id = str(stage.get("stage_id") or f"stage-{stage_index}")
+            normalized_stage_status = _normalize_stage_status(
+                stage.get("status"),
+                stage_index == path.current_stage,
+            )
+            stage_row = LearningStage(
+                id=str(uuid.uuid4()),
+                path_id=path.id,
+                stage_id=stage_id,
+                title=str(stage.get("title") or f"阶段 {stage_index}"),
+                description=str(stage.get("description") or ""),
+                order=_as_positive_int(stage.get("order"), stage_index),
+                status=normalized_stage_status,
+                learning_objectives=json.dumps(
+                    _as_string_list(stage.get("learning_objectives") or stage.get("objectives")),
+                    ensure_ascii=False,
+                ),
+                knowledge_point_ids=json.dumps(
+                    _as_string_list(stage.get("knowledge_point_ids")),
+                    ensure_ascii=False,
+                ),
+                topics=json.dumps(_as_string_list(stage.get("topics")), ensure_ascii=False),
+                unlock_conditions=json.dumps(
+                    _as_string_list(stage.get("unlock_conditions")),
+                    ensure_ascii=False,
+                ),
+                resource_blueprint=json.dumps(
+                    stage.get("resource_blueprint") if isinstance(stage.get("resource_blueprint"), list) else [],
+                    ensure_ascii=False,
+                ),
+                estimated_days=_as_positive_int(stage.get("estimated_days"), 1),
+            )
+            db.add(stage_row)
+            db.flush()
+
+            for task_index, task in enumerate(stage.get("tasks") or [], 1):
+                if not isinstance(task, dict):
+                    continue
+                task_id = str(task.get("task_id") or task.get("id") or f"{stage_id}-task-{task_index}")
+                task_type = str(
+                    task.get("task_type")
+                    or task.get("type")
+                    or task.get("resource_type")
+                    or "document"
+                )
+                title = str(task.get("title") or task.get("task") or task.get("description") or "学习任务")
+                normalized_task_status = (
+                    "completed"
+                    if normalized_stage_status == "completed"
+                    else _normalize_task_status(task.get("status"))
+                )
+                db.add(LearningTask(
+                    id=str(uuid.uuid4()),
+                    path_id=path.id,
+                    stage_row_id=stage_row.id,
+                    stage_id=stage_id,
+                    task_id=task_id,
+                    task_type=task_type,
+                    title=title,
+                    description=str(task.get("description") or ""),
+                    content=_task_content(task),
+                    order=_as_positive_int(task.get("order"), task_index),
+                    estimated_minutes=_task_minutes(task),
+                    difficulty=str(task.get("difficulty") or "初级"),
+                    status=normalized_task_status,
+                    prerequisite_task_ids=json.dumps(
+                        _as_string_list(
+                            task.get("prerequisite_task_ids")
+                            or task.get("prerequisites")
+                        ),
+                        ensure_ascii=False,
+                    ),
+                    resource_id=task.get("resource_id"),
+                    completed_at=datetime.utcnow()
+                    if normalized_task_status == "completed"
+                    else None,
+                ))
+
+    def ensure_normalized_entities(self, db: Session, path: LearningPath) -> None:
+        """为历史 JSON 路径幂等补齐标准化 Stage/Task 行和课程归属。"""
+        existing_stages = (
+            db.query(LearningStage)
+            .filter(LearningStage.path_id == path.id)
+            .count()
         )
-        db.add(record)
-        db.commit()
-        db.refresh(record)
-        logger.info(f"学习路径已保存: student={student_id} v{new_version}")
-        return record
+        existing_tasks = (
+            db.query(LearningTask)
+            .filter(LearningTask.path_id == path.id)
+            .count()
+        )
+        changed = False
+        if not path.course_id or not path.user_id:
+            course = self._resolve_course(db, path.student_id)
+            if course:
+                path.course_id = course.id
+                path.user_id = course.user_id
+                changed = True
+        if not existing_stages or not existing_tasks:
+            if existing_tasks:
+                db.query(LearningTask).filter(LearningTask.path_id == path.id).delete(
+                    synchronize_session=False
+                )
+            if existing_stages:
+                db.query(LearningStage).filter(LearningStage.path_id == path.id).delete(
+                    synchronize_session=False
+                )
+            stages = _normalized_stage_snapshot(_safe_json_loads(path.stages, []))
+            if stages:
+                current_order, current_stage_id = _resolve_current_stage(
+                    stages,
+                    {
+                        "current_stage": path.current_stage,
+                        "current_stage_id": path.current_stage_id,
+                    },
+                )
+                path.current_stage = current_order
+                path.current_stage_id = current_stage_id
+                self._persist_entities(db, path, stages)
+                changed = True
+        if changed:
+            db.commit()
 
     # ── SSE 流式路径生成 ───────────────────────────────────────
 
@@ -180,13 +407,14 @@ class PlannerService:
             data: {"type":"error","code":"...","message":"..."}
             data: {"type":"done"}
         """
-        yield f'data: {{"type":"start","message":"开始检查学生画像和学习目标"}}\n\n'
+        yield _sse_event("workflow_started", message="开始检查课程画像和学习目标")
 
         if not self._claim_generation(student_id):
             yield sse_error("CONFLICT", "该学生的学习路径正在生成，请勿重复提交")
             yield sse_done()
             return
 
+        run: Optional[AgentRun] = None
         try:
             # 1. Always use the latest persisted profile. Path generation is a
             # user-confirmed next step and is never started by profile chat.
@@ -215,22 +443,93 @@ class PlannerService:
                 yield sse_done()
                 return
 
-            yield f'data: {{"type":"progress","progress":20,"message":"画像读取完成，开始生成个性化学习路径"}}\n\n'
+            course = self._resolve_course(db, student_id)
+            if not course:
+                raise ValueError("学生不属于任何有效课程，无法生成课程学习路径")
+            context = AgentContext(
+                user_id=course.user_id,
+                course_id=course.id,
+                session_id=f"planner-{uuid.uuid4().hex[:12]}",
+            )
+            run = self._start_agent_run(db, context, "PlannerAgent")
+            yield _sse_event(
+                "agent_started",
+                step="planner",
+                agent="PlannerAgent",
+                run_id=run.id,
+                message="PlannerAgent 正在基于课程画像生成学习路径",
+            )
 
-            raw = await self._generate_with_agent(profile, resolved_goal)
-            if isinstance(raw, str) and raw.strip():
-                yield _sse_event("delta", content=raw)
-
+            raw = await self._generate_with_agent(
+                context=context,
+                profile=profile,
+                goal=resolved_goal,
+            )
             path_data = _normalize_path_result(raw, resolved_goal)
+            knowledge_sources = self._retrieve_course_knowledge(resolved_goal, profile)
             self._attach_stage_knowledge_sources(path_data, knowledge_sources)
-            record = self.save_path(db, student_id, path_data)
+            metadata = self._generation_metadata(profile, run.id)
+            self._complete_agent_run(
+                db,
+                run,
+                status="completed",
+                metadata=metadata,
+                knowledge_hit_count=sum(
+                    len(stage.get("knowledge_sources") or [])
+                    for stage in path_data.get("stages", [])
+                ),
+            )
+            yield _sse_event(
+                "agent_completed",
+                step="planner",
+                agent="PlannerAgent",
+                run_id=run.id,
+                provider=metadata.get("provider"),
+                model=metadata.get("model"),
+                fallback_used=metadata.get("fallback_used", False),
+                duration_ms=run.duration_ms,
+                message="PlannerAgent 已生成并校验学习路径",
+            )
+
+            record = self.save_path(
+                db,
+                student_id,
+                path_data,
+                user_id=course.user_id,
+                course_id=course.id,
+                generation_metadata=metadata,
+            )
             saved = self._path_to_dict(record)
-            yield _sse_event("progress", progress=90, message="学习路径已保存")
+            yield _sse_event(
+                "path_saved",
+                step="planner",
+                path_id=record.id,
+                version=record.version,
+                generation_source=record.generation_source,
+                message="学习路径、阶段和任务已事务化保存",
+            )
             yield _sse_event("data", data=saved)
+            yield _sse_event("workflow_completed", step="done", message="学习路径生成完成")
             yield sse_done()
             logger.info("路径已自动持久化: student=%s path=%s", student_id, record.id)
         except Exception as exc:
             db.rollback()
+            if run:
+                self._complete_agent_run(
+                    db,
+                    run,
+                    status="failed",
+                    metadata=self._generation_metadata(profile if "profile" in locals() else {}, run.id),
+                    error_code=exc.__class__.__name__,
+                    fallback_reason=str(exc),
+                )
+            yield _sse_event(
+                "agent_failed",
+                step="planner",
+                agent="PlannerAgent",
+                run_id=run.id if run else None,
+                message=str(exc) or "学习路径生成失败",
+            )
             logger.exception("学习路径生成失败: student=%s", student_id)
             yield sse_error("PLANNER_GENERATE_FAILED", str(exc) or "学习路径生成失败")
             yield sse_done()
@@ -262,32 +561,152 @@ class PlannerService:
         if not resolved_goal:
             raise ValueError("学生画像缺少学习目标")
 
-        raw = await self._generate_with_agent(profile, resolved_goal)
+        course = self._resolve_course(db, student_id)
+        if not course:
+            raise ValueError("学生不属于任何有效课程")
+        context = AgentContext(
+            user_id=course.user_id,
+            course_id=course.id,
+            session_id=f"planner-{uuid.uuid4().hex[:12]}",
+        )
+        run = self._start_agent_run(db, context, "PlannerAgent")
+        started = time.monotonic()
+        try:
+            raw = await self._generate_with_agent(
+                context=context,
+                profile=profile,
+                goal=resolved_goal,
+            )
+        except Exception as exc:
+            self._complete_agent_run(
+                db,
+                run,
+                status="failed",
+                metadata=self._generation_metadata(profile, run.id),
+                error_code=exc.__class__.__name__,
+                fallback_reason=str(exc),
+                duration_ms=int((time.monotonic() - started) * 1000),
+            )
+            raise
         result = _normalize_path_result(raw, resolved_goal)
+        knowledge_sources = self._retrieve_course_knowledge(resolved_goal, profile)
         self._attach_stage_knowledge_sources(result, knowledge_sources)
-        record = self.save_path(db, student_id, result)
+        metadata = self._generation_metadata(profile, run.id)
+        self._complete_agent_run(
+            db,
+            run,
+            status="completed",
+            metadata=metadata,
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        record = self.save_path(
+            db,
+            student_id,
+            result,
+            user_id=course.user_id,
+            course_id=course.id,
+            generation_metadata=metadata,
+        )
         return self._path_to_dict(record)
 
     # ── 工具方法 ─────────────────────────────────────────────
 
-    async def _generate_with_agent(self, profile: Dict, goal: str) -> Any:
-        """Adapt the service to the frozen PlannerAgent contract."""
+    async def _generate_with_agent(
+        self,
+        *,
+        context: AgentContext,
+        profile: Dict,
+        goal: str,
+    ) -> Any:
+        """主演示链路只调用 PlannerAgent v2；旧方法仅保留给旧接口内部兼容。"""
         if not self.agent:
             raise RuntimeError("PlannerAgent 未配置")
-        if hasattr(self.agent, "generate_plan"):
+        if hasattr(self.agent, "generate_plan_v2"):
+            enriched_profile = {
+                **profile,
+                "learning_goal": goal,
+            }
+            return await self.agent.generate_plan_v2(
+                context=context,
+                profile=enriched_profile,
+                course_outline=[],
+            )
+        if not LLM_STRICT_MODE and hasattr(self.agent, "generate_plan"):
             return await self.agent.generate_plan(
                 profile=profile,
                 goal_override=goal,
             )
-        if hasattr(self.agent, "build_path"):
-            return await self.agent.build_path(
-                student_id=profile.get("student_id", ""),
-                profile=profile,
-                goal=goal,
-                current_path=None,
-                evaluation_feedback=None,
-            )
-        raise RuntimeError("PlannerAgent 缺少 generate_plan/build_path 方法")
+        raise RuntimeError("PlannerAgent 缺少 generate_plan_v2 方法")
+
+    @staticmethod
+    def _start_agent_run(
+        db: Session,
+        context: AgentContext,
+        agent_name: str,
+    ) -> AgentRun:
+        run = AgentRun(
+            id=f"run_{uuid.uuid4().hex}",
+            agent_name=agent_name,
+            user_id=context.user_id,
+            course_id=context.course_id,
+            stage_id=context.stage_id,
+            task_id=context.task_id,
+            request_id=context.session_id,
+            status="started",
+            started_at=datetime.utcnow(),
+        )
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+        return run
+
+    @staticmethod
+    def _complete_agent_run(
+        db: Session,
+        run: AgentRun,
+        *,
+        status: str,
+        metadata: Dict,
+        knowledge_hit_count: int = 0,
+        error_code: Optional[str] = None,
+        fallback_reason: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+    ) -> None:
+        completed_at = datetime.utcnow()
+        run.status = status
+        run.provider = metadata.get("provider")
+        run.model = metadata.get("model")
+        run.fallback_used = bool(metadata.get("fallback_used"))
+        run.fallback_type = metadata.get("fallback_type")
+        run.fallback_reason = fallback_reason
+        run.knowledge_hit_count = max(0, int(knowledge_hit_count or 0))
+        run.error_code = error_code
+        run.completed_at = completed_at
+        run.duration_ms = duration_ms if duration_ms is not None else max(
+            0,
+            int((completed_at - (run.started_at or completed_at)).total_seconds() * 1000),
+        )
+        db.add(run)
+        db.commit()
+
+    def _generation_metadata(self, profile: Dict, run_id: str) -> Dict:
+        agent_meta = getattr(self.agent, "last_generation_metadata", {}) or {}
+        usage = getattr(getattr(self.agent, "llm", None), "last_usage", None)
+        fallback_used = bool(agent_meta.get("fallback_used"))
+        provider = agent_meta.get("provider") or getattr(usage, "provider", None)
+        model = agent_meta.get("model") or getattr(usage, "model", None)
+        if provider == "spark" and not model:
+            model = SPARK_MODEL
+        return {
+            "generation_source": "rule_fallback" if fallback_used else "agent",
+            "generated_by": "PlannerAgent",
+            "provider": provider,
+            "model": model,
+            "agent_run_id": run_id,
+            "profile_version": _as_positive_int(profile.get("version"), 1),
+            "fallback_used": fallback_used,
+            "fallback_type": agent_meta.get("fallback_type"),
+        }
 
     def _retrieve_course_knowledge(self, goal: str, profile: Dict) -> list[Dict]:
         if not self.retriever:
@@ -379,9 +798,19 @@ class PlannerService:
             "goal": path.goal,
             "stages": stages,
             "current_stage": path.current_stage,
+            "current_stage_id": path.current_stage_id,
             "status": path.status,
-            "estimated_days": total_days or None,
+            "estimated_days": path.estimated_days or total_days or None,
             "total_estimated_days": total_days or None,
+            "generation_source": path.generation_source or "legacy",
+            "generated_by": path.generated_by,
+            "provider": path.provider,
+            "model": path.model,
+            "agent_run_id": path.agent_run_id,
+            "profile_version": path.profile_version,
+            "fallback_used": bool(path.fallback_used),
+            "fallback_type": path.fallback_type,
+            "generated_at": path.generated_at.isoformat() if path.generated_at else None,
             "created_at": path.created_at.isoformat() if path.created_at else None,
             "updated_at": path.updated_at.isoformat() if path.updated_at else None,
         }
@@ -405,6 +834,8 @@ def _resolve_goal(profile: Dict, requested_goal: Optional[str]) -> str:
 
 
 def _parse_agent_json(raw: Any) -> Dict:
+    if hasattr(raw, "model_dump"):
+        raw = raw.model_dump()
     if isinstance(raw, dict):
         return raw
     if not isinstance(raw, str):
@@ -447,11 +878,16 @@ def _normalize_path_result(raw: Any, resolved_goal: str) -> Dict:
             topics = [topics] if topics else []
         topics = [str(topic).strip() for topic in topics if str(topic).strip()]
         tasks = item.get("tasks") if isinstance(item.get("tasks"), list) else []
+        learning_objectives = _as_string_list(
+            item.get("learning_objectives") or item.get("objectives")
+        )
         stages.append({
             **item,
             "stage_id": str(item.get("stage_id") or f"stage-{index}"),
+            "order": _as_positive_int(item.get("order"), index),
             "title": title,
-            "objectives": item.get("objectives") or f"完成 {title} 的核心学习任务",
+            "learning_objectives": learning_objectives or [f"完成 {title} 的核心学习任务"],
+            "objectives": learning_objectives or [f"完成 {title} 的核心学习任务"],
             "topics": topics or [title],
             "tasks": tasks,
         })
@@ -496,6 +932,152 @@ def _as_float(value, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _as_string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    values = value if isinstance(value, list) else [value]
+    return [
+        str(item).strip()
+        for item in values
+        if item is not None and str(item).strip()
+    ]
+
+
+def _normalized_stage_snapshot(raw_stages: Any) -> list[Dict]:
+    if not isinstance(raw_stages, list):
+        return []
+    result: list[Dict] = []
+    seen_stage_ids: set[str] = set()
+    seen_task_ids: set[str] = set()
+    for stage_index, raw_stage in enumerate(raw_stages, 1):
+        if not isinstance(raw_stage, dict):
+            continue
+        stage_id = str(raw_stage.get("stage_id") or f"stage-{stage_index}")
+        if stage_id in seen_stage_ids:
+            continue
+        seen_stage_ids.add(stage_id)
+        objectives = _as_string_list(
+            raw_stage.get("learning_objectives") or raw_stage.get("objectives")
+        )
+        tasks = []
+        for task_index, raw_task in enumerate(raw_stage.get("tasks") or [], 1):
+            if not isinstance(raw_task, dict):
+                continue
+            task_id = str(
+                raw_task.get("task_id")
+                or raw_task.get("id")
+                or f"{stage_id}-task-{task_index}"
+            )
+            if task_id in seen_task_ids:
+                continue
+            seen_task_ids.add(task_id)
+            task_type = str(
+                raw_task.get("task_type")
+                or raw_task.get("type")
+                or raw_task.get("resource_type")
+                or "document"
+            )
+            tasks.append({
+                **raw_task,
+                "task_id": task_id,
+                "task_type": task_type,
+                "type": task_type,
+                "title": str(
+                    raw_task.get("title")
+                    or raw_task.get("task")
+                    or raw_task.get("description")
+                    or "学习任务"
+                ),
+                "order": _as_positive_int(raw_task.get("order"), task_index),
+                "estimated_minutes": _task_minutes(raw_task),
+                "status": _normalize_task_status(raw_task.get("status")),
+                "prerequisite_task_ids": _as_string_list(
+                    raw_task.get("prerequisite_task_ids")
+                    or raw_task.get("prerequisites")
+                ),
+            })
+        result.append({
+            **raw_stage,
+            "stage_id": stage_id,
+            "order": _as_positive_int(raw_stage.get("order"), stage_index),
+            "title": str(raw_stage.get("title") or f"阶段 {stage_index}"),
+            "description": str(raw_stage.get("description") or ""),
+            "learning_objectives": objectives,
+            "objectives": objectives,
+            "knowledge_point_ids": _as_string_list(raw_stage.get("knowledge_point_ids")),
+            "topics": _as_string_list(raw_stage.get("topics")),
+            "unlock_conditions": _as_string_list(raw_stage.get("unlock_conditions")),
+            "estimated_days": _as_positive_int(raw_stage.get("estimated_days"), 1),
+            "status": str(raw_stage.get("status") or "locked"),
+            "tasks": sorted(tasks, key=lambda task: task["order"]),
+        })
+    return sorted(result, key=lambda stage: stage["order"])
+
+
+def _resolve_current_stage(stages: list[Dict], path_data: Dict) -> tuple[int, str]:
+    requested_id = path_data.get("current_stage_id")
+    requested_order = path_data.get("current_stage")
+    for stage in stages:
+        if requested_id and str(stage["stage_id"]) == str(requested_id):
+            return stage["order"], stage["stage_id"]
+    for stage in stages:
+        if str(stage["stage_id"]) == str(requested_order):
+            return stage["order"], stage["stage_id"]
+        if stage["order"] == _safe_int(requested_order, -1):
+            return stage["order"], stage["stage_id"]
+    active = next(
+        (stage for stage in stages if str(stage.get("status")).lower() in {"active", "in_progress"}),
+        stages[0],
+    )
+    return active["order"], active["stage_id"]
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_stage_status(value: Any, is_current: bool = False) -> str:
+    status = str(value or "").strip().lower()
+    if status in {"completed", "complete", "done", "finished"}:
+        return "completed"
+    if is_current or status in {"active", "current", "in_progress"}:
+        return "active"
+    return "locked" if status == "locked" else "not_started"
+
+
+def _normalize_task_status(value: Any) -> str:
+    status = str(value or "").strip().lower()
+    if status in {"completed", "complete", "done", "finished"}:
+        return "completed"
+    if status in {"active", "current", "in_progress"}:
+        return "active"
+    if status == "locked":
+        return "locked"
+    return "not_started"
+
+
+def _task_minutes(task: Dict) -> int:
+    minutes = _safe_int(task.get("estimated_minutes") or task.get("estimatedMinutes"), 0)
+    if minutes <= 0:
+        try:
+            minutes = round(float(task.get("estimated_hours") or 0) * 60)
+        except (TypeError, ValueError):
+            minutes = 0
+    return max(5, min(480, minutes or 20))
+
+
+def _task_content(task: Dict) -> str:
+    content = task.get("content")
+    if isinstance(content, str):
+        return content
+    if content is not None:
+        return json.dumps(content, ensure_ascii=False)
+    return ""
 
 
 def _sse_event(event_type: str, **payload) -> str:

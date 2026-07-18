@@ -41,6 +41,70 @@ def _ensure_sqlite_compat_columns():
     if not DATABASE_URL.startswith("sqlite"):
         return
     with engine.begin() as conn:
+        user_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()
+        }
+        if user_columns and "is_demo" not in user_columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN is_demo BOOLEAN DEFAULT 0 NOT NULL"))
+            logger.info("数据库迁移完成：users.is_demo")
+        if user_columns:
+            conn.execute(text("""
+                UPDATE users
+                SET is_demo = 1
+                WHERE id = 'demo_student' OR username = 'demo_student'
+            """))
+
+        path_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(learning_paths)")).fetchall()
+        }
+        path_migrations = {
+            "user_id": "VARCHAR(36)",
+            "course_id": "VARCHAR(36)",
+            "current_stage_id": "VARCHAR(64)",
+            "estimated_days": "INTEGER",
+            "generation_source": "VARCHAR(30) DEFAULT 'legacy'",
+            "generated_by": "VARCHAR(80)",
+            "provider": "VARCHAR(50)",
+            "model": "VARCHAR(100)",
+            "agent_run_id": "VARCHAR(64)",
+            "profile_version": "INTEGER",
+            "fallback_used": "BOOLEAN DEFAULT 0",
+            "fallback_type": "VARCHAR(50)",
+            "generated_at": "DATETIME",
+        }
+        for column, ddl in path_migrations.items():
+            if column not in path_columns:
+                conn.execute(text(f"ALTER TABLE learning_paths ADD COLUMN {column} {ddl}"))
+                logger.info("数据库迁移完成：learning_paths.%s", column)
+
+        conn.execute(text("""
+            UPDATE learning_paths
+            SET course_id = (
+                SELECT courses.id
+                FROM courses
+                WHERE courses.student_id = learning_paths.student_id
+                LIMIT 1
+            )
+            WHERE course_id IS NULL
+        """))
+        conn.execute(text("""
+            UPDATE learning_paths
+            SET user_id = (
+                SELECT courses.user_id
+                FROM courses
+                WHERE courses.id = learning_paths.course_id
+                LIMIT 1
+            )
+            WHERE user_id IS NULL
+        """))
+        conn.execute(text("""
+            UPDATE learning_paths
+            SET generation_source = 'legacy'
+            WHERE generation_source IS NULL OR generation_source = ''
+        """))
+
         columns = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info(resources)")).fetchall()

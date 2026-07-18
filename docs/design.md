@@ -329,36 +329,193 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 
 ### 6.1 接口总览
 
+#### 6.1.1 系统与健康
+
 | 方法 | 路径 | 用途 | 响应方式 |
 |------|------|------|----------|
-| `GET` | `/` | 健康检查 | JSON |
-| `POST` | `/api/profile/chat` | 对话式画像构建 | **SSE 流式** |
+| `GET` | `/` | 根路径健康检查 | JSON |
+| `GET` | `/api/health` | 结构化健康检查（含数据库连通性） | JSON |
+
+#### 6.1.2 认证与多课程
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `POST` | `/api/auth/register` | 用户注册 | JSON |
+| `POST` | `/api/auth/login` | 用户登录，返回 Token | JSON |
+| `GET` | `/api/auth/me` | 获取当前用户信息 | JSON |
+| `POST` | `/api/auth/logout` | 退出登录 | JSON |
+| `PUT` | `/api/auth/profile` | 更新个人信息 | JSON |
+| `PUT` | `/api/auth/password` | 修改密码 | JSON |
+| `GET` | `/api/auth/courses` | 获取我的课程列表 | JSON |
+| `POST` | `/api/auth/courses` | 创建新课程 | JSON |
+| `POST` | `/api/auth/courses/{course_id}/activate` | 激活课程（切换当前课） | JSON |
+| `GET` | `/api/auth/courses/{course_id}/dashboard` | 课程仪表盘数据 | JSON |
+| `PUT` | `/api/auth/courses/{course_id}` | 更新课程信息 | JSON |
+
+#### 6.1.3 学生画像
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `POST` | `/api/profile/chat` | 对话式画像构建（SSE 流式） | **SSE** |
+| `POST` | `/api/profile/{student_id}/chat` | 按学生 ID 对话式画像构建 | **SSE** |
+| `POST` | `/api/profile/{student_id}/chat/stream` | 同上（兼容端点） | **SSE** |
 | `GET` | `/api/profile/{student_id}` | 获取学生画像 | JSON |
 | `PUT` | `/api/profile/{student_id}` | 更新画像 | JSON |
-| `POST` | `/api/planner/generate` | 生成学习路径 | **SSE 流式** |
-| `GET` | `/api/planner/{student_id}` | 获取学习路径 | JSON |
-| `POST` | `/api/resource/generate` | 生成学习资源 | 异步任务（返回 task_id） |
-| `GET` | `/api/resource/{resource_id}` | 获取资源详情 | JSON |
+
+#### 6.1.4 课程画像（主流程入口）
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `GET` | `/api/courses/{course_id}/profile` | 获取课程画像 | JSON |
+| `POST` | `/api/courses/{course_id}/profile/conversations/{conversation_id}/messages` | 课程画像对话消息（调用 ProfileAgent → DeepSeek） | JSON |
+| `PUT` | `/api/courses/{course_id}/profile` | 更新课程画像 | JSON |
+
+#### 6.1.5 学习路径
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `POST` | `/api/planner/generate` | 生成学习路径（SSE 流式） | **SSE** |
+| `GET` | `/api/planner/{student_id}` | 获取当前激活的学习路径 | JSON |
+| `GET` | `/api/planner/{student_id}/all` | 获取所有路径版本 | JSON |
+| `GET` | `/api/planner/{student_id}/path/{path_id}` | 获取指定版本的路径 | JSON |
+| `DELETE` | `/api/planner/{student_id}/{path_id}` | 归档学习路径 | JSON |
+
+#### 6.1.6 课程学习（任务系统）
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `GET` | `/api/courses/{course_id}/learning-path` | 获取课程学习路径 | JSON |
+| `GET` | `/api/courses/{course_id}/learn` | 获取当前学习任务 | JSON |
+| `GET` | `/api/courses/{course_id}/learn/{task_id}` | 获取指定学习任务 | JSON |
+| `POST` | `/api/courses/{course_id}/tasks/{task_id}/complete` | 完成任务 | JSON |
+| `GET` | `/api/courses/{course_id}/learning-path/generation` | 查询路径生成状态 | JSON |
+
+#### 6.1.7 学习资源
+
+> 资源路由同时挂载在 `/api/resource/` 和 `/api/resources/`，两者等价。
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `POST` | `/api/resource/generate` | 生成学习资源（异步，返回 task_id） | JSON |
+| `POST` | `/api/resource/generate/stream` | 生成学习资源（SSE 流式） | **SSE** |
 | `GET` | `/api/resource/list` | 资源列表 | JSON |
-| `POST` | `/api/tutor/chat` | 智能辅导问答 | **SSE 流式** |
+| `GET` | `/api/resource/types` | 支持的资源类型 | JSON |
+| `GET` | `/api/resource/{resource_id}` | 获取资源详情 | JSON |
+| `POST` | `/api/resource/{resource_id}/bookmark` | 收藏资源 | JSON |
+
+#### 6.1.8 智能辅导
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `POST` | `/api/tutor/chat` | 智能辅导问答（SSE 流式） | **SSE** |
+| `POST` | `/api/tutor/ask` | 兼容端点，同上 | **SSE** |
+| `POST` | `/api/tutor/ask/stream` | 兼容端点，同上 | **SSE** |
+| `GET` | `/api/tutor/history/{session_id}` | 获取辅导对话历史 | JSON |
+| `GET` | `/api/tutor/sessions` | 辅导会话列表 | JSON |
+| `POST` | `/api/tutor/sessions` | 创建辅导会话 | JSON |
+| `POST` | `/api/tutor/check` | 提交答案检查 | JSON |
+
+#### 6.1.9 学习评估
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
 | `POST` | `/api/evaluate/start` | 开始学习评估 | JSON |
+| `POST` | `/api/evaluate/generate` | 兼容端点，同上 | JSON |
+| `POST` | `/api/evaluate/generate/stream` | 生成评估（SSE 流式） | **SSE** |
 | `GET` | `/api/evaluate/report/{student_id}` | 获取评估报告 | JSON |
+| `GET` | `/api/evaluate/reports/{report_id}` | 获取指定评估报告 | JSON |
+| `GET` | `/api/evaluate/history/{student_id}` | 评估报告历史 | JSON |
+| `GET` | `/api/evaluate/courses/{course_id}/latest` | 课程最新评估 | JSON |
+| `GET` | `/api/evaluate/progress/{student_id}` | 学习进度统计 | JSON |
+| `GET` | `/api/evaluate/{student_id}` | 获取评估（兼容） | JSON |
+| `GET` | `/api/evaluate/{student_id}/history` | 评估历史（兼容） | JSON |
+| `GET` | `/api/evaluate/{student_id}/progress` | 进度统计（兼容） | JSON |
 | `POST` | `/api/evaluate/record` | 提交学习记录 | JSON |
+| `GET` | `/api/evaluate/record` | 查询学习记录 | JSON |
+| `GET` | `/api/evaluate/wrong-book` | 错题本 | JSON |
+| `PATCH` | `/api/evaluate/wrong-book/{question_id}` | 更新错题状态 | JSON |
+| `POST` | `/api/evaluate/reports/{report_id}/path-adjustments/preview` | 预览路径调整 | JSON |
+| `POST` | `/api/evaluate/reports/{report_id}/path-adjustments/apply` | 应用路径调整 | JSON |
+| `POST` | `/api/evaluate/self` | 自评 | JSON |
+
+#### 6.1.10 互动课堂
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `POST` | `/api/classrooms/generate` | 生成互动课堂（异步） | JSON |
+| `GET` | `/api/classrooms/demo` | 获取演示课堂 | JSON |
+| `GET` | `/api/classrooms/{classroom_id}` | 获取课堂详情 | JSON |
+| `POST` | `/api/classrooms/{classroom_id}/sessions` | 创建课堂会话 | JSON |
+| `PATCH` | `/api/classrooms/{classroom_id}/sessions/{session_id}/scenes/{scene_id}` | 更新场景进度 | JSON |
+| `POST` | `/api/classrooms/{classroom_id}/sessions/{session_id}/tutor/chat` | 课堂内 AI 导师对话 | JSON |
+| `POST` | `/api/classrooms/{classroom_id}/sessions/{session_id}/tutor/interventions/check` | 检查导师干预 | JSON |
+| `POST` | `/api/classrooms/{classroom_id}/sessions/{session_id}/quiz/submit` | 提交课堂测验 | JSON |
+| `POST` | `/api/classrooms/{classroom_id}/sessions/{session_id}/complete` | 完成课堂 | JSON |
+| `POST` | `/api/classrooms/{classroom_id}/sessions/{session_id}/evaluate` | 评估课堂表现 | JSON |
+
+#### 6.1.11 其他
+
+| 方法 | 路径 | 用途 | 响应方式 |
+|------|------|------|----------|
+| `POST` | `/api/pipeline/generate` | Agent 编排管道（画像→路径→资源全流程 SSE） | **SSE** |
+| `GET` | `/api/session/bootstrap` | 会话引导数据 | JSON |
 | `GET` | `/api/task/{task_id}/status` | 查询异步任务进度 | JSON |
+| `POST` | `/api/judge/submit` | 在线判题提交 | JSON |
+| `GET` | `/api/judge/problems` | 判题列表 | JSON |
+| `GET` | `/api/judge/problems/{problem_id}` | 判题详情 | JSON |
+| `GET` | `/api/judge/languages` | 支持的编程语言 | JSON |
 
 ### 6.2 统一规范
 
 - 所有接口前缀 `/api/`
 - 流式接口统一 SSE，`Content-Type: text/event-stream`
 - 异步任务返回 `task_id`，前端轮询 `/api/task/{id}/status`
+- 所有需认证的接口通过 `Authorization: Bearer <token>` 传递令牌
 - 普通成功响应统一格式：`{"success": true, "data": {}, "message": "ok"}`
 - 错误响应统一格式：`{"success": false, "error": true, "code": "ERROR_CODE", "message": "描述"}`
 - 学生 ID 使用 UUID，任务 ID 使用 `task_` 前缀
-- 第一阶段普通 JSON 接口保留顶层业务字段作为旧前端兼容；正式合同以 `data` 内字段为准。
+- 第一阶段普通 JSON 接口保留顶层业务字段作为旧前端兼容；正式合同以 `data` 内字段为准
 
 ### 6.3 核心接口示例
 
-#### 画像对话（SSE 流式）
+#### 画像对话（课程级，主流程入口）
+
+```
+POST /api/courses/{course_id}/profile/conversations/{conversation_id}/messages
+
+请求（需登录态）：
+{
+  "message": "我是软件工程专业学生，Python 基础较好但线性代数薄弱...",
+  "history": [{"role": "user", "content": "..."}, ...]
+}
+
+响应：
+{
+  "success": true,
+  "data": {
+    "conversation_id": "profile-xxx-draft",
+    "assistant_message": {"role": "assistant", "content": "我已经更新了你的课程画像..."},
+    "profile": {...10个维度...},
+    "profile_patch": {"major": "软件工程", "learning_goal": "..."},
+    "profile_completion_rate": 0.8,
+    "missing_dimensions": ["年级"],
+    "next_questions": ["你目前大几？", "每周能投入多少时间？"],
+    "ready_for_confirmation": false,
+    "sources": ["dialogue"],
+    "agent_run": {
+      "agent_name": "ProfileAgent",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "status": "completed",
+      "fallback_used": false,
+      "duration_ms": 1234
+    }
+  },
+  "message": "ok"
+}
+```
+
+#### 画像对话（旧兼容接口，SSE 流式）
 
 ```
 POST /api/profile/chat
@@ -370,11 +527,13 @@ POST /api/profile/chat
 }
 
 响应（SSE 流式）：
+data: {"type":"start","message":"开始分析学习画像"}
 data: {"type":"chat","content":"了解了，你的数学基础..."}
-...
 data: {"type":"profile_update","profile":{...6个维度...}}
 data: {"type":"done"}
 ```
+
+> 注意：旧接口 `/api/profile/chat` 保留向后兼容。新开发请使用课程级接口 `/api/courses/{id}/profile/conversations/...`。
 
 #### 资源生成（异步任务）
 
@@ -387,6 +546,26 @@ GET /api/task/task_abc/status
 
 GET /api/task/task_abc/status
 → {"success":true,"data":{"status":"done","result":{"resources":[...]}},"message":"ok"}
+```
+
+#### 互动课堂获取
+
+```
+GET /api/classrooms/demo?course_id=ai_deep_learning_demo
+
+响应：
+{
+  "success": true,
+  "data": {
+    "classroom_id": "classroom_gradient_001",
+    "title": "梯度下降与学习率沉浸式课堂",
+    "scenes": [
+      {"scene_id": "scene_intro", "scene_type": "introduction", "title": "课程导入"},
+      {"scene_id": "scene_loss_gradient", "scene_type": "presentation", "title": "损失函数与梯度"},
+      ...
+    ]
+  }
+}
 ```
 
 ---
@@ -589,23 +768,51 @@ Day 1-5 不再重新排期，只做完成情况确认；Day 6-Day 16 是比赛�
 
 #### 10.4.2 SSE 事件格式
 
-流式接口统一返回以下事件类型：
+流式接口统一返回以下事件类型。不同 Agent 使用的事件子集不同：
 
-| type | 用途 | 示例 |
-|------|------|------|
-| `start` | 任务开始 | `{"type":"start","message":"开始生成"}` |
-| `delta` | 文本增量 | `{"type":"delta","content":"本节内容..."}` |
-| `progress` | 进度更新 | `{"type":"progress","progress":0.5,"message":"正在检索知识库"}` |
-| `data` | 结构化结果 | `{"type":"data","data":{...}}` |
-| `error` | 流式错误 | `{"type":"error","code":"LLM_ERROR","message":"模型调用失败"}` |
-| `done` | 任务完成 | `{"type":"done"}` |
+| type | 用途 | 使用者 | 示例 |
+|------|------|--------|------|
+| `start` | 任务开始 | 通用 | `{"type":"start","message":"开始生成学习路径"}` |
+| `chat` | 对话文本增量 | ProfileAgent | `{"type":"chat","content":"你的数学基础..."}` |
+| `delta` | 文本/JSON 增量 | PlannerAgent, TutorAgent | `{"type":"delta","content":"第一阶段..."}` |
+| `progress` | 进度更新 | PlannerAgent, ResourceAgent | `{"type":"progress","progress":0.5,"message":"正在检索"}` |
+| `profile_update` | 画像更新 | ProfileAgent | `{"type":"profile_update","profile":{...}}` |
+| `path_data` | 路径结果 | Pipeline | `{"type":"path_data","data":{...}}` |
+| `data` | 结构化结果 | PlannerAgent | `{"type":"data","data":{"stages":[...]}}` |
+| `error` | 流式错误 | 通用 | `{"type":"error","code":"LLM_ERROR","message":"调用失败"}` |
+| `done` | 任务完成 | 通用 | `{"type":"done"}` |
 
-SSE 示例：
+各 Agent SSE 事件流：
 
+**ProfileAgent（画像对话）：**
 ```text
-data: {"type":"start","message":"开始生成学习路径"}
-data: {"type":"delta","content":"第一阶段：数学基础补强"}
-data: {"type":"data","data":{"stages":[...]}}
+data: {"type":"start","message":"开始分析学习画像"}
+data: {"type":"chat","content":"了解了，你的数学基础..."}
+data: {"type":"profile_update","profile":{...}}
+data: {"type":"done"}
+```
+
+**PlannerAgent（学习路径生成）：**
+```text
+data: {"type":"start","message":"开始检查学生画像和学习目标"}
+data: {"type":"progress","progress":20,"message":"画像读取完成"}
+data: {"type":"delta","content":"{\"stages\":[...]}"}
+data: {"type":"data","data":{...完整路径...}}
+data: {"type":"done"}
+```
+
+**TutorAgent（智能辅导）：**
+```text
+data: {"type":"start","message":"开始生成辅导回复"}
+data: {"type":"delta","content":"Attention mechanism allows..."}
+data: {"type":"done"}
+```
+
+**Pipeline（编排管道）：**
+```text
+data: {"type":"start","message":"开始分析学生画像"}
+data: {"type":"profile_update","profile":{...}}
+data: {"type":"path_data","data":{...}}
 data: {"type":"done"}
 ```
 

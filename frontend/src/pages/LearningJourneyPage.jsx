@@ -1,22 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Empty, message, Result, Spin, Modal } from 'antd'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
+import { Button, Empty, Result } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { getLearningPath, getLearningPathById } from '../api/planner'
-import { getResources, getResource } from '../api/resource'
-import { getEvaluation, getReviewFeed, getWrongBook } from '../api/evaluate'
-import { useLearningBehavior } from '../hooks/useLearningBehavior'
+import { getLearningPathById } from '../api/planner'
+import { getCourseLearningPath } from '../api/courseLearning'
+import { getResources } from '../api/resource'
+import { getEvaluation, getReviewFeed } from '../api/evaluate'
 import { normalizeStringList, normalizeTasks } from '../utils/stageUtils'
-import { safeProgress, dedupeTasks, dedupeResources, scopedReviewPlans } from '../utils/safeClamp'
+import { safeProgress, dedupeTasks, scopedReviewPlans } from '../utils/safeClamp'
 import { useAuth } from '../contexts/AuthContext'
 import { useContinueLearning } from '../hooks/useContinueLearning'
 import LoadingSkeleton from '../components/LoadingSkeleton'
-import MarkdownRenderer from '../components/MarkdownRenderer'
-import QuizCard from '../components/QuizCard'
 import CoursePathHeader from '../components/CoursePathHeader'
 import PathOverview from '../components/PathOverview'
 import StageCard from '../components/StageCard'
-import StageDetailDrawer from '../components/StageDetailDrawer'
 import CurrentLearningCard from '../components/CurrentLearningCard'
 import ReviewPlanCard from '../components/ReviewPlanCard'
 import PathReasonDrawer from '../components/PathReasonDrawer'
@@ -41,29 +38,14 @@ function matchResourcesToStage(stage, allResources) {
 }
 
 function getStageStatus(stage, currentStage) {
-  const cur = currentStage || 1
-  const id = stage.stage_id
-  if (id < cur) return 'completed'
-  if (id === cur) return 'current'
+  if (stage?.status === 'completed') return 'completed'
+  if (stage?.status === 'active' || stage?.status === 'current') return 'current'
+  if (stage?.status === 'locked') return 'locked'
+  const cur = Number(currentStage) || 1
+  const order = Number(stage.order || stage.stage_id) || 1
+  if (order < cur) return 'completed'
+  if (order === cur) return 'current'
   return 'locked'
-}
-
-function parseExerciseContent(resource) {
-  if (resource?.type !== 'exercise' || !resource.content) return []
-  try {
-    const parsed = typeof resource.content === 'string' ? JSON.parse(resource.content) : resource.content
-    if (!Array.isArray(parsed)) return []
-    return parsed.map((item, i) => {
-      const options = Array.isArray(item.options)
-        ? item.options.map((opt, oi) => {
-          if (typeof opt === 'object') return { key: String(opt.key || opt.label || String.fromCharCode(65 + oi)).toUpperCase(), content: opt.content || opt.text || opt.value || '' }
-          const text = String(opt)
-          const m = text.match(/^([A-D])[.、:：]\s*(.*)$/i)
-          return { key: m ? m[1].toUpperCase() : String.fromCharCode(65 + oi), content: m ? m[2] : text }
-        }) : []
-      return { ...item, id: String(item.id || `${resource.id}-q${i + 1}`), options, answer: String(item.answer || '').toUpperCase(), difficulty: item.difficulty || 'medium' }
-    }).filter((q) => q.question && q.options.length > 0 && q.answer)
-  } catch { return [] }
 }
 
 // ═══════════════════════════════════════════════
@@ -73,6 +55,7 @@ function parseExerciseContent(resource) {
 export default function LearningJourneyPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { courseId } = useParams()
   const { studentId, activeCourse, courses } = useAuth()
   const { continueLearning } = useContinueLearning()
   const pathId = new URLSearchParams(location.search).get('pathId')
@@ -85,71 +68,69 @@ export default function LearningJourneyPage() {
   const [resources, setResources] = useState([])
   const [evaluation, setEvaluation] = useState(null)
   const [reviewFeed, setReviewFeed] = useState([])
-  const [wrongBookCount, setWrongBookCount] = useState(0)
 
   // ── UI ──
   const [expandedStageId, setExpandedStageId] = useState(null)
   const [activeStageId, setActiveStageId] = useState(null)
-  const [detailStage, setDetailStage] = useState(null)
   const [reasonDrawer, setReasonDrawer] = useState(false)
-  const [selectedResource, setSelectedResource] = useState(null)
-  const [resourceModalVisible, setResourceModalVisible] = useState(false)
-  const [completing, setCompleting] = useState(false)
-  const [resourceError, setResourceError] = useState(null)
-
-  const { trackView, trackComplete, trackExerciseAnswer } = useLearningBehavior(studentId, (report, adaptation) => {
-    if (report) setEvaluation(report)
-    if (adaptation?.learning_path?.stages?.length) setPathData(adaptation.learning_path)
-    if (adaptation?.review_resources?.length) {
-      setResources((cur) => { const m = new Map(cur.map((r) => [r.id, r])); adaptation.review_resources.forEach((r) => m.set(r.id, r)); return [...m.values()] })
-    }
-  })
-
   // ── Current course context ──
   const currentCourse = useMemo(() => {
+    const routeCourse = courses?.find((course) => String(course.id) === String(courseId))
+    if (routeCourse) return routeCourse
     if (activeCourse) return activeCourse
     return courses?.[0] || null
-  }, [activeCourse, courses])
+  }, [activeCourse, courseId, courses])
 
   // ── Load ──
   const loadAllData = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      if (!studentId) throw new Error('当前课程上下文不存在')
-      const path = pathId ? await getLearningPathById(studentId, pathId) : await getLearningPath(studentId)
+      const scopedStudentId = currentCourse?.student_id || studentId
+      if (!currentCourse?.id || !scopedStudentId) throw new Error('当前课程上下文不存在')
+      const scopedPath = pathId
+        ? await getLearningPathById(scopedStudentId, pathId)
+        : await getCourseLearningPath(currentCourse.id)
+      const path = scopedPath?.path || scopedPath
       if (!path?.id) throw new Error('还没有生成学习路径')
-      const [resList, evalReport, feed, wb] = await Promise.all([
-        getResources({ student_id: studentId, path_id: path.id, page_size: 100 }),
-        getEvaluation(studentId).catch(() => null),
-        getReviewFeed(studentId).catch(() => null),
-        getWrongBook(studentId).catch(() => null),
+      const [resList, evalReport, feed] = await Promise.all([
+        getResources({ student_id: scopedStudentId, path_id: path.id, page_size: 100 }),
+        getEvaluation(scopedStudentId).catch(() => null),
+        getReviewFeed(scopedStudentId).catch(() => null),
       ])
       setPathData(path)
       setResources(resList?.items || [])
       setEvaluation(evalReport)
       setReviewFeed(feed?.items || [])
-      setWrongBookCount(wb?.total || 0)
 
       // Set initial expanded / active to current stage
-      const cur = path.current_stage || 1
-      setExpandedStageId(cur)
-      setActiveStageId(cur)
+      const current = path.current_stage_id
+        || path.stages?.find((stage) => Number(stage.order || stage.stage_id) === Number(path.current_stage || 1))?.stage_id
+        || path.stages?.[0]?.stage_id
+      setExpandedStageId(current)
+      setActiveStageId(current)
     } catch (err) { setError(err.message || '加载失败') }
     finally { setLoading(false) }
-  }, [studentId, pathId])
+  }, [currentCourse, pathId, studentId])
 
-  useEffect(() => { loadAllData() }, [loadAllData])
+  useEffect(() => {
+    const timer = window.setTimeout(() => loadAllData(), 0)
+    return () => window.clearTimeout(timer)
+  }, [loadAllData])
 
   // ── Derived ──
   const stages = useMemo(() => pathData?.stages || [], [pathData])
   const currentStageNum = pathData?.current_stage || 1
-  const currentStageData = useMemo(() => stages.find((s) => s.stage_id === currentStageNum), [stages, currentStageNum])
+  const currentStageData = useMemo(
+    () => stages.find((s) => String(s.stage_id) === String(pathData?.current_stage_id))
+      || stages.find((s) => Number(s.order || s.stage_id) === Number(currentStageNum))
+      || stages[0],
+    [pathData?.current_stage_id, stages, currentStageNum],
+  )
 
   const allTasksDeduped = useMemo(() => dedupeTasks(stages.flatMap((s) => normalizeTasks(s.tasks))), [stages])
   const totalCompleted = allTasksDeduped.filter((t) => t.status === 'completed').length
-  const { completed: safeDone, total: safeAll, percent: overallPct } = safeProgress(totalCompleted, allTasksDeduped.length)
+  const { completed: safeDone, total: safeAll } = safeProgress(totalCompleted, allTasksDeduped.length)
 
-  const currentStageResources = useMemo(() => matchResourcesToStage(currentStageData, resources), [currentStageData, resources])
   const currentStageTasks = useMemo(() => normalizeTasks(currentStageData?.tasks), [currentStageData])
   const currentCompleted = currentStageTasks.filter((t) => t.status === 'completed').length
   const nextTask = currentStageTasks.find((t) => t.status !== 'completed') || currentStageTasks[0]
@@ -186,9 +167,6 @@ export default function LearningJourneyPage() {
   }, [])
 
   const stageBaseUrl = currentCourse?.id ? `/course/${currentCourse.id}/stage` : '/stage'
-  const wrongbookUrl = currentCourse?.id ? `/course/${currentCourse.id}/wrongbook` : '/wrong-book'
-
-  const handleViewDetail = useCallback((stage) => setDetailStage(stage), [])
   const handleRegenerate = useCallback(() => navigate('/profile', { state: { startChat: true } }), [navigate])
 
   const handleContinueLearning = useCallback(() => {
@@ -201,34 +179,6 @@ export default function LearningJourneyPage() {
       state: { stage, pathId: pathData?.id, pathData },
     })
   }, [navigate, pathData, stageBaseUrl])
-
-  const handleResourceClick = useCallback(async (resource) => {
-    setResourceError(null); setSelectedResource(resource); setResourceModalVisible(true)
-    trackView(resource)
-    if (resource.content) return
-    try {
-      const detail = await getResource(resource.id)
-      if (detail) setSelectedResource({ ...resource, ...detail })
-    } catch (err) { setResourceError(err.message || '加载失败') }
-  }, [trackView])
-
-  const handleCompleteResource = useCallback(async () => {
-    if (!selectedResource) return
-    setCompleting(true)
-    try { await trackComplete(selectedResource); message.success('已更新'); setResourceModalVisible(false); setSelectedResource(null) }
-    catch (err) { message.error('记录失败') }
-    finally { setCompleting(false) }
-  }, [selectedResource, trackComplete])
-
-  const handleExerciseAnswered = useCallback(async (resource, quiz, selected, isCorrect) => {
-    try {
-      const r = await trackExerciseAnswer(resource, quiz, selected, isCorrect)
-      if (r?.added_to_wrong_book) { setWrongBookCount((c) => c + 1); message.warning('已加入错题本') }
-      else message.success('已保存')
-      const f = await getReviewFeed(studentId).catch(() => null)
-      if (f?.items) setReviewFeed(f.items)
-    } catch (err) { message.error(err.message) }
-  }, [trackExerciseAnswer, studentId])
 
   // ── Render states ──
   if (loading) return <div style={{ height: '100%', background: 'var(--bg-page)' }}><LoadingSkeleton type="detail" /></div>
@@ -250,7 +200,7 @@ export default function LearningJourneyPage() {
     )
   }
 
-  const courseName = pathData?.goal || currentCourse?.title || '人工智能'
+  const courseName = currentCourse?.title || pathData?.course_title || '人工智能'
 
   return (
     <div style={{
@@ -290,7 +240,7 @@ export default function LearningJourneyPage() {
         }}>
           {/* Left: Stage cards */}
           <div style={{ minWidth: 0 }} ref={stageListRef}>
-            {stages.map((stage, idx) => {
+            {stages.map((stage, index) => {
               const sid = stage.stage_id
               const status = getStageStatus(stage, currentStageNum)
               const stageRes = matchResourcesToStage(stage, resources)
@@ -299,7 +249,7 @@ export default function LearningJourneyPage() {
                   <StageCard
                     stage={stage}
                     status={status}
-                    stageIndex={sid}
+                    stageIndex={stage.order || index + 1}
                     resources={stageRes}
                     expanded={expandedStageId === sid}
                     onToggle={() => handleStageClick(stage, sid)}
@@ -313,7 +263,7 @@ export default function LearningJourneyPage() {
             {/* "Why this path" link */}
             <Button type="link" onClick={() => setReasonDrawer(true)}
               style={{ color: '#6C5CE7', padding: 0, fontSize: 13, marginTop: 8 }}>
-              为什么这样规划？
+              查看生成依据
             </Button>
           </div>
 
@@ -332,49 +282,15 @@ export default function LearningJourneyPage() {
             <ReviewPlanCard
               plans={scopedPlans}
               maxItems={3}
-              onStartReview={(item) => { /* navigate to review */ }}
+              onStartReview={() => { /* navigate to review */ }}
             />
           </div>
         </div>
       </div>
 
       {/* ═══ Drawers & Modals ═══ */}
-      <StageDetailDrawer
-        stage={detailStage}
-        resources={detailStage ? matchResourcesToStage(detailStage, resources) : []}
-        visible={!!detailStage}
-        onClose={() => setDetailStage(null)}
-        onContinue={handleContinueLearning}
-        onResourceClick={handleResourceClick}
-      />
       <PathReasonDrawer visible={reasonDrawer} onClose={() => setReasonDrawer(false)} pathData={pathData} />
 
-      {/* Resource detail modal */}
-      <Modal
-        title={selectedResource?.title || '资源详情'}
-        open={resourceModalVisible}
-        onCancel={() => { setResourceModalVisible(false); setSelectedResource(null); setResourceError(null) }}
-        footer={resourceError ? [
-          <Button key="retry" type="primary" icon={<ReloadOutlined />} onClick={async () => { setResourceError(null); try { const d = await getResource(selectedResource.id); if (d) setSelectedResource({ ...selectedResource, ...d }) } catch (e) { setResourceError(e.message) } }}>重试</Button>,
-        ] : selectedResource ? [
-          <Button key="close" onClick={() => { setResourceModalVisible(false); setSelectedResource(null) }}>关闭</Button>,
-          <Button key="complete" type="primary" onClick={handleCompleteResource} loading={completing} style={{ borderRadius: 8, background: '#6C5CE7' }}>完成学习</Button>,
-        ] : null}
-        width={720}
-        styles={{ body: { maxHeight: '65vh', overflow: 'auto', padding: '20px 28px' } }}
-      >
-        {resourceError ? <Result status="error" title="加载失败" subTitle={resourceError} /> :
-         !selectedResource ? null :
-         parseExerciseContent(selectedResource).length > 0 ? (
-           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-             {parseExerciseContent(selectedResource).map((q) => (
-               <QuizCard key={q.id} quiz={q} onAnswered={(_, isCorrect, sel) => handleExerciseAnswered(selectedResource, q, sel, isCorrect)} />
-             ))}
-           </div>
-         ) : selectedResource.content ? <MarkdownRenderer content={selectedResource.content} /> :
-         <Empty description="暂无内容" />
-        }
-      </Modal>
     </div>
   )
 }

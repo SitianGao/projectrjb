@@ -4,7 +4,7 @@ import { initializeCourseLearning } from '../services/orchestratorService'
 import { useAgentJob } from './useAgentJob'
 import { useAgentJobEvents } from './useAgentJobEvents'
 
-export function useInitializeCourseLearning({ courseId, studentId, goal }) {
+export function useInitializeCourseLearning({ courseId, goal }) {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -12,13 +12,13 @@ export function useInitializeCourseLearning({ courseId, studentId, goal }) {
   const handleEvent = useAgentJobEvents(applyEvent)
 
   const start = useCallback(async () => {
-    if (!studentId) return null
+    if (!courseId) return null
     setLoading(true)
     setError(null)
     resetJob()
     try {
       const path = await initializeCourseLearning({
-        studentId,
+        courseId,
         goal,
         onEvent: handleEvent,
       })
@@ -33,7 +33,7 @@ export function useInitializeCourseLearning({ courseId, studentId, goal }) {
     } finally {
       setLoading(false)
     }
-  }, [courseId, goal, handleEvent, resetJob, studentId])
+  }, [courseId, goal, handleEvent, resetJob])
 
   return { start, loading, error, result, job }
 }

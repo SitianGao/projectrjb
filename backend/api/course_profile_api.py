@@ -36,6 +36,7 @@ DIMENSIONS = [
 
 class CourseProfileMessageRequest(BaseModel):
     message: str
+    client_message_id: Optional[str] = None
     conversation_id: Optional[str] = None
     history: Optional[list] = None
     current_profile: Optional[dict] = None
@@ -190,15 +191,40 @@ def _merge_profile(current: dict | None, patch: dict, completion: float, history
 async def get_course_profile(course_id: str, user=Depends(require_user), db: Session = Depends(get_db)):
     course = _course_for_user(db, user, course_id)
     profile = profile_service.get_profile(db, course.student_id)
-    completion, missing, filled = _completion(profile)
-    return ok({
-        "course": {"id": course.id, "title": course.title, "goal": course.goal or "", "student_id": course.student_id},
-        "profile": profile,
-        "completion_rate": completion,
-        "missing_dimensions": missing,
-        "filled_dimensions": filled,
-        "ready_for_path_generation": completion >= 0.85,
-    })
+    from services.course_profile_conversation_service import build_profile_state
+    return ok(build_profile_state(course, profile))
+
+
+@router.get("/courses/{course_id}/profile/conversations/{conversation_id}/state")
+async def get_course_profile_conversation_state(
+    course_id: str,
+    conversation_id: str,
+    user=Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    course = _course_for_user(db, user, course_id)
+    from deps import profile_agent
+    from services.course_profile_conversation_service import (
+        CourseProfileConversationService,
+        build_profile_state,
+    )
+
+    svc = CourseProfileConversationService(profile_agent, profile_service)
+    messages = svc.get_messages(
+        db,
+        user=user,
+        course_id=course_id,
+        conversation_id=conversation_id,
+    )
+    latest_agent_run = None
+    for message in reversed(messages):
+        if message.get("role") == "assistant" and message.get("agent_run"):
+            latest_agent_run = message.get("agent_run")
+            break
+    profile = profile_service.get_profile(db, course.student_id)
+    state = build_profile_state(course, profile, messages=messages, agent_run=latest_agent_run)
+    state["conversation"] = {"conversation_id": conversation_id}
+    return ok(state)
 
 
 @router.post("/courses/{course_id}/profile/conversations/{conversation_id}/messages")
@@ -209,38 +235,46 @@ async def send_course_profile_message(
     user=Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    course = _course_for_user(db, user, course_id)
-    current = profile_service.get_profile(db, course.student_id) or request.current_profile or {}
-    patch = _infer_patch(request.message, course, current)
-    provisional = _merge_profile(current, patch, 0, request.history or [])
-    completion, missing, _ = _completion(provisional)
-    profile = _merge_profile(current, patch, completion, [
-        *(request.history or []),
-        {"role": "user", "content": request.message},
-    ])
-    profile_service.save_profile(db, course.student_id, profile, increment_version=True)
-    saved = profile_service.get_profile(db, course.student_id) or profile
-    completion, missing, filled = _completion(saved)
-    ready = completion >= 0.85
-    assistant_message = _assistant_reply(saved, missing, ready)
-    latest = profile_service._get_latest_profile_record(db, course.student_id)
-    if latest:
-        history = [
-            *(request.history or []),
-            {"role": "user", "content": request.message},
-            {"role": "assistant", "content": assistant_message},
-        ][-20:]
-        latest.chat_history = json.dumps(history, ensure_ascii=False)
-        db.commit()
+    """课程画像对话 —— 委托给 CourseProfileConversationService → ProfileAgent.build_profile_v2() → DeepSeek。
+
+    旧关键字匹配 _infer_patch / _assistant_reply 已不再作为主流程，
+    仅保留为 ProfileAgent 内部的 keyword_fallback 降级路径。
+    """
+    from services.course_profile_conversation_service import CourseProfileConversationService
+    from deps import profile_agent
+
+    svc = CourseProfileConversationService(profile_agent, profile_service)
+    result = await svc.process_message(
+        db=db,
+        user=user,
+        course_id=course_id,
+        conversation_id=conversation_id or request.conversation_id or str(uuid.uuid4()),
+        message=request.message,
+        client_message_id=request.client_message_id,
+        history=request.history,
+        current_profile=request.current_profile,
+    )
+
     return ok({
-        "conversation_id": conversation_id or str(uuid.uuid4()),
-        "assistant_message": {"role": "assistant", "content": assistant_message},
-        "profile_patch": patch,
-        "profile": saved,
-        "completion_rate": completion,
-        "missing_dimensions": missing,
-        "filled_dimensions": filled,
-        "ready_for_path_generation": ready,
+        "message_id": result.message_id,
+        "client_message_id": result.client_message_id,
+        "conversation_id": result.conversation_id,
+        "assistant_message": result.assistant_message,
+        "profile": result.profile,
+        "profile_patch": result.profile_patch,
+        "profile_completion_rate": result.profile_completion_rate,
+        "completion_rate": result.profile_completion_rate,
+        "dimensions": result.dimensions,
+        "required_dimensions_complete": result.required_dimensions_complete,
+        "missing_required_dimensions": result.missing_required_dimensions,
+        "missing_optional_dimensions": result.missing_optional_dimensions,
+        "missing_dimensions": result.missing_dimensions,
+        "next_questions": result.next_questions,
+        "can_confirm": result.can_confirm,
+        "ready_for_confirmation": result.ready_for_confirmation,
+        "ready_for_path_generation": result.ready_for_confirmation,
+        "sources": result.sources,
+        "agent_run": result.agent_run.model_dump() if result.agent_run else None,
     })
 
 
@@ -258,12 +292,7 @@ async def update_course_profile(
     profile = _merge_profile(current, request.profile_patch, completion, [])
     profile_service.save_profile(db, course.student_id, profile, increment_version=True)
     saved = profile_service.get_profile(db, course.student_id)
-    completion, missing, filled = _completion(saved)
-    return ok({
-        "profile": saved,
-        "profile_patch": request.profile_patch,
-        "completion_rate": completion,
-        "missing_dimensions": missing,
-        "filled_dimensions": filled,
-        "ready_for_path_generation": completion >= 0.85,
-    })
+    from services.course_profile_conversation_service import build_profile_state
+    state = build_profile_state(course, saved)
+    state["profile_patch"] = request.profile_patch
+    return ok(state)

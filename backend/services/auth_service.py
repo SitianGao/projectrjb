@@ -97,6 +97,7 @@ class AuthService:
             "phone": user.phone or "",
             "bio": user.bio or "",
             "avatar": user.avatar,
+            "is_demo": bool(user.is_demo),
             "active_course_id": active.id if active else None,
             "student_id": active.student_id if active else None,
             "active_course": self._course_dict(active) if active else None,

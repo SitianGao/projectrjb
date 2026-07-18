@@ -1,7 +1,7 @@
 """学生 & 画像表"""
 import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 
 from . import Base
 
@@ -35,3 +35,22 @@ class StudentProfile(Base):
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class CourseProfileConversationMessage(Base):
+    __tablename__ = "course_profile_conversation_messages"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "client_message_id", name="uq_profile_conversation_client_message"),
+    )
+
+    id = Column(String(36), primary_key=True)
+    conversation_id = Column(String(80), nullable=False, index=True)
+    client_message_id = Column(String(80), nullable=False)
+    user_id = Column(String(36), nullable=False, index=True)
+    course_id = Column(String(36), nullable=False, index=True)
+    role = Column(String(20), nullable=False)
+    content = Column(Text, nullable=False)
+    assistant_content = Column(Text)
+    response_json = Column(Text)
+    agent_run_json = Column(Text)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

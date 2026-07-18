@@ -77,6 +77,7 @@ class AgentOrchestrator:
         context: AgentContext,
         message: str = "",
         profile: dict | None = None,
+        course_outline: list[str] | None = None,
     ) -> dict:
         """
         ProfileAgent 创建课程画像 → PlannerAgent 生成学习路径 → 返回首页所需数据。
@@ -90,43 +91,82 @@ class AgentOrchestrator:
         trace: list[dict] = []
         result: dict = {}
 
-        # Step 1: ProfileAgent
+        # Step 1: ProfileAgent v2
         if self.profile_agent:
             logger.info("Orchestrator: ProfileAgent starting for course=%s", context.course_id)
             try:
-                profile_result = await self.profile_agent.build_profile(
-                    student_id=context.user_id,
+                profile_output = await self.profile_agent.build_profile_v2(
+                    context=context,
                     message=message or f"开始学习课程 {context.course_id}",
+                    history=[],
                     current_profile=profile,
                 )
+                profile_result = (
+                    profile_output.model_dump()
+                    if hasattr(profile_output, "model_dump")
+                    else profile_output
+                )
                 result["profile"] = profile_result
-                trace.append({"agent": "ProfileAgent", "status": "completed"})
+                usage = getattr(self.profile_agent.llm, "last_usage", None)
+                trace.append({
+                    "agent": "ProfileAgent",
+                    "status": "completed",
+                    "provider": getattr(usage, "provider", None),
+                    "model": getattr(usage, "model", None),
+                    "fallback_used": False,
+                })
                 logger.info("Orchestrator: ProfileAgent completed")
             except Exception as e:
                 trace.append({"agent": "ProfileAgent", "status": "failed", "error": str(e)})
                 logger.error("Orchestrator: ProfileAgent failed: %s", e)
+                raise
 
-        # Step 2: PlannerAgent
+        # Step 2: PlannerAgent v2
         if self.planner_agent:
             logger.info("Orchestrator: PlannerAgent starting for course=%s", context.course_id)
             try:
                 profile_inner = (result.get("profile") or {}).get("profile", result.get("profile") or {})
-                path_result = await self.planner_agent.generate_plan(
+                path_output = await self.planner_agent.generate_plan_v2(
+                    context=context,
                     profile=profile_inner,
-                    goal_override=profile_inner.get("learning_goal"),
+                    course_outline=course_outline or [],
                 )
-                # Normalize
-                from services.planner_service import _normalize_path_result
-                normalized = _normalize_path_result(
-                    json.loads(path_result) if isinstance(path_result, str) else path_result,
-                    profile_inner.get("learning_goal", ""),
+                path_result = (
+                    path_output.model_dump()
+                    if hasattr(path_output, "model_dump")
+                    else path_output
                 )
-                result["learning_path"] = normalized
-                trace.append({"agent": "PlannerAgent", "status": "completed"})
+                result["learning_path"] = path_result
+                metadata = getattr(self.planner_agent, "last_generation_metadata", {}) or {}
+                trace.append({
+                    "agent": "PlannerAgent",
+                    "status": "completed",
+                    **metadata,
+                })
                 logger.info("Orchestrator: PlannerAgent completed")
             except Exception as e:
                 trace.append({"agent": "PlannerAgent", "status": "failed", "error": str(e)})
                 logger.error("Orchestrator: PlannerAgent failed: %s", e)
+                raise
+
+        # Step 3: ResourceAgent prepares real jobs from the generated stage.
+        stages = (result.get("learning_path") or {}).get("stages") or []
+        if self.resource_agent and stages:
+            current_stage = stages[0]
+            resource_context = context.model_copy(
+                update={"stage_id": str(current_stage.get("stage_id") or "")}
+            )
+            jobs = await self.resource_agent.prepare_stage_resources(
+                context=resource_context,
+                stage=current_stage,
+                resource_blueprint=current_stage.get("resource_blueprint"),
+            )
+            result["resource_jobs"] = jobs
+            trace.append({
+                "agent": "ResourceAgent",
+                "status": "completed",
+                "resource_job_count": len(jobs),
+            })
 
         result["orchestration_trace"] = trace
         return result

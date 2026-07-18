@@ -421,101 +421,24 @@
   }
 }
 
-/* ===== 深色模式 ===== */
-[data-theme='dark'] .interactive-classroom-page {
-  background: #0f0f1a;
-  color: rgba(255,255,255,0.95);
+/* ── New immersive classroom layout (overrides for full-height mode) ── */
+.interactive-classroom-page {
+  min-height: 100vh;
+  background: linear-gradient(160deg, #F6F7FB 0%, #EDE9FE 40%, #F6F7FB 100%);
+  padding: 0;
 }
 
-[data-theme='dark'] .classroom-header,
-[data-theme='dark'] .classroom-sidebar,
-[data-theme='dark'] .classroom-canvas,
-[data-theme='dark'] .classroom-tutor,
-[data-theme='dark'] .classroom-action-footer,
-[data-theme='dark'] .classroom-progress-card,
-[data-theme='dark'] .classroom-resource-card,
-[data-theme='dark'] .classroom-completion {
-  background: #1a1a2e;
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+/* ── Responsive for new layout ── */
+@media (max-width: 1024px) {
+  .classroom-task-outline {
+    position: absolute;
+    z-index: 200;
+    height: 100%;
+  }
 }
 
-[data-theme='dark'] .classroom-header-main h3,
-[data-theme='dark'] .classroom-canvas-head h3 {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .classroom-scene-item {
-  background: rgba(255,255,255,0.03);
-  border-color: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .classroom-scene-item:hover {
-  background: rgba(108,92,231,0.08);
-  border-color: rgba(108,92,231,0.2);
-}
-
-[data-theme='dark'] .classroom-scene-item.is-active {
-  background: rgba(108,92,231,0.15);
-  border-color: rgba(108,92,231,0.3);
-}
-
-[data-theme='dark'] .classroom-scene-item.is-completed {
-  background: rgba(82,196,26,0.1);
-  border-color: rgba(82,196,26,0.2);
-}
-
-[data-theme='dark'] .classroom-scene-item.is-locked {
-  background: rgba(255,255,255,0.02);
-  color: rgba(255,255,255,0.3);
-}
-
-[data-theme='dark'] .classroom-scene-icon {
-  background: rgba(108,92,231,0.15);
-  color: #a78bfa;
-}
-
-[data-theme='dark'] .classroom-scene-meta {
-  color: rgba(255,255,255,0.5);
-}
-
-[data-theme='dark'] .presentation-slide,
-[data-theme='dark'] .goal-card-grid .ant-card,
-[data-theme='dark'] .whiteboard-grid .ant-card,
-[data-theme='dark'] .discussion-grid .ant-card {
-  background: rgba(255,255,255,0.03);
-  border-color: rgba(255,255,255,0.06);
-}
-
-[data-theme='dark'] .quiz-question {
-  background: rgba(255,255,255,0.03);
-  border-color: rgba(255,255,255,0.06);
-}
-
-[data-theme='dark'] .tutor-knowledge {
-  background: rgba(108,92,231,0.1);
-}
-
-[data-theme='dark'] .tutor-empty {
-  background: rgba(255,255,255,0.03);
-  color: rgba(255,255,255,0.5);
-}
-
-[data-theme='dark'] .tutor-message .ant-typography {
-  background: rgba(255,255,255,0.05);
-}
-
-[data-theme='dark'] .tutor-user .ant-typography {
-  background: rgba(108,92,231,0.15);
-}
-
-[data-theme='dark'] .loss-chart {
-  background: rgba(255,255,255,0.03);
-  border-color: rgba(255,255,255,0.06);
-}
-
-[data-theme='dark'] .classroom-resource-icon {
-  background: rgba(108,92,231,0.15);
-  color: #a78bfa;
+@media (max-width: 768px) {
+  .interactive-classroom-page {
+    min-height: 100dvh;
+  }
 }

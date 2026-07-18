@@ -23,8 +23,8 @@ _load_env_files()
 # 数据库配置
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./eduagent.db")
 
-# ── LLM 主模型配置（Spark HTTP API） ──────────────────
-LLM_PRIMARY = os.getenv("LLM_PRIMARY", "spark")          # spark / deepseek
+# ── LLM 主模型配置 ───────────────────────────────────
+LLM_PRIMARY = os.getenv("LLM_PRIMARY", "deepseek")       # deepseek / spark
 SPARK_API_PASSWORD = os.getenv("SPARK_API_PASSWORD", "")  # API 密码（Bearer token）
 SPARK_API_URL = os.getenv(
     "SPARK_API_URL",

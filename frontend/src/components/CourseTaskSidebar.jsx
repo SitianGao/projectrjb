@@ -12,10 +12,18 @@ import {
 
 const TASK_TYPES = {
   objective: { label: '学习目标', icon: <AimOutlined /> },
+  goal: { label: '学习目标', icon: <AimOutlined /> },
   lecture: { label: '核心讲义', icon: <BookOutlined /> },
+  document: { label: '核心讲义', icon: <BookOutlined /> },
   diagram: { label: '概念图解', icon: <NodeIndexOutlined /> },
+  mindmap: { label: '概念图解', icon: <NodeIndexOutlined /> },
   quiz: { label: '知识检查', icon: <EditOutlined /> },
+  exercise: { label: '知识检查', icon: <EditOutlined /> },
   exam: { label: '阶段测评', icon: <CheckCircleFilled /> },
+  assessment: { label: '阶段测评', icon: <CheckCircleFilled /> },
+  code: { label: '代码实操', icon: <EditOutlined /> },
+  ppt: { label: '教学课件', icon: <BookOutlined /> },
+  interactive_classroom: { label: 'AI 互动课堂', icon: <PlayCircleFilled /> },
 }
 
 const STATUS_STYLES = {
@@ -43,6 +51,16 @@ const STATUS_STYLES = {
     textColor: '#6B7280',
     dot: '#D1D5DB',
   },
+  not_started: {
+    icon: <span style={{
+      width: 18, height: 18, borderRadius: '50%',
+      border: '2px solid #D1D5DB', display: 'inline-block',
+    }} />,
+    bg: 'transparent',
+    border: 'transparent',
+    textColor: '#6B7280',
+    dot: '#D1D5DB',
+  },
   locked: {
     icon: <LockOutlined style={{ color: '#D1D5DB', fontSize: 16 }} />,
     bg: 'transparent',
@@ -54,6 +72,8 @@ const STATUS_STYLES = {
 
 function getTaskStatus(task, currentTaskId, tasks) {
   if (task.status === 'completed') return 'completed'
+  if (task.status === 'locked') return 'locked'
+  if (task.status === 'active') return 'active'
   if (task.id === currentTaskId) return 'active'
 
   const idx = tasks.findIndex((t) => t.id === task.id)
@@ -121,7 +141,7 @@ export default function CourseTaskSidebar({
         {tasks.map((task, idx) => {
           const status = getTaskStatus(task, currentTaskId, tasks)
           const st = STATUS_STYLES[status]
-          const typeConfig = TASK_TYPES[task.type] || TASK_TYPES['lecture']
+          const typeConfig = TASK_TYPES[task.type] || { label: task.type_label || '学习任务', icon: <BookOutlined /> }
           const isClickable = status !== 'locked'
 
           return (

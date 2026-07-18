@@ -26,6 +26,7 @@ from services.tutor_service import TutorService
 from services.evaluate_service import EvaluateService
 from services.task_service import TaskService
 from services.classroom_service import ClassroomService
+from services.course_learning_service import CourseLearningService
 from database import get_db
 
 # ── 全局单例 ──────────────────────────────────
@@ -35,7 +36,7 @@ profile_agent = ProfileAgent(llm_client)
 profile_service = ProfileService(profile_agent, get_db)
 
 planner_agent = PlannerAgent(llm_client)
-planner_service = PlannerService(planner_agent, get_db, profile_service)
+planner_service = PlannerService(planner_agent, get_db, profile_service, default_retriever)
 
 resource_agent = ResourceAgent(llm_client)
 resource_service = ResourceService(resource_agent, profile_service)
@@ -47,6 +48,7 @@ evaluate_agent = EvaluateAgent(llm_client)
 evaluate_service = EvaluateService(profile_service, evaluate_agent)
 task_service = TaskService()
 classroom_service = ClassroomService(profile_service, evaluate_service, planner_service)
+course_learning_service = CourseLearningService(planner_service)
 
 orchestrator = AgentOrchestrator(llm_client)
 orchestrator.register_agents(

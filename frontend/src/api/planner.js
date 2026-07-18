@@ -44,9 +44,13 @@ import client from './client'
  * @returns {Promise<Response>} fetch Response，通过 body reader 读取 SSE 流
  */
 export async function generateLearningPath({ student_id, goal } = {}) {
+  const token = localStorage.getItem('auth_token')
   const response = await fetch('/api/planner/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ student_id, goal }),
   })
   if (!response.ok) {

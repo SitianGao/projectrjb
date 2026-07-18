@@ -173,10 +173,7 @@ class ProfileAgent(BaseAgent):
                 user_prompt=user_prompt,
                 response_model=ProfileOutput,
             )
-            # 确保 can_start_journey 与 completeness 一致
-            if result.completeness >= PROFILE_READY_THRESHOLD:
-                result.can_start_journey = True
-                result.next_questions = []
+            result = self._normalize_profile_output(context, result, current_profile)
             logger.info(
                 "[ProfileAgent] build_profile_v2 LLM success user_id=%s course_id=%s completeness=%.2f",
                 context.user_id, context.course_id, result.completeness,
@@ -194,7 +191,11 @@ class ProfileAgent(BaseAgent):
         fallback_data = self._keyword_fallback(
             context.user_id, message, history or [], current_profile,
         )
-        return self._legacy_dict_to_profile_output(context, fallback_data)
+        return self._normalize_profile_output(
+            context,
+            self._legacy_dict_to_profile_output(context, fallback_data),
+            current_profile,
+        )
 
     async def update_from_evaluation(
         self,
@@ -509,6 +510,7 @@ class ProfileAgent(BaseAgent):
         student_id: str,
         message: str,
         history: List[str],
+        current_profile: Optional[Dict] = None,
     ) -> Dict:
         """
         关键字规则降级方案 —— LLM 不可用时的兜底逻辑。
@@ -547,13 +549,23 @@ class ProfileAgent(BaseAgent):
 
         next_questions = ["你对哪些技术方向感兴趣？", "你更喜欢理论学习还是动手实践？"]
 
+        current = current_profile or {}
+        memory = current.get("memory_strength") if isinstance(current.get("memory_strength"), dict) else {}
+
         return {
             "student_id": student_id,
             "profile": {
+                "learning_goal": current.get("learning_goal") or learning_goal,
+                "cognitive_style": cognitive_style or current.get("cognitive_style", ""),
+                "preferred_resources": memory.get("preferred_resources") or ["mindmap", "exercise", "document"],
+                "assessment_preference": memory.get("assessment_preference") or "",
+                "weekly_available_hours": memory.get("weekly_available_hours"),
+                "target_duration_weeks": memory.get("target_duration_weeks"),
+                "session_duration_minutes": memory.get("session_duration_minutes"),
+                "sessions_per_week": memory.get("sessions_per_week"),
+                "preferred_study_time": memory.get("preferred_study_time") or "",
                 "knowledge_level": knowledge_level,
-                "learning_goal": learning_goal,
                 "learning_history": history,
-                "cognitive_style": cognitive_style,
                 "weakness": weaknesses,
                 "interest": interests,
                 "pace_preference": pace_preference,
@@ -607,10 +619,21 @@ class ProfileAgent(BaseAgent):
             version=1,
             knowledge_foundation=KnowledgeFoundation(),
             learning_goal=learning_goal,
+            learning_history=[
+                str(item)[:60]
+                for item in (profile_data.get("learning_history") or [])
+                if str(item).strip()
+            ][:6],
             cognitive_style=profile_data.get("cognitive_style", "案例驱动型"),
             preferred_resources=["mindmap", "exercise", "document"],
+            assessment_preference=profile_data.get("assessment_preference", ""),
             weak_points=weak_points,
             interest_directions=interest_directions,
+            session_duration_minutes=profile_data.get("session_duration_minutes"),
+            sessions_per_week=profile_data.get("sessions_per_week"),
+            weekly_available_hours=profile_data.get("weekly_available_hours"),
+            target_duration_weeks=profile_data.get("target_duration_weeks"),
+            preferred_study_time=profile_data.get("preferred_study_time", ""),
             update_reason="keyword_fallback",
             updated_at=datetime.now(timezone.utc).isoformat(),
         )
@@ -621,9 +644,87 @@ class ProfileAgent(BaseAgent):
             completeness=max(0.0, min(1.0, float(completeness))),
             confidence=data.get("confidence", 0.4),
             sources=data.get("sources", ["keyword_fallback"]),
+            assistant_reply="我临时使用规则结果更新了画像。你可以继续补充目标、基础、资源偏好和测评偏好。",
             next_questions=data.get("next_questions") or [],
             can_start_journey=completeness >= PROFILE_READY_THRESHOLD,
         )
+
+    @staticmethod
+    def _normalize_profile_output(
+        context: AgentContext,
+        result: ProfileOutput,
+        current_profile: Optional[Dict] = None,
+    ) -> ProfileOutput:
+        """Apply the profile contract that is independent of a provider response."""
+        result.profile.user_id = str(context.user_id)
+        result.profile.course_id = str(context.course_id)
+        if not result.profile.updated_at:
+            result.profile.updated_at = datetime.now(timezone.utc).isoformat()
+
+        # Keep learning_history as refined facts, not raw transcript paragraphs.
+        cleaned_history = []
+        for item in result.profile.learning_history or []:
+            text = str(item).strip()
+            if not text:
+                continue
+            if len(text) > 60:
+                text = text[:57].rstrip() + "..."
+            cleaned_history.append(text)
+        result.profile.learning_history = list(dict.fromkeys(cleaned_history))[:6]
+
+        # Resolve obvious contradictions: a strong knowledge score wins over a
+        # weak-point label for the same concept unless the weak score is explicit.
+        foundation = result.profile.knowledge_foundation
+        strong_aliases = {
+            "python": foundation.python,
+            "线性代数": foundation.linear_algebra,
+            "linear_algebra": foundation.linear_algebra,
+            "微积分": foundation.calculus,
+            "calculus": foundation.calculus,
+            "机器学习": foundation.machine_learning,
+            "machine_learning": foundation.machine_learning,
+            "深度学习": foundation.deep_learning,
+            "deep_learning": foundation.deep_learning,
+        }
+        filtered_weak = []
+        for weak in result.profile.weak_points or []:
+            name = (weak.name or weak.knowledge_point_id or "").lower()
+            is_contradictory = any(
+                alias.lower() in name and score >= 70 and weak.score >= 50
+                for alias, score in strong_aliases.items()
+            )
+            if not is_contradictory:
+                filtered_weak.append(weak)
+        result.profile.weak_points = filtered_weak
+
+        missing_required = ProfileAgent._missing_required_dimensions(result.profile)
+        result.missing_dimensions = missing_required
+        result.can_start_journey = result.completeness >= PROFILE_READY_THRESHOLD and not missing_required
+        if result.can_start_journey:
+            result.next_questions = []
+        return result
+
+    @staticmethod
+    def _missing_required_dimensions(profile: CourseProfile) -> list[str]:
+        missing: list[str] = []
+        if not profile.learning_goal:
+            missing.append("学习目标")
+        kf = profile.knowledge_foundation
+        if all(getattr(kf, key) == 50 for key in ["python", "linear_algebra", "calculus"]) and kf.machine_learning <= 35:
+            missing.append("知识基础")
+        if not profile.weak_points:
+            missing.append("薄弱知识点")
+        if not profile.cognitive_style:
+            missing.append("认知或理解偏好")
+        if not profile.preferred_resources:
+            missing.append("资源偏好")
+        if not profile.assessment_preference:
+            missing.append("测评偏好")
+        if profile.weekly_available_hours is None:
+            missing.append("每周可投入时间")
+        if profile.target_duration_weeks is None:
+            missing.append("目标学习周期")
+        return missing
 
     @staticmethod
     def _finalize_result(result: Dict) -> Dict:

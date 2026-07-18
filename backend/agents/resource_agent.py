@@ -936,6 +936,10 @@ class ResourceAgent(BaseAgent):
                     response_model=ResourceGenerationOutput,
                 )
             except Exception as exc:
+                if RESOURCE_STRICT_MODE:
+                    raise RuntimeError(
+                        f"严格模式：ResourceAgent 生成失败，拒绝规则模板降级：{exc}"
+                    ) from exc
                 logger.warning("ResourceAgent v2 LLM 调用失败，回退规则化: %s", exc)
                 result = self._rule_based_resources_v2(
                     topic=topic,
@@ -948,6 +952,8 @@ class ResourceAgent(BaseAgent):
                 )
         else:
             # 3. 规则化兜底
+            if RESOURCE_STRICT_MODE:
+                raise RuntimeError("严格模式：ResourceAgent 未配置 LLM，拒绝规则模板降级")
             logger.info("ResourceAgent v2: 无 LLM，使用规则化资源生成")
             result = self._rule_based_resources_v2(
                 topic=topic,
@@ -1000,3 +1006,43 @@ class ResourceAgent(BaseAgent):
         result.difficulty = difficulty
 
         return result
+
+    async def prepare_stage_resources(
+        self,
+        *,
+        context: AgentContext,
+        stage: dict,
+        resource_blueprint: list[dict] | None = None,
+    ) -> list[dict]:
+        """根据已保存阶段生成可追踪的资源任务描述，不在前端伪造进度。"""
+        blueprint = resource_blueprint or stage.get("resource_blueprint") or []
+        if not blueprint:
+            blueprint = [
+                {
+                    "resource_type": task.get("task_type") or task.get("type"),
+                    "topic": task.get("title") or stage.get("title"),
+                    "task_id": task.get("task_id"),
+                }
+                for task in stage.get("tasks") or []
+                if (task.get("task_type") or task.get("type")) in {
+                    "document",
+                    "mindmap",
+                    "exercise",
+                    "code",
+                    "ppt",
+                    "interactive_classroom",
+                }
+            ]
+        return [
+            {
+                "job_id": f"resource_job_{context.course_id}_{index}",
+                "course_id": context.course_id,
+                "stage_id": context.stage_id or stage.get("stage_id"),
+                "task_id": item.get("task_id"),
+                "resource_type": item.get("resource_type") or item.get("type") or "document",
+                "topic": item.get("topic") or stage.get("title") or "",
+                "status": "created",
+            }
+            for index, item in enumerate(blueprint, 1)
+            if isinstance(item, dict)
+        ]

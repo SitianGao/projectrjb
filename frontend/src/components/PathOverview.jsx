@@ -15,6 +15,21 @@ const STATUS_CONFIG = {
   review: { icon: <ExclamationCircleFilled style={{ color: '#F59E0B' }} />, color: '#F59E0B', label: '需复习' },
 }
 
+function resolveStageStatus(stage, currentStage) {
+  if (stage?.needsReview) return 'review'
+  if (stage?.status === 'completed') return 'completed'
+  if (stage?.status === 'active' || stage?.status === 'current') return 'current'
+  if (stage?.status === 'locked') return 'locked'
+
+  const stageOrder = Number(stage?.order)
+  const currentOrder = Number(currentStage) || 1
+  if (Number.isFinite(stageOrder)) {
+    if (stageOrder < currentOrder) return 'completed'
+    if (stageOrder === currentOrder) return 'current'
+  }
+  return 'locked'
+}
+
 /**
  * Compact horizontal step indicator replacing the old zigzag chart.
  * Height: ~140-180px. Shows stages as connected steps.
@@ -29,20 +44,10 @@ export default function PathOverview({
 
   const items = stages.map((stage, idx) => {
     const stageId = stage.stage_id || idx + 1
-    let status
-    if (stage.needsReview) {
-      status = 'review'
-    } else if (stageId < currentStage) {
-      status = 'completed'
-    } else if (stageId === currentStage) {
-      status = 'current'
-    } else {
-      status = 'locked'
-    }
-
+    const status = resolveStageStatus(stage, currentStage)
     const cfg = STATUS_CONFIG[status]
     const tasks = normalizeTasks(stage.tasks)
-    const { completed, total, percent } = safeProgress(
+    const { completed, total } = safeProgress(
       tasks.filter((t) => t.status === 'completed').length,
       tasks.length,
     )
@@ -104,13 +109,9 @@ export default function PathOverview({
       </div>
       <Steps
         current={currentStage - 1}
-        items={items}
         size="small"
         style={{ overflow: 'auto' }}
-        items={items.map((item, idx) => ({
-          ...item,
-          status: item.status,
-        }))}
+        items={items}
       />
     </div>
   )

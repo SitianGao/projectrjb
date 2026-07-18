@@ -50,7 +50,7 @@ class LLMClient:
         primary: str = "",
         fallback: str = "deepseek",
     ):
-        self.primary = primary or os.getenv("LLM_PRIMARY", "spark")
+        self.primary = primary or os.getenv("LLM_PRIMARY", "deepseek")
         self.fallback = fallback
         self.timeout_seconds = max(1, int(config.LLM_TIMEOUT))
         self.max_retries = (
@@ -146,9 +146,10 @@ class LLMClient:
                         yield "[提示: AI 服务暂时不可用，当前将使用模板资源，建议稍后重新生成。]"
         finally:
             elapsed = int((time.monotonic() - start) * 1000)
-            self._last_usage = UsageStats()
-            self._last_usage.provider = provider
-            self._last_usage.duration_ms = elapsed
+            usage = self._last_usage or UsageStats()
+            usage.provider = usage.provider or provider
+            usage.duration_ms = elapsed
+            self._last_usage = usage
 
     # ── Spark ─────────────────────────────────────────────────
 
@@ -162,8 +163,7 @@ class LLMClient:
     ) -> AsyncIterator[str]:
         api_password = os.getenv("SPARK_API_PASSWORD", "")
         if not api_password:
-            yield "[提示: 讯飞星火 API 未配置，请检查 .env 文件]"
-            return
+            raise RuntimeError("讯飞星火 API 未配置，请检查 SPARK_API_PASSWORD")
 
         api_url = os.getenv("SPARK_API_URL", "https://spark-api-open.xf-yun.com/v1/chat/completions")
         model_name = model or os.getenv("SPARK_MODEL", "4.0Ultra")

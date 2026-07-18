@@ -47,6 +47,7 @@ class PlannerAgent(BaseAgent):
 
     def __init__(self, llm_client=None):
         super().__init__(llm_client)
+        self.last_generation_metadata: dict = {}
 
     def get_system_prompt(self) -> str:
         return PLANNER_SYSTEM_PROMPT
@@ -128,20 +129,40 @@ class PlannerAgent(BaseAgent):
             f"请根据以上信息生成个性化学习路径；如果存在评估反馈，必须说明并落实路径调整。"
         )
 
+        fallback_reason = ""
+        self.last_generation_metadata = {}
         if self.llm:
             try:
-                return await self.call_llm_json(
+                result = await self.call_llm_json(
                     context=context,
                     user_prompt=user_prompt,
                     response_model=LearningPathOutput,
                 )
-            except Exception:
+                usage = self.llm.last_usage
+                self.last_generation_metadata = {
+                    "generation_source": "agent",
+                    "provider": getattr(usage, "provider", None) or getattr(self.llm, "primary", None),
+                    "model": getattr(usage, "model", None),
+                    "fallback_used": False,
+                    "fallback_type": None,
+                }
+                return result
+            except Exception as exc:
+                fallback_reason = str(exc)
                 if LLM_STRICT_MODE:
                     raise
 
         if LLM_STRICT_MODE:
             raise RuntimeError("严格模式：讯飞星火未配置，拒绝规则路径降级")
 
+        self.last_generation_metadata = {
+            "generation_source": "rule_fallback",
+            "provider": None,
+            "model": None,
+            "fallback_used": True,
+            "fallback_type": "planner_rule_template",
+            "fallback_reason": fallback_reason or "LLM client unavailable",
+        }
         return self._rule_based_plan_v2(
             context=context,
             profile=profile,
@@ -254,6 +275,58 @@ class PlannerAgent(BaseAgent):
     # ------------------------------------------------------------------
     # 规则化兜底 V2（返回 LearningPathOutput）
     # ------------------------------------------------------------------
+    @staticmethod
+    def _derive_stages_from_profile(
+        goal: str,
+        knowledge_level: str,
+        weaknesses: list[str],
+        interests: list[str],
+    ) -> list[str]:
+        """开发模式降级路径仍需对画像变化敏感，且必须明确标记为 fallback。"""
+        combined = " ".join([goal, knowledge_level, *weaknesses, *interests]).lower()
+        beginner = any(
+            token in combined
+            for token in ("初级", "薄弱", "零基础", "不了解", "数学基础", "机器学习基础")
+        )
+        advanced = any(
+            token in combined
+            for token in ("中高级", "高级", "已掌握", "熟悉机器学习", "掌握梯度下降")
+        )
+
+        if any(token in combined for token in ("自然语言", "文本分类", "nlp", "transformer")):
+            topics = []
+            if beginner and not advanced:
+                topics.append("机器学习与自然语言处理基础")
+            topics.extend([
+                "文本预处理与向量表示",
+                "序列模型与 Transformer",
+                "文本分类模型训练与评估",
+                "自然语言处理文本分类项目",
+            ])
+            return topics
+
+        if any(token in combined for token in ("图像", "cnn", "卷积", "视觉")):
+            topics = []
+            if beginner and not advanced:
+                topics.extend([
+                    "机器学习与数学基础",
+                    "梯度下降与神经网络训练",
+                ])
+            topics.extend([
+                "卷积操作与特征提取",
+                "CNN 网络结构与正则化",
+                "图像分类项目实践",
+            ])
+            return topics
+
+        topics = []
+        if beginner and not advanced:
+            topics.append("课程基础概念与前置知识")
+        topics.extend(str(item).strip() for item in weaknesses if str(item).strip())
+        topics.extend(str(item).strip() for item in interests if str(item).strip())
+        topics.append(goal or "课程综合实践")
+        return list(dict.fromkeys(topics))
+
     def _rule_based_plan_v2(
         self,
         *,
