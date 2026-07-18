@@ -104,9 +104,6 @@ export default function PathOverview({
       maxWidth: 1440,
       margin: '0 auto 24px',
     }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-        学习路径总览
-      </div>
       <Steps
         current={currentStage - 1}
         size="small"

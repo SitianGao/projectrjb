@@ -157,21 +157,7 @@ export default function LearningJourneyPage() {
   }, [evaluation])
 
   // ── Handlers ──
-  const handleStageClick = useCallback((stage, stageId) => {
-    setActiveStageId(stageId)
-    setExpandedStageId((prev) => prev === stageId ? null : stageId)
-    // Scroll to stage
-    setTimeout(() => {
-      document.getElementById(`stage-${stageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
-  }, [])
-
   const stageBaseUrl = currentCourse?.id ? `/course/${currentCourse.id}/stage` : '/stage'
-  const handleRegenerate = useCallback(() => navigate('/profile', { state: { startChat: true } }), [navigate])
-
-  const handleContinueLearning = useCallback(() => {
-    continueLearning(currentCourse?.id)
-  }, [continueLearning, currentCourse])
 
   const handleGoStageDetail = useCallback((stage) => {
     if (!stage) return
@@ -179,6 +165,15 @@ export default function LearningJourneyPage() {
       state: { stage, pathId: pathData?.id, pathData },
     })
   }, [navigate, pathData, stageBaseUrl])
+
+  const handleStageClick = useCallback((stage, stageId) => {
+    setActiveStageId(stageId || stage?.stage_id)
+    handleGoStageDetail(stage)
+  }, [handleGoStageDetail])
+
+  const handleContinueLearning = useCallback(() => {
+    continueLearning(currentCourse?.id)
+  }, [continueLearning, currentCourse])
 
   // ── Render states ──
   if (loading) return <div style={{ height: '100%', background: 'var(--bg-page)' }}><LoadingSkeleton type="detail" /></div>
@@ -213,13 +208,6 @@ export default function LearningJourneyPage() {
         <CoursePathHeader
           courseName={courseName}
           courseId={currentCourse?.id}
-          currentStageTitle={currentStageData?.title || ''}
-          currentStageId={currentStageNum}
-          totalStages={stages.length}
-          completedTasks={safeDone}
-          totalTasks={safeAll}
-          masteryPercent={mastery}
-          onRegenerate={handleRegenerate}
           onContinueStage={handleContinueLearning}
         />
 

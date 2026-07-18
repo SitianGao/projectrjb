@@ -9,7 +9,7 @@ import {
   SunOutlined,
   MoonOutlined,
   DesktopOutlined,
-  ReadOutlined,
+  RobotOutlined,
   CodeOutlined,
   BookOutlined,
   BranchesOutlined,
@@ -58,7 +58,7 @@ function AuthLayout() {
   const { mode, setMode, resolved } = useTheme()
   const activeCoursePath = activeCourse?.id ? `/course/${activeCourse.id}` : '/courses'
   const navItems = [
-    { label: '学习首页', path: '/home', match: (p) => p === '/home', icon: <ReadOutlined /> },
+    { label: 'AI 助手', path: '/home', match: (p) => p === '/home', icon: <RobotOutlined /> },
     { label: '我的课程', path: '/courses', match: (p) => p === '/' || p === '/courses' || (p.startsWith('/course/') && !p.includes('/path') && !p.includes('/stage/') && !p.includes('/task/') && !p.includes('/learn/') && !p.includes('/classroom/') && !p.includes('/test') && !p.includes('/assessment')), icon: <BookOutlined /> },
     { label: '学习路径', path: activeCourse?.id ? `/course/${activeCourse.id}/path` : '/courses', match: (p) => p.includes('/path') || p.includes('/stage/') || p.includes('/task/') || p.includes('/learn/') || p.includes('/classroom/'), icon: <BranchesOutlined /> },
     { label: '资源中心', path: '/resources', match: (p) => p === '/resources' || p.startsWith('/resources?') || p.startsWith('/resources/'), icon: <FileTextOutlined /> },

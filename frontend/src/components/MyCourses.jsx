@@ -102,9 +102,9 @@ export default function MyCourses() {
         await activateCourse(course.id)
       }
       if (path?.id) {
-        navigate(`/journey?pathId=${encodeURIComponent(path.id)}`)
+        navigate(`/course/${course.id}/path`)
       } else {
-        navigate('/profile', { state: { startChat: true } })
+        navigate(`/course/${course.id}/profile/setup`)
       }
     } catch (error) {
       message.error(error.message || '进入课程失败')
