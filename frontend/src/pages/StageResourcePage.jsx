@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { normalizeStringList, normalizeTasks, getStageStatus, computeStageDays } from '../utils/stageUtils'
 import { safeProgress, dedupeResources } from '../utils/safeClamp'
 import ClassroomResourceCard from '../components/classroom/ClassroomResourceCard'
+import './StageResourcePage.css'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -38,14 +39,14 @@ const TYPE_CONFIG = {
 const STATUS_CONFIG = {
   completed: { icon: <CheckCircleFilled />, color: '#22C55E', label: '已完成', dot: '#22C55E' },
   current: { icon: <PlayCircleFilled />, color: '#6C5CE7', label: '进行中', dot: '#6C5CE7' },
-  locked: { icon: <LockFilled />, color: '#D1D5DB', label: '未解锁', dot: '#D1D5DB' },
+  locked: { icon: <LockFilled />, color: 'var(--text-muted)', label: '未解锁', dot: 'var(--text-muted)' },
 }
 
 const TASK_STATUS_COLORS = {
-  completed: { color: '#22C55E', bg: '#F0FDF4' },
-  in_progress: { color: '#6C5CE7', bg: '#F3F0FF' },
-  pending: { color: '#9CA3AF', bg: '#F9FAFB' },
-  locked: { color: '#D1D5DB', bg: '#F9FAFB' },
+  completed: { color: '#22C55E', bg: 'var(--stage-completed-bg)' },
+  in_progress: { color: '#6C5CE7', bg: 'var(--tint-primary)' },
+  pending: { color: 'var(--text-muted)', bg: 'var(--surface-secondary)' },
+  locked: { color: 'var(--text-muted)', bg: 'var(--surface-secondary)' },
 }
 
 export default function StageResourcePage() {
@@ -146,11 +147,11 @@ export default function StageResourcePage() {
     setGenDrawerOpen(true)
   }
 
-  if (loading) return <div style={{ height: '100%', background: '#F6F7FB' }}><LoadingSkeleton type="detail" /></div>
+  if (loading) return <div style={{ height: '100%', background: 'var(--bg-page)' }}><LoadingSkeleton type="detail" /></div>
 
   if (error) {
     return (
-      <div style={{ maxWidth: 500, margin: '60px auto', background: '#F6F7FB', padding: 24 }}>
+      <div style={{ maxWidth: 500, margin: '60px auto', background: 'var(--bg-page)', padding: 24 }}>
         <Result status="error" title="加载失败" subTitle={error}
           extra={<Space><Button icon={<ArrowLeftOutlined />} onClick={() => navigate(pathUrl)}>返回学习路径</Button>
           <Button type="primary" icon={<ReloadOutlined />} onClick={loadData}>重试</Button></Space>} />
@@ -160,7 +161,7 @@ export default function StageResourcePage() {
 
   if (!stage) {
     return (
-      <div style={{ maxWidth: 500, margin: '60px auto', background: '#F6F7FB', padding: 24 }}>
+      <div style={{ maxWidth: 500, margin: '60px auto', background: 'var(--bg-page)', padding: 24 }}>
         <Result status="404" title="当前学习阶段不存在或已被删除"
           extra={<Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate(pathUrl)}>返回学习路径</Button>} />
       </div>
@@ -168,7 +169,7 @@ export default function StageResourcePage() {
   }
 
   return (
-    <div style={{ minHeight: '100%', background: '#F6F7FB', padding: '20px 24px 48px' }}>
+    <div style={{ minHeight: '100%', background: 'var(--bg-page)', padding: '20px 24px 48px' }}>
       <div style={{ maxWidth: 1060, margin: '0 auto' }}>
 
         {/* Breadcrumb */}
@@ -186,13 +187,13 @@ export default function StageResourcePage() {
         </Button>
 
         {/* ── Stage Header ── */}
-        <Card style={{ borderRadius: 16, marginBottom: 24, borderLeft: `4px solid ${statusCfg.color}`, border: `1px solid #E5E7EB` }}
+        <Card style={{ borderRadius: 16, marginBottom: 24, borderLeft: `4px solid ${statusCfg.color}`, border: `1px solid var(--border)` }}
           styles={{ body: { padding: '24px 28px' } }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <Space size={8} style={{ marginBottom: 8 }}>
                 <FlagFilled style={{ color: statusCfg.color, fontSize: 18 }} />
-                <Title level={3} style={{ margin: 0, color: '#111827' }}>
+                <Title level={3} style={{ margin: 0, color: 'var(--text-primary)' }}>
                   阶段{stage.stage_id}：{stage.title}
                 </Title>
                 <Tag color={status === 'current' ? 'purple' : status === 'completed' ? 'success' : 'default'} style={{ borderRadius: 6 }}>
@@ -200,7 +201,7 @@ export default function StageResourcePage() {
                 </Tag>
               </Space>
               {stage.description && (
-                <Paragraph style={{ margin: '8px 0 0', fontSize: 14, color: '#6B7280', lineHeight: 1.7 }}>
+                <Paragraph style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                   {stage.description}
                 </Paragraph>
               )}
@@ -218,10 +219,10 @@ export default function StageResourcePage() {
           <div style={{ marginTop: 16 }}>
             {objectives.length > 0 && (
               <div style={{ marginBottom: 12 }}>
-                <Text strong style={{ fontSize: 13, color: '#111827', display: 'block', marginBottom: 6 }}>
+                <Text strong style={{ fontSize: 13, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
                   <AimOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />学习目标
                 </Text>
-                <Paragraph style={{ margin: 0, fontSize: 13, color: '#6B7280', lineHeight: 1.7 }}>
+                <Paragraph style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                   {objectives.join('；')}
                 </Paragraph>
               </div>
@@ -251,7 +252,7 @@ export default function StageResourcePage() {
         {/* ── Task List ── */}
         {tasks.length > 0 && (
           <Card title={<Space><UnorderedListOutlined /><Text strong>学习任务（{tasks.length} 项）</Text></Space>}
-            style={{ borderRadius: 16, marginBottom: 24, border: '1px solid #E5E7EB' }}
+            style={{ borderRadius: 16, marginBottom: 24, border: '1px solid var(--border)' }}
             styles={{ body: { padding: '14px 20px 20px' } }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {tasks.map((task) => {
@@ -260,9 +261,9 @@ export default function StageResourcePage() {
                 return (
                   <div key={task.task_id} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
-                    background: tc.bg, border: `1px solid #E5E7EB`,
+                    background: tc.bg, border: `1px solid var(--border)`,
                   }}>
-                    <span style={{ flex: 1, fontSize: 13, color: '#374151' }}>{task.description}</span>
+                    <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>{task.description}</span>
                     {task.difficulty && <Tag style={{ borderRadius: 6, fontSize: 11 }}>{task.difficulty}</Tag>}
                     {task.estimated_hours != null && <Text type="secondary" style={{ fontSize: 11 }}>⏱ {task.estimated_hours}h</Text>}
                     {/interactive_classroom|classroom|openmaic/.test(String(task.type || task.resource_type || '').toLowerCase()) ? (
@@ -309,12 +310,12 @@ export default function StageResourcePage() {
             <Button size="small" onClick={() => navigate(`/resources?stageId=${stageId}`)}
               style={{ borderRadius: 8 }}>进入资源中心 <RightOutlined /></Button>
           </Space>}
-          style={{ borderRadius: 16, border: '1px solid #E5E7EB' }}
+          style={{ borderRadius: 16, border: '1px solid var(--border)' }}
           styles={{ body: { padding: '16px 20px 20px' } }}>
           {stageResources.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <BookOutlined style={{ fontSize: 36, color: '#D1D5DB', marginBottom: 12 }} />
-              <Paragraph style={{ color: '#6B7280', maxWidth: 400, margin: '0 auto 16px' }}>
+              <BookOutlined style={{ fontSize: 36, color: 'var(--text-muted)', marginBottom: 12 }} />
+              <Paragraph style={{ color: 'var(--text-secondary)', maxWidth: 400, margin: '0 auto 16px' }}>
                 本阶段暂无学习资源。系统可以根据当前阶段目标和知识点，为你生成讲义、练习题、PPT 或思维导图。
               </Paragraph>
               <Space>
@@ -338,7 +339,7 @@ export default function StageResourcePage() {
                 const cfg = TYPE_CONFIG[res.type] || TYPE_CONFIG.document
                 return (
                   <Col xs={24} sm={12} md={6} key={res.id}>
-                    <Card size="small" hoverable style={{ borderRadius: 10, border: '1px solid #E5E7EB', minWidth: 0 }}
+                    <Card size="small" hoverable style={{ borderRadius: 10, border: '1px solid var(--border)', minWidth: 0 }}
                       onClick={() => handleResourceClick(res)}
                       styles={{ body: { padding: '12px 14px' } }}>
                       <Tag icon={cfg.icon} color={cfg.color} style={{ borderRadius: 6, marginBottom: 6 }}>{cfg.label}</Tag>

@@ -234,3 +234,79 @@
     width: 100%;
   }
 }
+
+/* ===== 深色模式 ===== */
+[data-theme='dark'] .profile-setup-page {
+  background: #0f0f1a;
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .profile-setup-header,
+[data-theme='dark'] .profile-conversation-card,
+[data-theme='dark'] .profile-live-panel,
+[data-theme='dark'] .profile-confirm-card,
+[data-theme='dark'] .profile-summary-card,
+[data-theme='dark'] .agent-workflow-card,
+[data-theme='dark'] .learning-path-result-card {
+  background: #1a1a2e;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .profile-kicker {
+  color: #a78bfa;
+}
+
+[data-theme='dark'] .profile-message-list {
+  background: rgba(108,92,231,0.08);
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .profile-message-role {
+  background: rgba(108,92,231,0.15);
+  color: #a78bfa;
+}
+
+[data-theme='dark'] .profile-message--user .profile-message-role {
+  background: rgba(79,140,255,0.15);
+  color: #6ba3ff;
+}
+
+[data-theme='dark'] .profile-message p {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .profile-message-loading {
+  color: rgba(255,255,255,0.5);
+}
+
+[data-theme='dark'] .profile-completion {
+  background: rgba(108,92,231,0.1);
+}
+
+[data-theme='dark'] .profile-dimension-card {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .profile-dimension-card.is-missing {
+  background: rgba(255,255,255,0.02);
+}
+
+[data-theme='dark'] .agent-workflow-step {
+  background: rgba(255,255,255,0.03);
+}
+
+[data-theme='dark'] .agent-workflow-step span {
+  color: #a78bfa;
+}
+
+[data-theme='dark'] .agent-workflow-step p {
+  color: rgba(255,255,255,0.5);
+}
+
+[data-theme='dark'] .result-stage-list span {
+  background: rgba(108,92,231,0.15);
+  color: #a78bfa;
+}

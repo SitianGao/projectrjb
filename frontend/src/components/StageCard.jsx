@@ -14,9 +14,9 @@ import { normalizeStringList, normalizeTasks } from '../utils/stageUtils'
 const { Text, Paragraph } = Typography
 
 const STATUS_MAP = {
-  completed: { label: '已完成', color: '#22C55E', bg: '#F0FDF4', icon: <CheckCircleFilled /> },
-  current: { label: '进行中', color: '#6C5CE7', bg: '#F3F0FF', icon: <PlayCircleFilled /> },
-  locked: { label: '未解锁', color: '#9CA3AF', bg: '#F9FAFB', icon: <LockFilled /> },
+  completed: { label: '已完成', color: '#22C55E', bg: 'var(--stage-completed-bg)', icon: <CheckCircleFilled /> },
+  current: { label: '进行中', color: '#6C5CE7', bg: 'var(--tint-primary)', icon: <PlayCircleFilled /> },
+  locked: { label: '未解锁', color: 'var(--text-muted)', bg: 'var(--surface-secondary)', icon: <LockFilled /> },
 }
 
 /**
@@ -49,8 +49,8 @@ export default function StageCard({
         size="small"
         style={{
           borderRadius: 12,
-          border: status === 'current' ? '1.5px solid #6C5CE7' : '1px solid #E5E7EB',
-          background: '#FFFFFF',
+          border: status === 'current' ? '1.5px solid #6C5CE7' : '1px solid var(--border)',
+          background: 'var(--bg-card)',
           opacity: isLocked ? 0.6 : 1,
           cursor: isLocked ? 'default' : 'pointer',
           minWidth: 0,
@@ -61,7 +61,7 @@ export default function StageCard({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <Space size={8}>
             <span style={{ color: cfg.color, fontSize: 18 }}>{cfg.icon}</span>
-            <Text strong style={{ fontSize: 15, color: '#111827' }}>
+            <Text strong style={{ fontSize: 15, color: 'var(--text-primary)' }}>
               阶段{stageIndex}：{stage?.title || '未命名'}
             </Text>
             <Tag color={status === 'current' ? 'purple' : status === 'completed' ? 'success' : 'default'} style={{ borderRadius: 6 }}>
@@ -71,7 +71,7 @@ export default function StageCard({
           {!isLocked && (
             <CaretRightOutlined
               style={{
-                color: '#9CA3AF', fontSize: 12,
+                color: 'var(--text-muted)', fontSize: 12,
                 transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
                 transition: 'transform 0.2s',
               }}
@@ -81,13 +81,13 @@ export default function StageCard({
 
         {/* Row 2: tasks, days, resources, mastery */}
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 10 }}>
-          <span style={{ fontSize: 13, color: '#6B7280' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             任务 {completed}/{tasks.length}
           </span>
-          <span style={{ fontSize: 13, color: '#6B7280' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             预计 {days} 天
           </span>
-          <span style={{ fontSize: 13, color: '#6B7280' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             资源 {resources.length} 项
           </span>
           {tasks.length > 0 && (
@@ -102,15 +102,15 @@ export default function StageCard({
 
         {/* Expanded content */}
         {expanded && !isLocked && (
-          <div style={{ marginTop: 14, borderTop: '1px solid #F3F4F6', paddingTop: 14 }}>
+          <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
             {/* Learning objectives */}
             {objectives.length > 0 && (
               <div style={{ marginBottom: 12 }}>
-                <Text strong style={{ fontSize: 13, color: '#111827' }}>
+                <Text strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>
                   <AimOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />
                   学习目标
                 </Text>
-                <Paragraph style={{ margin: '6px 0 0', fontSize: 13, color: '#6B7280', lineHeight: 1.7 }}>
+                <Paragraph style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                   {objectives.join('；')}
                 </Paragraph>
               </div>
@@ -119,7 +119,7 @@ export default function StageCard({
             {/* Knowledge tags */}
             {topics.length > 0 && (
               <div style={{ marginBottom: 12 }}>
-                <Text strong style={{ fontSize: 13, color: '#111827', display: 'block', marginBottom: 8 }}>
+                <Text strong style={{ fontSize: 13, color: 'var(--text-primary)', display: 'block', marginBottom: 8 }}>
                   核心知识点
                 </Text>
                 <Space size={4} wrap>
@@ -133,7 +133,7 @@ export default function StageCard({
 
             {/* Lock condition */}
             {isLocked && (
-              <Text style={{ fontSize: 12, color: '#9CA3AF', display: 'block', marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 12 }}>
                 完成阶段{stageIndex - 1}测评且正确率达到 70% 后解锁
               </Text>
             )}

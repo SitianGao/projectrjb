@@ -171,3 +171,53 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== 深色模式 ===== */
+[data-theme='dark'] .courses-page {
+  background: #0f0f1a;
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .courses-header h2,
+[data-theme='dark'] .current-course-copy h3,
+[data-theme='dark'] .compact-course-card h5 {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .courses-header .ant-typography,
+[data-theme='dark'] .current-course-copy p,
+[data-theme='dark'] .compact-course-card p {
+  color: rgba(255,255,255,0.65);
+}
+
+[data-theme='dark'] .current-course-card,
+[data-theme='dark'] .compact-course-card,
+[data-theme='dark'] .create-course-card,
+[data-theme='dark'] .courses-empty-card {
+  background: #1a1a2e;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='dark'] .compact-course-card:hover {
+  border-color: rgba(108,92,231,0.3);
+  box-shadow: 0 10px 24px rgba(108,92,231,0.15);
+}
+
+[data-theme='dark'] .create-course-card {
+  border-color: rgba(108,92,231,0.3);
+  color: #a78bfa;
+}
+
+[data-theme='dark'] .create-course-card:hover {
+  border-color: rgba(108,92,231,0.5);
+  background: rgba(108,92,231,0.08);
+}
+
+[data-theme='dark'] .create-course-card .anticon {
+  background: rgba(108,92,231,0.15);
+}
+
+[data-theme='dark'] .current-label {
+  color: #a78bfa;
+}

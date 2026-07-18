@@ -11,3 +11,10 @@
   background: #F6F7FB;
   min-height: 400px;
 }
+
+/* 深色模式 */
+[data-theme='dark'] .study-home-loading,
+[data-theme='dark'] .study-home-error {
+  background: #0f0f1a;
+  color: rgba(255,255,255,0.95);
+}

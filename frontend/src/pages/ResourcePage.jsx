@@ -17,6 +17,7 @@ import ResourceGenerateDrawer from '../components/ResourceGenerateDrawer'
 import { useResources } from '../hooks/useResources'
 import { useAuth } from '../contexts/AuthContext'
 import { normalizeTitle, getResourceStats } from '../utils/resourceNormalizer'
+import './ResourcePage.css'
 
 const { Text, Title, Paragraph } = Typography
 
@@ -102,14 +103,14 @@ export default function ResourcePage() {
   }
 
   return (
-    <div style={{ minHeight: '100%', background: '#F6F7FB', padding: '20px 24px 48px' }}>
+    <div style={{ minHeight: '100%', background: 'var(--bg-page)', padding: '20px 24px 48px' }}>
       <div style={{ maxWidth: 1440, margin: '0 auto' }}>
 
         {/* ── Header ── */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
           <div>
-            <Title level={3} style={{ margin: 0, color: '#111827' }}>资源中心</Title>
-            <Text style={{ color: '#6B7280', fontSize: 14 }}>
+            <Title level={3} style={{ margin: 0, color: 'var(--text-primary)' }}>资源中心</Title>
+            <Text style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
               生成、管理并复用你的个性化学习资源
             </Text>
           </div>
@@ -121,7 +122,7 @@ export default function ResourcePage() {
         </div>
 
         {/* ── Filter bar ── */}
-        <Card style={{ borderRadius: 16, marginBottom: 20, border: '1px solid #E5E7EB' }}
+        <Card style={{ borderRadius: 16, marginBottom: 20, border: '1px solid var(--border)' }}
           styles={{ body: { padding: '14px 20px' } }}>
           <Space size={12} wrap style={{ width: '100%' }}>
             <Input prefix={<SearchOutlined style={{ color: '#6C5CE7' }} />}
@@ -159,10 +160,10 @@ export default function ResourcePage() {
           <Result status="error" title="资源加载失败" subTitle={error}
             extra={<Button type="primary" icon={<ReloadOutlined />} onClick={reload}>重试</Button>} />
         ) : filtered.length === 0 ? (
-          <Card style={{ borderRadius: 16, textAlign: 'center', padding: 48, border: '1px solid #E5E7EB' }}>
-            <InboxOutlined style={{ fontSize: 48, color: '#D1D5DB', marginBottom: 16 }} />
-            <Title level={4} style={{ color: '#111827' }}>还没有学习资源</Title>
-            <Paragraph style={{ color: '#6B7280', maxWidth: 460, margin: '0 auto 20px' }}>
+          <Card style={{ borderRadius: 16, textAlign: 'center', padding: 48, border: '1px solid var(--border)' }}>
+            <InboxOutlined style={{ fontSize: 48, color: 'var(--text-muted)', marginBottom: 16 }} />
+            <Title level={4} style={{ color: 'var(--text-primary)' }}>还没有学习资源</Title>
+            <Paragraph style={{ color: 'var(--text-secondary)', maxWidth: 460, margin: '0 auto 20px' }}>
               你可以选择一门课程和学习主题，生成讲义、练习题、PPT 或思维导图。
               生成的资源会自动保存到此处，并可关联到具体课程和阶段。
             </Paragraph>
@@ -181,7 +182,7 @@ export default function ResourcePage() {
                 <Col xs={24} sm={12} lg={8} xl={6} key={res.id}>
                   <Card
                     hoverable
-                    style={{ borderRadius: 12, border: '1px solid #E5E7EB', height: '100%', minWidth: 0 }}
+                    style={{ borderRadius: 12, border: '1px solid var(--border)', height: '100%', minWidth: 0 }}
                     styles={{ body: { padding: '16px 18px' } }}
                     onClick={() => openResource(res)}
                   >
@@ -193,7 +194,7 @@ export default function ResourcePage() {
                     </Space>
 
                     {/* Title */}
-                    <Text strong style={{ fontSize: 14, color: '#111827', display: 'block', marginBottom: 6 }}
+                    <Text strong style={{ fontSize: 14, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}
                       ellipsis={{ rows: 2 }}>{normalizeTitle(res.title, res.type, res.topic)}</Text>
                     {/* Stats */}
                     {(() => { const s = getResourceStats(res); return s ? <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>{s.icon} {s.label}</Text> : null })()}

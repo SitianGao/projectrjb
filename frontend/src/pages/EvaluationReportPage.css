@@ -234,3 +234,72 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== 深色模式 ===== */
+[data-theme='dark'] .evaluation-page {
+  background: #0f0f1a;
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .evaluation-header h2 {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .evaluation-card {
+  background: #1a1a2e;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .evaluation-card .ant-card-body,
+[data-theme='dark'] .evaluation-card .ant-card-head {
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .context-bar {
+  background: rgba(255,255,255,0.03);
+}
+
+[data-theme='dark'] .context-grid {
+  color: rgba(255,255,255,0.65);
+}
+
+[data-theme='dark'] .overall-score {
+  background: rgba(108,92,231,0.12);
+}
+
+[data-theme='dark'] .overall-score h1 {
+  color: #a78bfa;
+}
+
+[data-theme='dark'] .section-kicker {
+  color: #a78bfa;
+}
+
+[data-theme='dark'] .dimension-card strong {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .dimension-card p,
+[data-theme='dark'] .knowledge-card p {
+  color: rgba(255,255,255,0.65);
+}
+
+[data-theme='dark'] .knowledge-grid h3 {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .knowledge-card {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .course-progress-summary {
+  background: rgba(108,92,231,0.1);
+}
+
+[data-theme='dark'] .evaluation-empty {
+  background: #1a1a2e;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}

@@ -30,28 +30,28 @@ export default function CurrentLearningCard({
     <Card
       style={{
         borderRadius: 16,
-        border: '1px solid #E5E7EB',
+        border: '1px solid var(--border)',
         boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        background: '#FFFFFF',
+        background: 'var(--bg-card)',
         minWidth: 0,
         width: '100%',
         ...style,
       }}
       styles={{ body: { padding: '18px 20px' } }}
     >
-      <Text strong style={{ fontSize: 15, color: '#111827', display: 'block', marginBottom: 14 }}>
+      <Text strong style={{ fontSize: 15, color: 'var(--text-primary)', display: 'block', marginBottom: 14 }}>
         📍 当前学习安排
       </Text>
 
       {/* Current stage */}
       <div style={{
-        background: '#F3F0FF', borderRadius: 10,
+        background: 'var(--tint-primary)', borderRadius: 10,
         padding: '10px 14px', marginBottom: 14,
       }}>
         <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           当前阶段
         </Text>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginTop: 2 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginTop: 2 }}>
           阶段{stageId}：{stageTitle}
         </div>
       </div>
@@ -64,17 +64,17 @@ export default function CurrentLearningCard({
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '8px 12px', borderRadius: 8,
-          background: '#FAFAFC', border: '1px solid #E5E7EB',
+          background: 'var(--surface-secondary)', border: '1px solid var(--border)',
         }}>
           <BookOutlined style={{ color: '#6C5CE7' }} />
-          <Text style={{ fontSize: 13, color: '#111827', flex: 1 }}>{nextTaskTitle || '暂无任务'}</Text>
+          <Text style={{ fontSize: 13, color: 'var(--text-primary)', flex: 1 }}>{nextTaskTitle || '暂无任务'}</Text>
         </div>
       </div>
 
       {/* Time estimate */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
         <ClockCircleOutlined style={{ color: '#6C5CE7', fontSize: 13 }} />
-        <Text style={{ fontSize: 13, color: '#6B7280' }}>
+        <Text style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
           预计用时 {estimatedMinutes} 分钟
         </Text>
       </div>
@@ -82,8 +82,8 @@ export default function CurrentLearningCard({
       {/* Stage progress */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-          <Text style={{ fontSize: 12, color: '#6B7280' }}>本阶段进度</Text>
-          <Text style={{ fontSize: 12, color: '#6B7280' }}>{completed}/{total}</Text>
+          <Text style={{ fontSize: 12, color: 'var(--text-secondary)' }}>本阶段进度</Text>
+          <Text style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{completed}/{total}</Text>
         </div>
         <Progress percent={percent} size="small" strokeColor="#6C5CE7" style={{ margin: 0 }} />
       </div>

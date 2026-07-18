@@ -39,13 +39,13 @@ export default function ReviewPlanCard({
     return (
       <Card
         style={{
-          borderRadius: 16, border: '1px solid #E5E7EB',
-          background: '#FFFFFF', minWidth: 0, width: '100%',
+          borderRadius: 16, border: '1px solid var(--border)',
+          background: 'var(--bg-card)', minWidth: 0, width: '100%',
           ...style,
         }}
         styles={{ body: { padding: '18px 20px' } }}
       >
-        <Text strong style={{ fontSize: 15, color: '#111827', display: 'block', marginBottom: 16 }}>
+        <Text strong style={{ fontSize: 15, color: 'var(--text-primary)', display: 'block', marginBottom: 16 }}>
           📝 今日复习计划
         </Text>
         <Empty
@@ -63,14 +63,14 @@ export default function ReviewPlanCard({
   return (
     <Card
       style={{
-        borderRadius: 16, border: '1px solid #E5E7EB',
-        background: '#FFFFFF', minWidth: 0, width: '100%',
+        borderRadius: 16, border: '1px solid var(--border)',
+        background: 'var(--bg-card)', minWidth: 0, width: '100%',
         ...style,
       }}
       styles={{ body: { padding: '18px 20px' } }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Text strong style={{ fontSize: 15, color: '#111827' }}>📝 今日复习计划</Text>
+        <Text strong style={{ fontSize: 15, color: 'var(--text-primary)' }}>📝 今日复习计划</Text>
         <Tag color="orange" style={{ borderRadius: 6 }}>{plans.length} 项</Tag>
       </div>
 
@@ -85,15 +85,15 @@ export default function ReviewPlanCard({
               style={{
                 padding: '12px 14px',
                 borderRadius: 12,
-                border: `1px solid #E5E7EB`,
+                border: `1px solid var(--border)`,
                 borderLeft: `3px solid ${uc.color}`,
-                background: '#FAFAFC',
+                background: 'var(--surface-secondary)',
                 minWidth: 0,
               }}
             >
               {/* Topic + priority */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <Text strong style={{ fontSize: 14, color: '#111827' }}>{item.topic}</Text>
+                <Text strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>{item.topic}</Text>
                 <Tag color={item.urgency === 'high' ? 'red' : item.urgency === 'medium' ? 'orange' : 'green'} style={{ borderRadius: 6, margin: 0 }}>
                   {uc.icon} {uc.label}
                 </Tag>
@@ -175,8 +175,8 @@ export default function ReviewPlanCard({
         {resourcesModal?.resources?.map((res, i) => (
           <div key={res.id || i} style={{
             padding: '8px 12px', borderRadius: 8,
-            border: '1px solid #E5E7EB', marginBottom: 6,
-            fontSize: 13, color: '#374151',
+            border: '1px solid var(--border)', marginBottom: 6,
+            fontSize: 13, color: 'var(--text-primary)',
           }}>
             <BookOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />
             {res.title}

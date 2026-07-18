@@ -15,6 +15,7 @@
   --sidebar-border: rgba(0,0,0,0.06);
   /* ── 新增语义 token ── */
   --surface-secondary: #fafbfc;
+  --tint-primary: #f3f0ff;
   --input-bar-bg: #f5f6f8;
   --progress-track: #f3f4f6;
   --session-highlight: #e6f4ff;
@@ -51,55 +52,59 @@
 }
 
 [data-theme='dark'] {
-  --bg-page: #0a0a1a;
-  --bg-card: #141428;
-  --bg-chat: #0f1129;
-  --border: rgba(255,255,255,0.08);
-  --text-primary: rgba(255,255,255,0.9);
-  --text-secondary: rgba(255,255,255,0.55);
-  --text-muted: rgba(255,255,255,0.35);
-  --topbar-bg: #111130;
-  --topbar-border: rgba(255,255,255,0.06);
-  --topbar-text: rgba(255,255,255,0.9);
-  --sidebar-bg: rgba(255,255,255,0.03);
-  --sidebar-border: rgba(255,255,255,0.06);
+  --bg-page: #0f0f1a;
+  --bg-card: #1a1a2e;
+  --bg-chat: #12122a;
+  --border: rgba(255,255,255,0.1);
+  --text-primary: rgba(255,255,255,0.95);
+  --text-secondary: rgba(255,255,255,0.65);
+  --text-muted: rgba(255,255,255,0.4);
+  --topbar-bg: #16162e;
+  --topbar-border: rgba(255,255,255,0.08);
+  --topbar-text: rgba(255,255,255,0.95);
+  --sidebar-bg: rgba(255,255,255,0.04);
+  --sidebar-border: rgba(255,255,255,0.08);
   /* ── 新增语义 token ── */
-  --surface-secondary: rgba(255,255,255,0.025);
-  --input-bar-bg: rgba(255,255,255,0.05);
-  --progress-track: rgba(255,255,255,0.06);
-  --session-highlight: rgba(22,119,255,0.1);
-  --md-code-bg: rgba(255,255,255,0.06);
+  --surface-secondary: rgba(255,255,255,0.03);
+  --tint-primary: rgba(108,92,231,0.14);
+  --input-bar-bg: rgba(255,255,255,0.06);
+  --progress-track: rgba(255,255,255,0.08);
+  --session-highlight: rgba(108,92,231,0.15);
+  --md-code-bg: rgba(255,255,255,0.08);
   --md-code-text: #a78bfa;
-  --md-border: rgba(255,255,255,0.08);
-  --md-th-bg: rgba(255,255,255,0.04);
-  --md-blockquote-bg: rgba(139,92,246,0.05);
+  --md-border: rgba(255,255,255,0.1);
+  --md-th-bg: rgba(255,255,255,0.05);
+  --md-blockquote-bg: rgba(139,92,246,0.08);
   --md-blockquote-text: #94a3b8;
-  --msg-bubble-bg: rgba(255,255,255,0.04);
-  --msg-bubble-border: rgba(255,255,255,0.06);
-  --msg-user-bg: linear-gradient(135deg, rgba(22,119,255,0.1) 0%, rgba(22,119,255,0.04) 100%);
-  --msg-user-border: rgba(22,119,255,0.15);
-  --scrollbar-thumb: rgba(255,255,255,0.2);
+  --msg-bubble-bg: rgba(255,255,255,0.05);
+  --msg-bubble-border: rgba(255,255,255,0.08);
+  --msg-user-bg: linear-gradient(135deg, rgba(108,92,231,0.15) 0%, rgba(108,92,231,0.06) 100%);
+  --msg-user-border: rgba(108,92,231,0.2);
+  --scrollbar-thumb: rgba(255,255,255,0.25);
   /* ── 阶段状态色 ── */
   --stage-completed: #73d13d;
-  --stage-completed-bg: rgba(82,196,26,0.1);
-  --stage-completed-border: rgba(82,196,26,0.2);
-  --stage-inprogress: #4dabff;
-  --stage-inprogress-bg: rgba(22,119,255,0.1);
-  --stage-inprogress-border: rgba(77,171,255,0.2);
-  --stage-inprogress-glow: rgba(77,171,255,0.2);
+  --stage-completed-bg: rgba(82,196,26,0.12);
+  --stage-completed-border: rgba(82,196,26,0.25);
+  --stage-inprogress: #6C5CE7;
+  --stage-inprogress-bg: rgba(108,92,231,0.15);
+  --stage-inprogress-border: rgba(108,92,231,0.25);
+  --stage-inprogress-glow: rgba(108,92,231,0.25);
   --stage-locked: #555;
-  --stage-locked-bg: rgba(255,255,255,0.02);
+  --stage-locked-bg: rgba(255,255,255,0.03);
   --stage-locked-dot: #444;
   /* ── 功能色 ── */
   --color-success: #73d13d;
-  --color-primary: #4dabff;
+  --color-primary: #6C5CE7;
   --color-warning: #ffc069;
   --color-danger: #ff7875;
   --color-pink: #ff85c0;
   --color-purple: #b37feb;
-  --color-text-disabled: rgba(255,255,255,0.3);
+  --color-text-disabled: rgba(255,255,255,0.35);
   /* ── 阴影 ── */
-  --shadow: rgba(0,0,0,0.45) 0 10px 15px -3px, rgba(0,0,0,0.3) 0 4px 6px -2px;
+  --shadow: rgba(0,0,0,0.5) 0 10px 15px -3px, rgba(0,0,0,0.35) 0 4px 6px -2px;
+  /* ── 深色模式专用 ── */
+  --dark-glow: rgba(108,92,231,0.3);
+  --dark-card-hover: rgba(108,92,231,0.08);
 }
 
 /* ===== 布局 ===== */

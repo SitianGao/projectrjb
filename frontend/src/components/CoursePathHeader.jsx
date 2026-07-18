@@ -32,10 +32,10 @@ export default function CoursePathHeader({
 
   return (
     <div style={{
-      background: '#FFFFFF',
+      background: 'var(--bg-card)',
       borderRadius: 16,
       padding: '20px 28px',
-      border: '1px solid #E5E7EB',
+      border: '1px solid var(--border)',
       marginBottom: 24,
       maxWidth: 1440,
       margin: '0 auto 24px',
@@ -54,10 +54,10 @@ export default function CoursePathHeader({
       {/* Title row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Title level={4} style={{ margin: 0, color: '#111827' }}>
+          <Title level={4} style={{ margin: 0, color: 'var(--text-primary)' }}>
             {courseName} 个性化学习路径
           </Title>
-          <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 4, display: 'block' }}>
+          <Text style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, display: 'block' }}>
             基于你的学习目标、基础测评、学习记录和错题情况自动生成
           </Text>
 

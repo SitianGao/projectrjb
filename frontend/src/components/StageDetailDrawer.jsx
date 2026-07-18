@@ -55,10 +55,10 @@ export default function StageDetailDrawer({
       {/* Objectives */}
       {objectives.length > 0 && (
         <div style={{ marginBottom: 18 }}>
-          <Text strong style={{ fontSize: 13, color: '#111827', display: 'block', marginBottom: 6 }}>
+          <Text strong style={{ fontSize: 13, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
             <AimOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />学习目标
           </Text>
-          <ul style={{ margin: 0, paddingLeft: 20, color: '#6B7280', fontSize: 13, lineHeight: 1.8 }}>
+          <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.8 }}>
             {objectives.map((obj, i) => <li key={i}>{obj}</li>)}
           </ul>
         </div>
@@ -67,7 +67,7 @@ export default function StageDetailDrawer({
       {/* Knowledge points */}
       {topics.length > 0 && (
         <div style={{ marginBottom: 18 }}>
-          <Text strong style={{ fontSize: 13, color: '#111827', display: 'block', marginBottom: 6 }}>
+          <Text strong style={{ fontSize: 13, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
             <TagsOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />核心知识点
           </Text>
           <Space size={4} wrap>
@@ -79,7 +79,7 @@ export default function StageDetailDrawer({
       {/* Task list */}
       {tasks.length > 0 && (
         <div style={{ marginBottom: 18 }}>
-          <Text strong style={{ fontSize: 13, color: '#111827', display: 'block', marginBottom: 6 }}>
+          <Text strong style={{ fontSize: 13, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
             <UnorderedListOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />学习任务
           </Text>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -87,10 +87,10 @@ export default function StageDetailDrawer({
               <div key={task.task_id} style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '6px 10px', borderRadius: 6,
-                background: task.status === 'completed' ? '#F0FDF4' : '#F9FAFB',
+                background: task.status === 'completed' ? 'var(--stage-completed-bg)' : 'var(--surface-secondary)',
                 fontSize: 13,
               }}>
-                <span style={{ flex: 1, color: '#374151' }}>{task.description}</span>
+                <span style={{ flex: 1, color: 'var(--text-primary)' }}>{task.description}</span>
                 {task.estimated_hours && (
                   <Text type="secondary" style={{ fontSize: 11 }}><ClockCircleOutlined /> {task.estimated_hours}h</Text>
                 )}
@@ -103,7 +103,7 @@ export default function StageDetailDrawer({
       {/* Matched resources */}
       {uniqueResources.length > 0 && (
         <div style={{ marginBottom: 18 }}>
-          <Text strong style={{ fontSize: 13, color: '#111827', display: 'block', marginBottom: 6 }}>
+          <Text strong style={{ fontSize: 13, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
             <FileTextOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />阶段资源（{uniqueResources.length} 项）
           </Text>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -112,8 +112,8 @@ export default function StageDetailDrawer({
                 key={res.id}
                 onClick={() => onResourceClick?.(res)}
                 style={{
-                  padding: '8px 12px', borderRadius: 8, border: '1px solid #E5E7EB',
-                  cursor: 'pointer', fontSize: 13, color: '#374151',
+                  padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
+                  cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)',
                   minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
                 }}
               >
@@ -127,7 +127,7 @@ export default function StageDetailDrawer({
 
       {/* Unlock condition for locked stages */}
       {stage.stage_id > 1 && (
-        <Paragraph style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 18, padding: '10px 14px', background: '#F9FAFB', borderRadius: 8 }}>
+        <Paragraph style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 18, padding: '10px 14px', background: 'var(--surface-secondary)', borderRadius: 8 }}>
           解锁条件：完成阶段{stage.stage_id - 1}测评且正确率达到 70%
         </Paragraph>
       )}

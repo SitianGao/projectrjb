@@ -58,7 +58,7 @@ export default function PathOverview({
             textAlign: 'center',
             padding: '4px 8px',
             borderRadius: 10,
-            background: isActive ? '#F3F0FF' : 'transparent',
+            background: isActive ? 'var(--tint-primary)' : 'transparent',
             border: isActive ? '1.5px solid #6C5CE7' : '1.5px solid transparent',
             transition: 'all 0.2s',
             minWidth: 100,
@@ -69,7 +69,7 @@ export default function PathOverview({
           </div>
           <div style={{
             fontSize: 13, fontWeight: isActive ? 600 : 400,
-            color: status === 'locked' ? '#9CA3AF' : '#111827',
+            color: status === 'locked' ? 'var(--text-muted)' : 'var(--text-primary)',
             margin: '2px 0',
           }}>
             {name}
@@ -91,15 +91,15 @@ export default function PathOverview({
 
   return (
     <div style={{
-      background: '#FFFFFF',
+      background: 'var(--bg-card)',
       borderRadius: 16,
       padding: '20px 24px',
-      border: '1px solid #E5E7EB',
+      border: '1px solid var(--border)',
       boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
       maxWidth: 1440,
       margin: '0 auto 24px',
     }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
         学习路径总览
       </div>
       <Steps

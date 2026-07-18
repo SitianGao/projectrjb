@@ -1,0 +1,368 @@
+/* ===== 学习路径页 ===== */
+
+/* 深色模式 */
+[data-theme='dark'] .learning-path-page {
+  background: #0f0f1a;
+  color: rgba(255,255,255,0.95);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 深色模式背景装饰 - 星空粒子效果 */
+[data-theme='dark'] .learning-path-page::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(2px 2px at 20% 30%, rgba(108,92,231,0.3), transparent),
+    radial-gradient(2px 2px at 40% 70%, rgba(167,139,250,0.2), transparent),
+    radial-gradient(1px 1px at 60% 20%, rgba(139,92,246,0.3), transparent),
+    radial-gradient(1px 1px at 80% 60%, rgba(108,92,231,0.2), transparent),
+    radial-gradient(2px 2px at 10% 80%, rgba(167,139,250,0.15), transparent),
+    radial-gradient(1px 1px at 90% 40%, rgba(139,92,246,0.25), transparent);
+  pointer-events: none;
+  z-index: 0;
+  animation: twinkle 8s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* 渐变光晕装饰 */
+[data-theme='dark'] .learning-path-page::after {
+  content: '';
+  position: fixed;
+  top: -200px;
+  right: -200px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(108,92,231,0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  animation: float 12s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-30px, 30px) scale(1.05); }
+  66% { transform: translate(20px, -20px) scale(0.95); }
+}
+
+/* 确保内容在装饰之上 */
+[data-theme='dark'] .learning-path-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-theme='dark'] .ant-statistic-title {
+  color: rgba(255,255,255,0.65);
+}
+
+[data-theme='dark'] .ant-statistic-content {
+  color: rgba(255,255,255,0.95);
+}
+
+/* 统计卡片 */
+[data-theme='dark'] .stat-mini-card {
+  background: linear-gradient(135deg, rgba(26,26,46,0.9), rgba(26,26,46,0.7));
+  backdrop-filter: blur(10px);
+  border-color: rgba(255,255,255,0.08);
+  transition: all 0.3s ease;
+}
+
+[data-theme='dark'] .stat-mini-card:hover {
+  background: linear-gradient(135deg, rgba(108,92,231,0.15), rgba(108,92,231,0.05));
+  border-color: rgba(108,92,231,0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(108,92,231,0.2);
+}
+
+[data-theme='dark'] .stat-mini-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6C5CE7, #a78bfa);
+  border-radius: 16px 16px 0 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+[data-theme='dark'] .stat-mini-card:hover::before {
+  opacity: 1;
+}
+
+/* 路径主卡片 */
+[data-theme='dark'] .path-main-card {
+  background: linear-gradient(135deg, rgba(26,26,46,0.95), rgba(26,26,46,0.85));
+  backdrop-filter: blur(10px);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 路径卡片顶部光效 */
+[data-theme='dark'] .path-main-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(from 0deg, transparent, rgba(108,92,231,0.1), transparent 30%);
+  animation: rotate 15s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes rotate {
+  100% { transform: rotate(360deg); }
+}
+
+[data-theme='dark'] .path-main-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 弹窗内容 */
+[data-theme='dark'] .ant-modal-content {
+  background: linear-gradient(135deg, #1a1a2e, #16162e);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+}
+
+[data-theme='dark'] .ant-modal-header {
+  background: transparent;
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .ant-modal-title {
+  color: rgba(255,255,255,0.95);
+  font-size: 18px;
+}
+
+[data-theme='dark'] .ant-modal-close {
+  color: rgba(255,255,255,0.65);
+  transition: all 0.3s ease;
+}
+
+[data-theme='dark'] .ant-modal-close:hover {
+  color: rgba(255,255,255,0.95);
+  transform: rotate(90deg);
+}
+
+/* 统计详情弹窗 */
+[data-theme='dark'] .ant-card {
+  background: linear-gradient(135deg, rgba(26,26,46,0.95), rgba(26,26,46,0.85));
+  backdrop-filter: blur(10px);
+  border-color: rgba(255,255,255,0.08);
+  transition: all 0.3s ease;
+}
+
+[data-theme='dark'] .ant-card:hover {
+  border-color: rgba(108,92,231,0.3);
+  box-shadow: 0 8px 24px rgba(108,92,231,0.15);
+}
+
+[data-theme='dark'] .ant-card-head {
+  color: rgba(255,255,255,0.95);
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .ant-card-body {
+  color: rgba(255,255,255,0.95);
+}
+
+/* 标签 */
+[data-theme='dark'] .ant-tag {
+  background: rgba(108,92,231,0.12);
+  border-color: rgba(108,92,231,0.2);
+  color: #a78bfa;
+}
+
+/* 进度条 */
+[data-theme='dark'] .ant-progress-bg {
+  background: #6C5CE7;
+}
+
+/* 学习日历 */
+[data-theme='dark'] .ant-statistic-content-value {
+  color: rgba(255,255,255,0.95);
+}
+
+/* 提示卡片 */
+[data-theme='dark'] .ant-card {
+  background: #1a1a2e;
+}
+
+[data-theme='dark'] .ant-card .ant-card {
+  background: rgba(255,255,255,0.03);
+}
+
+/* 任务卡片 */
+[data-theme='dark'] .ant-card[size="small"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border-color: rgba(255,255,255,0.06);
+  transition: all 0.3s ease;
+}
+
+[data-theme='dark'] .ant-card[size="small"]:hover {
+  background: linear-gradient(135deg, rgba(108,92,231,0.1), rgba(108,92,231,0.03));
+  border-color: rgba(108,92,231,0.25);
+  transform: translateX(8px);
+  box-shadow: 0 4px 16px rgba(108,92,231,0.15);
+}
+
+/* 任务卡片左侧渐变边框效果 */
+[data-theme='dark'] .ant-card[size="small"]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #6C5CE7, #a78bfa);
+  border-radius: 16px 0 0 16px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+[data-theme='dark'] .ant-card[size="small"]:hover::after {
+  opacity: 1;
+}
+
+/* 列表项 */
+[data-theme='dark'] li {
+  color: rgba(255,255,255,0.65);
+}
+
+/* 强调文本 */
+[data-theme='dark'] .ant-typography strong {
+  color: rgba(255,255,255,0.95);
+}
+
+/* 次要文本 */
+[data-theme='dark'] .ant-typography.ant-typography-secondary {
+  color: rgba(255,255,255,0.5);
+}
+
+/* 警告提示 */
+[data-theme='dark'] .ant-alert {
+  background: linear-gradient(135deg, rgba(108,92,231,0.1), rgba(108,92,231,0.05));
+  border-color: rgba(108,92,231,0.2);
+  backdrop-filter: blur(10px);
+}
+
+[data-theme='dark'] .ant-alert-message {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .ant-alert-description {
+  color: rgba(255,255,255,0.65);
+}
+
+/* 进度条增强 */
+[data-theme='dark'] .ant-progress-bg {
+  background: linear-gradient(90deg, #6C5CE7, #a78bfa);
+  box-shadow: 0 0 12px rgba(108,92,231,0.4);
+}
+
+[data-theme='dark'] .ant-progress-text {
+  color: rgba(255,255,255,0.95);
+}
+
+/* 标签增强 */
+[data-theme='dark'] .ant-tag {
+  background: rgba(108,92,231,0.12);
+  border-color: rgba(108,92,231,0.2);
+  color: #a78bfa;
+  transition: all 0.3s ease;
+}
+
+[data-theme='dark'] .ant-tag:hover {
+  background: rgba(108,92,231,0.2);
+  border-color: rgba(108,92,231,0.4);
+  transform: scale(1.05);
+}
+
+/* 按钮 */
+[data-theme='dark'] .ant-btn-default {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.95);
+  transition: all 0.3s ease;
+}
+
+[data-theme='dark'] .ant-btn-default:hover {
+  background: rgba(108,92,231,0.1);
+  border-color: rgba(108,92,231,0.4);
+  color: #a78bfa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(108,92,231,0.2);
+}
+
+/* 主要按钮增强 */
+[data-theme='dark'] .ant-btn-primary {
+  background: linear-gradient(135deg, #6C5CE7, #8B5CF6);
+  border: none;
+  box-shadow: 0 4px 16px rgba(108,92,231,0.3);
+  transition: all 0.3s ease;
+}
+
+[data-theme='dark'] .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #7C6CF7, #9B6CF6);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(108,92,231,0.4);
+}
+
+/* 结果页 */
+[data-theme='dark'] .ant-result-title {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .ant-result-subtitle {
+  color: rgba(255,255,255,0.65);
+}
+
+/* 统计卡片背景色 */
+[data-theme='dark'] .ant-card[style*="background: #f6ffed"] {
+  background: rgba(82,196,26,0.1) !important;
+}
+
+[data-theme='dark'] .ant-card[style*="background: #e6f4ff"] {
+  background: rgba(22,119,255,0.1) !important;
+}
+
+[data-theme='dark'] .ant-card[style*="background: #fff7e6"] {
+  background: rgba(250,140,22,0.1) !important;
+}
+
+[data-theme='dark'] .ant-card[style*="background: #fff0f6"] {
+  background: rgba(235,47,150,0.1) !important;
+}
+
+[data-theme='dark'] .ant-card[style*="background: #f9f0ff"] {
+  background: rgba(114,46,209,0.1) !important;
+}
+
+[data-theme='dark'] .ant-card[style*="background: #fffbe6"] {
+  background: rgba(250,219,20,0.1) !important;
+  border-color: rgba(250,219,20,0.2) !important;
+}
+
+/* 学习日历圆圈 */
+[data-theme='dark'] .ant-statistic-content-suffix {
+  color: rgba(255,255,255,0.65);
+}
+
+[data-theme='dark'] .ant-statistic-content-prefix {
+  color: inherit;
+}

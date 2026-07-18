@@ -17,6 +17,7 @@ import ForgettingCurve from '../components/ForgettingCurve'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import { getLearningPath, generateLearningPath } from '../api/planner'
 import { useAuth } from '../contexts/AuthContext'
+import './LearningPathPage.css'
 
 /**
  * SSE 事件类型：start | delta | data | error | done

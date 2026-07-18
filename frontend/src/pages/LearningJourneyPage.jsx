@@ -20,6 +20,7 @@ import StageDetailDrawer from '../components/StageDetailDrawer'
 import CurrentLearningCard from '../components/CurrentLearningCard'
 import ReviewPlanCard from '../components/ReviewPlanCard'
 import PathReasonDrawer from '../components/PathReasonDrawer'
+import './LearningJourneyPage.css'
 
 // ── helpers ──
 
@@ -230,10 +231,10 @@ export default function LearningJourneyPage() {
   }, [trackExerciseAnswer, studentId])
 
   // ── Render states ──
-  if (loading) return <div style={{ height: '100%', background: '#F6F7FB' }}><LoadingSkeleton type="detail" /></div>
+  if (loading) return <div style={{ height: '100%', background: 'var(--bg-page)' }}><LoadingSkeleton type="detail" /></div>
   if (error) {
     return (
-      <div style={{ maxWidth: 500, margin: '60px auto', background: '#F6F7FB', padding: 24 }}>
+      <div style={{ maxWidth: 500, margin: '60px auto', background: 'var(--bg-page)', padding: 24 }}>
         <Result status="error" title="学习路径加载失败" subTitle={error}
           extra={<Button type="primary" icon={<ReloadOutlined />} onClick={loadAllData}>重新加载</Button>} />
       </div>
@@ -241,7 +242,7 @@ export default function LearningJourneyPage() {
   }
   if (!stages.length) {
     return (
-      <div style={{ maxWidth: 500, margin: '60px auto', background: '#F6F7FB', padding: 24 }}>
+      <div style={{ maxWidth: 500, margin: '60px auto', background: 'var(--bg-page)', padding: 24 }}>
         <Empty description="暂未生成学习路径">
           <Button type="primary" onClick={() => navigate('/profile', { state: { startChat: true } })} style={{ borderRadius: 8 }}>生成学习路径</Button>
         </Empty>
@@ -253,7 +254,7 @@ export default function LearningJourneyPage() {
 
   return (
     <div style={{
-      minHeight: '100%', background: '#F6F7FB',
+      minHeight: '100%', background: 'var(--bg-page)',
       padding: '20px 24px 48px',
     }}>
       <div style={{ maxWidth: 1440, margin: '0 auto', minWidth: 0 }}>

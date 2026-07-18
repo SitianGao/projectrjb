@@ -256,3 +256,119 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== 深色模式 ===== */
+[data-theme='dark'] .dashboard-page {
+  background: #0f0f1a;
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .dashboard-hero {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(108, 92, 231, 0.2), transparent 28%),
+    linear-gradient(135deg, #1a1a2e, #16162e);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='dark'] .hero-copy h1 {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .hero-copy h3 {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .hero-copy p,
+[data-theme='dark'] .shortcut-inner p,
+[data-theme='dark'] .path-preview-row p {
+  color: rgba(255,255,255,0.65);
+}
+
+[data-theme='dark'] .hero-meta {
+  color: #a78bfa;
+}
+
+[data-theme='dark'] .hero-stats {
+  background: #1a1a2e;
+  border-color: rgba(255,255,255,0.08);
+}
+
+[data-theme='dark'] .hero-progress strong {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .hero-stat-grid .ant-statistic {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .hero-stat-item {
+  background: rgba(255,255,255,0.03);
+  border-color: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .dashboard-shortcut {
+  background: #1a1a2e;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='dark'] .dashboard-shortcut:hover {
+  border-color: rgba(108,92,231,0.3);
+  box-shadow: 0 10px 24px rgba(108,92,231,0.15);
+}
+
+[data-theme='dark'] .shortcut-arrow {
+  color: rgba(255,255,255,0.4);
+}
+
+[data-theme='dark'] .dashboard-panel {
+  background: #1a1a2e;
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='dark'] .dashboard-panel .ant-card-head {
+  border-bottom-color: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .path-preview-row > span {
+  color: rgba(255,255,255,0.65);
+  background: rgba(255,255,255,0.06);
+}
+
+[data-theme='dark'] .path-preview-row > span.active {
+  color: #fff;
+  background: #6c5ce7;
+}
+
+[data-theme='dark'] .recent-course {
+  background: transparent;
+}
+
+[data-theme='dark'] .recent-course:hover {
+  background: rgba(108,92,231,0.08);
+}
+
+[data-theme='dark'] .recent-course--active {
+  background: rgba(108,92,231,0.12);
+  border-color: rgba(108,92,231,0.2);
+}
+
+[data-theme='dark'] .hero-guided-empty {
+  color: rgba(255,255,255,0.65);
+}
+
+[data-theme='dark'] .hero-guided-empty .anticon {
+  color: rgba(255,255,255,0.3);
+}
+
+[data-theme='dark'] .hero-guided-empty strong {
+  color: rgba(255,255,255,0.95);
+}
+
+[data-theme='dark'] .hero-guided-empty ul {
+  color: rgba(255,255,255,0.65);
+}
