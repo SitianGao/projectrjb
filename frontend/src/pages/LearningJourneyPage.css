@@ -1,243 +1,39 @@
 /* ===== 学习旅程页 ===== */
 
-/* 深色模式 */
-[data-theme='dark'] .learning-journey-page {
+.lj-page {
+  min-height: 100%;
+  background: var(--bg-page);
+}
+
+.lj-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Dark mode */
+[data-theme='dark'] .lj-page {
   background: #0f0f1a;
-  color: rgba(255,255,255,0.95);
 }
 
-/* 页面背景 */
-[data-theme='dark'] div[style*="background: #F6F7FB"] {
-  background: #0f0f1a !important;
-}
-
-/* 标题 */
-[data-theme='dark'] .ant-typography {
-  color: rgba(255,255,255,0.95);
-}
-
-/* 次要文本 */
-[data-theme='dark'] .ant-typography.ant-typography-secondary {
-  color: rgba(255,255,255,0.5);
-}
-
-/* 按钮 */
-[data-theme='dark'] .ant-btn-default {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-btn-default:hover {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.25);
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-btn-link {
-  color: #a78bfa;
-}
-
-[data-theme='dark'] .ant-btn-link:hover {
-  color: #c4b5fd;
-}
-
-/* 空状态 */
-[data-theme='dark'] .ant-empty-description {
-  color: rgba(255,255,255,0.5);
-}
-
-[data-theme='dark'] .ant-empty-image {
-  opacity: 0.6;
-}
-
-/* 结果页 */
-[data-theme='dark'] .ant-result-title {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-result-subtitle {
-  color: rgba(255,255,255,0.65);
-}
-
-/* 加载状态 */
-[data-theme='dark'] .ant-spin {
-  color: #6C5CE7;
-}
-
-/* 消息提示 */
-[data-theme='dark'] .ant-message-notice-content {
-  background: #1a1a2e;
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-/* 模态框 */
-[data-theme='dark'] .ant-modal-content {
-  background: #1a1a2e;
-}
-
-[data-theme='dark'] .ant-modal-header {
-  background: #1a1a2e;
-  border-bottom-color: rgba(255,255,255,0.06);
-}
-
-[data-theme='dark'] .ant-modal-title {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-modal-close {
-  color: rgba(255,255,255,0.65);
-}
-
-/* 抽屉 */
-[data-theme='dark'] .ant-drawer-content {
-  background: #1a1a2e;
-}
-
-[data-theme='dark'] .ant-drawer-header {
-  background: #1a1a2e;
-  border-bottom-color: rgba(255,255,255,0.06);
-}
-
-[data-theme='dark'] .ant-drawer-title {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-drawer-close {
-  color: rgba(255,255,255,0.65);
-}
-
-[data-theme='dark'] .ant-drawer-body {
-  color: rgba(255,255,255,0.95);
-}
-
-/* 卡片 */
 [data-theme='dark'] .ant-card {
   background: #1a1a2e;
   border-color: rgba(255,255,255,0.08);
 }
 
-[data-theme='dark'] .ant-card-head {
-  color: rgba(255,255,255,0.95);
-  border-bottom-color: rgba(255,255,255,0.06);
-}
-
-[data-theme='dark'] .ant-card-body {
+[data-theme='dark'] .ant-typography {
   color: rgba(255,255,255,0.95);
 }
 
-/* 标签 */
 [data-theme='dark'] .ant-tag {
   background: rgba(108,92,231,0.12);
   border-color: rgba(108,92,231,0.2);
   color: #a78bfa;
 }
 
-/* 进度条 */
 [data-theme='dark'] .ant-progress-bg {
   background: #6C5CE7;
-}
-
-/* 警告提示 */
-[data-theme='dark'] .ant-alert {
-  background: rgba(108,92,231,0.08);
-  border-color: rgba(108,92,231,0.2);
-}
-
-[data-theme='dark'] .ant-alert-message {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-alert-description {
-  color: rgba(255,255,255,0.65);
-}
-
-/* 输入框 */
-[data-theme='dark'] .ant-input {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-input:focus,
-[data-theme='dark'] .ant-input-focused {
-  border-color: #6C5CE7;
-  box-shadow: 0 0 0 2px rgba(108,92,231,0.2);
-}
-
-[data-theme='dark'] .ant-input::placeholder {
-  color: rgba(255,255,255,0.3);
-}
-
-/* 骨架屏 */
-[data-theme='dark'] .ant-skeleton-content .ant-skeleton-title,
-[data-theme='dark'] .ant-skeleton-content .ant-skeleton-paragraph > li {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 37%, rgba(255,255,255,0.04) 63%);
-  background-size: 400% 100%;
-}
-
-/* Markdown 渲染器 */
-[data-theme='dark'] .markdown-body {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .markdown-body pre {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.08);
-}
-
-[data-theme='dark'] .markdown-body code {
-  background: rgba(255,255,255,0.06);
-  color: #a78bfa;
-}
-
-[data-theme='dark'] .markdown-body blockquote {
-  border-left-color: #6C5CE7;
-  color: rgba(255,255,255,0.65);
-}
-
-[data-theme='dark'] .markdown-body table th {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.08);
-}
-
-[data-theme='dark'] .markdown-body table td {
-  border-color: rgba(255,255,255,0.06);
-}
-
-/* 测验卡片 */
-[data-theme='dark'] .ant-radio-wrapper {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-radio-inner {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.2);
-}
-
-[data-theme='dark'] .ant-radio-checked .ant-radio-inner {
-  border-color: #6C5CE7;
-}
-
-[data-theme='dark'] .ant-radio-inner::after {
-  background: #6C5CE7;
-}
-
-/* 分页 */
-[data-theme='dark'] .ant-pagination-item {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.1);
-}
-
-[data-theme='dark'] .ant-pagination-item a {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-pagination-item-active {
-  background: #6C5CE7;
-  border-color: #6C5CE7;
-}
-
-[data-theme='dark'] .ant-pagination-item-active a {
-  color: #fff;
 }

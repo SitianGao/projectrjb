@@ -4,12 +4,12 @@ import {
   BookOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  DeleteOutlined,
   FireOutlined,
   PlusOutlined,
   RightOutlined,
-  SyncOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Col, Empty, Progress, Row, Space, Spin, Tag, Tooltip, Typography, message } from 'antd'
+import { Button, Card, Col, Empty, Modal, Progress, Row, Space, Spin, Tag, Tooltip, Typography, message } from 'antd'
 import { getLearningPath } from '../api/planner'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -48,7 +48,6 @@ function SectionTitle({ count, onRefresh }) {
       </div>
       <Space>
         <Tag color="purple" style={{ fontSize: 13, padding: '2px 12px' }}>{count} 个课程</Tag>
-        {onRefresh && <Button size="small" icon={<SyncOutlined />} onClick={onRefresh}>刷新</Button>}
       </Space>
     </div>
   )
@@ -225,18 +224,38 @@ export default function MyCourses() {
                       <Text><FireOutlined style={{ color: '#eb2f96' }} /> 第 {path?.current_stage || 1} 阶段</Text>
                     </Tooltip>
                   </div>
+
+                  {/* Delete button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                    <Tooltip title="删除课程">
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          Modal.confirm({
+                            title: '确认删除',
+                            content: `确定要删除课程「${course.title}」吗？此操作不可撤销。`,
+                            okText: '删除',
+                            cancelText: '取消',
+                            okButtonProps: { danger: true },
+                            onOk: () => {
+                              message.info('删除功能需要后端支持，暂未实现')
+                            },
+                          })
+                        }}
+                        style={{ color: '#ff4d4f' }}
+                      />
+                    </Tooltip>
+                  </div>
                 </Card>
               </Col>
             )
           })}
         </Row>
       )}
-
-      <div style={{ textAlign: 'center', marginTop: 24 }}>
-        <Button type="primary" icon={<PlusOutlined />} loading={creating} onClick={startNewCourse}>
-          新建课程
-        </Button>
-      </div>
     </div>
   )
 }

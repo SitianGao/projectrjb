@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom'
-import { Breadcrumb, Button, Space, Typography } from 'antd'
+import { Button, Space, Typography } from 'antd'
 import {
   ArrowLeftOutlined,
   BranchesOutlined,
-  HomeOutlined,
 } from '@ant-design/icons'
 import CourseProgress from './CourseProgress'
 
@@ -47,22 +46,8 @@ export default function CourseContextHeader({
       border: '1px solid #E5E7EB',
       flexWrap: 'wrap',
     }}>
-      {/* Left: breadcrumb + info */}
+      {/* Left: info */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 0 }}>
-        <Breadcrumb
-          items={[
-            { title: <><HomeOutlined style={{ marginRight: 2 }} />学习首页</>, onClick: () => navigate('/home') },
-            { title: courseLabel, onClick: () => courseId && navigate(`/course/${courseId}/path`) },
-            { title: stageLabel },
-          ]}
-          style={{ fontSize: 13, whiteSpace: 'nowrap' }}
-        />
-
-        <div style={{
-          width: 1, height: 20, background: '#E5E7EB',
-          flexShrink: 0,
-        }} />
-
         <div style={{ minWidth: 0 }}>
           <Text strong style={{ fontSize: 15, color: '#111827' }}>
             {courseName}
@@ -70,11 +55,6 @@ export default function CourseContextHeader({
           {stageTitle && (
             <Text style={{ fontSize: 13, color: '#6B7280', marginLeft: 10 }}>
               当前阶段：{stageLabel}，{stageTitle}
-            </Text>
-          )}
-          {stageDescription && (
-            <Text style={{ display: 'block', fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
-              {stageDescription}
             </Text>
           )}
         </div>

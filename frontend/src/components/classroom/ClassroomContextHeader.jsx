@@ -1,4 +1,4 @@
-import { Breadcrumb, Button, Card, Space, Tag, Typography } from 'antd'
+import { Button, Card, Space, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined, ExpandOutlined, SaveOutlined, AimOutlined } from '@ant-design/icons'
 
 const { Title, Text } = Typography
@@ -8,12 +8,6 @@ export default function ClassroomContextHeader({ classroom, currentIndex, onBack
   return (
     <Card className="classroom-header">
       <div className="classroom-header-top">
-        <Breadcrumb items={[
-          { title: '学习路径' },
-          { title: classroom?.generation_brief?.course_name || '人工智能与深度学习' },
-          { title: '阶段二' },
-          { title: '互动课堂' },
-        ]} />
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={onBack}>返回阶段详情</Button>
           <Button icon={<AimOutlined />}>查看学习目标</Button>

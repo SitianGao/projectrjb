@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   Typography, Card, Tag, Button, Space, Row, Col, Result, Empty,
-  Progress, message, Spin, Breadcrumb, Modal,
+  Progress, message, Spin, Modal,
 } from 'antd'
 import {
-  ArrowLeftOutlined, AimOutlined, TagsOutlined,
+  ArrowLeftOutlined,
   UnorderedListOutlined, BookOutlined, ClockCircleOutlined,
   TrophyOutlined, FlagFilled, ReloadOutlined, ThunderboltOutlined,
   PlayCircleFilled, LockFilled, CheckCircleFilled,
-  FileTextOutlined, RightOutlined, HomeOutlined, BranchesOutlined,
+  FileTextOutlined, RightOutlined, BranchesOutlined,
   ExperimentOutlined,
 } from '@ant-design/icons'
 import MarkdownRenderer from '../components/MarkdownRenderer'
@@ -119,9 +119,6 @@ export default function StageResourcePage() {
   const completed = tasks.filter((t) => t.status === 'completed').length
   const { percent } = safeProgress(completed, tasks.length)
   const days = computeStageDays(stage)
-  const objectives = normalizeStringList(stage?.objectives)
-  const topics = normalizeStringList(stage?.topics).slice(0, 5)
-  const extraTopics = Math.max(0, normalizeStringList(stage?.topics).length - 5)
 
   const pathUrl = courseId ? `/course/${courseId}/path` : '/journey'
   const classroomTask = tasks.find((task) => (
@@ -172,15 +169,6 @@ export default function StageResourcePage() {
     <div style={{ minHeight: '100%', background: 'var(--bg-page)', padding: '20px 24px 48px' }}>
       <div style={{ maxWidth: 1060, margin: '0 auto' }}>
 
-        {/* Breadcrumb */}
-        <Breadcrumb style={{ marginBottom: 16, fontSize: 13 }}
-          items={[
-            { title: <><HomeOutlined style={{ marginRight: 2 }} />学习首页</>, onClick: () => navigate('/home') },
-            { title: '学习路径', onClick: () => navigate(pathUrl) },
-            { title: currentCourse?.title || '课程', onClick: () => courseId && navigate(`/course/${courseId}`) },
-            { title: `阶段${stage.stage_id}` },
-          ]} />
-
         <Button type="text" icon={<ArrowLeftOutlined />}
           onClick={() => navigate(pathUrl)} style={{ marginBottom: 16, paddingLeft: 0 }}>
           返回学习路径
@@ -194,17 +182,12 @@ export default function StageResourcePage() {
               <Space size={8} style={{ marginBottom: 8 }}>
                 <FlagFilled style={{ color: statusCfg.color, fontSize: 18 }} />
                 <Title level={3} style={{ margin: 0, color: 'var(--text-primary)' }}>
-                  阶段{stage.stage_id}：{stage.title}
+                  {stage.title}
                 </Title>
                 <Tag color={status === 'current' ? 'purple' : status === 'completed' ? 'success' : 'default'} style={{ borderRadius: 6 }}>
                   {statusCfg.label}
                 </Tag>
               </Space>
-              {stage.description && (
-                <Paragraph style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  {stage.description}
-                </Paragraph>
-              )}
             </div>
             <Space size={24}>
               <div style={{ textAlign: 'center' }}><Text type="secondary" style={{ fontSize: 11, display: 'block' }}>任务进度</Text>
@@ -213,31 +196,6 @@ export default function StageResourcePage() {
                 <Text strong style={{ fontSize: 18, color: '#6C5CE7' }}>{stageResources.length}</Text></div>
               <Progress type="circle" percent={percent} size={52} strokeColor="#6C5CE7" />
             </Space>
-          </div>
-
-          {/* Objectives + Topics */}
-          <div style={{ marginTop: 16 }}>
-            {objectives.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <Text strong style={{ fontSize: 13, color: 'var(--text-primary)', display: 'block', marginBottom: 6 }}>
-                  <AimOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />学习目标
-                </Text>
-                <Paragraph style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                  {objectives.join('；')}
-                </Paragraph>
-              </div>
-            )}
-            {topics.length > 0 && (
-              <div>
-                <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
-                  <TagsOutlined style={{ color: '#6C5CE7', marginRight: 6 }} />核心知识点
-                </Text>
-                <Space size={4} wrap>
-                  {topics.map((t) => <Tag key={t} color="purple" style={{ borderRadius: 6 }}>{t}</Tag>)}
-                  {extraTopics > 0 && <Tag style={{ borderRadius: 6 }}>+{extraTopics}</Tag>}
-                </Space>
-              </div>
-            )}
           </div>
 
           {/* Stats row */}
