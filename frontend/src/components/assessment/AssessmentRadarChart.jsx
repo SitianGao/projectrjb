@@ -35,7 +35,7 @@ export default function AssessmentRadarChart({ knowledgeMastery, loading }) {
   return (
     <Card
       className="assessment-card"
-      title={<span className="assessment-card-title">知识点掌握雷达图</span>}
+      title={<span className="assessment-card-title">六维能力图</span>}
     >
       {hasData ? (
         <>

@@ -1658,14 +1658,27 @@ class EvaluateService:
         # 纠错能力：错题订正率（已掌握错题 / 总错题）
         wrong_total = len(wrong_questions)
         wrong_mastered = len([w for w in wrong_questions if w.status == "mastered"])
-        error_correction = _clamp(round(wrong_mastered / wrong_total * 100)) if wrong_total else 0
+        wrong_reviewing = len([w for w in wrong_questions if w.status == "reviewing"])
+        # mastered全分，reviewing半分
+        error_correction = _clamp(round((wrong_mastered + wrong_reviewing * 0.5) / wrong_total * 100)) if wrong_total else 0
 
-        # 实践能力：基于代码类资源完成数和答题记录综合计算
-        code_records = [r for r in complete_records if r.resource_id and "code" in (r.action or "").lower()]
-        code_answer_records = [r for r in answer_records if r.resource_id]
-        code_count = len(code_records) + len([r for r in records if r.action == "experiment"])
-        practice_raw = _average_score(code_answer_records) if code_answer_records else 0
-        practice_bonus = min(code_count * 5, 30)
+        # 实践能力：基于代码/练习类资源完成数和答题记录综合计算
+        all_resource_ids = list({r.resource_id for r in records if r.resource_id})
+        resource_type_map = {}
+        if all_resource_ids:
+            resources = db.query(Resource).filter(Resource.id.in_(all_resource_ids)).all()
+            resource_type_map = {res.id: res.type for res in resources}
+
+        practice_resource_ids = {rid for rid, rtype in resource_type_map.items() if rtype in ("code", "exercise")}
+        practice_records = [r for r in records if r.resource_id in practice_resource_ids and r.action in ("view", "complete")]
+        practice_answer_records = [r for r in answer_records if r.resource_id in practice_resource_ids or not r.resource_id]
+        practice_count = len(practice_records) + len([r for r in records if r.action == "experiment"])
+        # 如果没有明确的实践资源记录，用所有答题记录作为备选
+        if practice_count == 0 and answer_records:
+            practice_count = len(answer_records)
+            practice_answer_records = answer_records
+        practice_raw = _average_score(practice_answer_records) if practice_answer_records else 0
+        practice_bonus = min(practice_count * 5, 30)
         practice_ability = _clamp(round(practice_raw * 0.7 + practice_bonus))
 
         overall = _weighted_overall(
@@ -1687,8 +1700,8 @@ class EvaluateService:
             _dimension("test_accuracy", "测评正确率", test_accuracy, None, f"基于 {questions_answered} 次作答记录计算。"),
             _dimension("task_completion", "任务完成度", task_completion, None, f"已完成 {completed_count} / {total_tasks} 个唯一学习任务。"),
             _dimension("learning_consistency", "学习连续性", learning_consistency, None, f"连续学习 {streak_days} 天，学习时长不直接等同掌握程度。"),
-            _dimension("error_correction", "纠错能力", error_correction, None, f"错题本中 {wrong_mastered}/{wrong_total} 题已掌握。"),
-            _dimension("practice_ability", "实践能力", practice_ability, None, f"基于 {code_count} 次代码实践和答题表现综合计算。"),
+            _dimension("error_correction", "纠错能力", error_correction, None, f"错题本中 {wrong_mastered} 题已掌握，{wrong_reviewing} 题复习中。"),
+            _dimension("practice_ability", "实践能力", practice_ability, None, f"基于 {practice_count} 次实践和答题表现综合计算。"),
         ]
         strengths, weaknesses = _split_knowledge_diagnosis(
             knowledge_scores,

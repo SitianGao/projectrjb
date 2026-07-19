@@ -51,7 +51,7 @@ const ITEMS = [
 
 function TrendTag({ value, suffix, positive }) {
   if (value === 0 || value === undefined || value === null) {
-    return <span className="summary-card-trend neutral">持平</span>
+    return null
   }
   const isUp = value > 0
   const cls = positive === 'down'
