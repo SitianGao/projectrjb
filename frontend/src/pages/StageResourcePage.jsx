@@ -409,9 +409,96 @@ export default function StageResourcePage() {
 }
 
 function ResourceContent({ resource }) {
+  const navigate = useNavigate()
   if (resource.type === 'document') return <DocumentResourceViewer resource={resource} />
   if (resource.type === 'exercise') return <ExerciseResourceViewer resource={resource} />
   if (resource.type === 'mindmap') return <MindmapResourceViewer resource={resource} />
+
+  // 代码实验资源
+  if (resource.type === 'code') {
+    const content = typeof resource.content === 'string'
+      ? (() => { try { return JSON.parse(resource.content) } catch { return resource.content } })()
+      : (resource.content || {})
+    const isExperiment = !!content.experiment_mode
+    const code = content.starter_code || content.code || content.snippet || ''
+
+    const handleOpenExperiment = () => {
+      localStorage.setItem('current_experiment', JSON.stringify({
+        ...content,
+        title: resource.title || content.title,
+      }))
+      navigate(`/code-experiment/${resource.id}`)
+    }
+
+    return (
+      <Card
+        title={
+          <Space>
+            {isExperiment ? '交互式代码实验' : '代码案例'}
+            {isExperiment && (
+              <Tag color="blue">
+                {({ code_guide: '📖 代码导读', param_experiment: '🔬 参数实验', code_completion: '✏️ 代码补全', error_diagnosis: '🐛 错误诊断', mini_project: '🚀 小型项目' })[content.experiment_mode] || content.experiment_mode}
+              </Tag>
+            )}
+          </Space>
+        }
+        style={{ borderRadius: 14 }}
+        extra={isExperiment && (
+          <Button type="primary" onClick={handleOpenExperiment}>🚀 进入实验</Button>
+        )}
+      >
+        {isExperiment && content.scenario && (
+          <Paragraph style={{ color: '#374151', marginBottom: 12 }}>{content.scenario}</Paragraph>
+        )}
+        {isExperiment && (
+          <Space size={8} wrap style={{ marginBottom: 12 }}>
+            <Tag>难度：{content.difficulty || '中级'}</Tag>
+            <Tag>预计 {content.estimated_minutes || 30} 分钟</Tag>
+            {content.steps?.length > 0 && <Tag>{content.steps.length} 个步骤</Tag>}
+            {content.editable_parameters?.length > 0 && <Tag>{content.editable_parameters.length} 个可调参数</Tag>}
+          </Space>
+        )}
+        {isExperiment && content.learning_objectives?.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Text strong style={{ fontSize: 13 }}>学习目标：</Text>
+            <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+              {content.learning_objectives.map((obj, i) => (
+                <li key={i} style={{ fontSize: 13, color: '#555' }}>{obj}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {!isExperiment && content.explanation && (
+          <Paragraph style={{ color: '#374151', marginBottom: 16 }}>{content.explanation}</Paragraph>
+        )}
+        {code ? (
+          <pre style={{
+            background: '#1E1E2E', color: '#CDD6F4', padding: 20,
+            borderRadius: 12, overflow: 'auto', fontSize: 13, lineHeight: 1.6,
+            maxHeight: isExperiment ? 300 : undefined,
+          }}>
+            <code>{code}</code>
+          </pre>
+        ) : (
+          <Empty description="暂无代码内容" />
+        )}
+        {isExperiment && content.steps?.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>实验步骤：</Text>
+            <ol style={{ margin: 0, paddingLeft: 20 }}>
+              {content.steps.map((step, i) => (
+                <li key={i} style={{ fontSize: 13, color: '#555', marginBottom: 4 }}>
+                  <Text strong>{step.title}</Text>
+                  {step.instruction && <Text type="secondary"> — {step.instruction.slice(0, 50)}...</Text>}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+      </Card>
+    )
+  }
+
   const content = typeof resource.content === 'string'
     ? resource.content
     : JSON.stringify(resource.content || {}, null, 2)

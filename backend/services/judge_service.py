@@ -619,32 +619,31 @@ class ExperimentRunner:
             code_file = work_dir / "experiment.py"
             code_file.write_text(code, encoding="utf-8")
 
-            try:
-                proc = subprocess.run(
-                    ["python3", str(code_file)],
-                    capture_output=True, text=True,
-                    timeout=time_limit_sec + 2,
-                    cwd=str(work_dir),
-                )
-            except FileNotFoundError:
-                # Windows 可能没有 python3，尝试 python
+            proc = None
+            for interp in ["python3", "python"]:
                 try:
                     proc = subprocess.run(
-                        ["python", str(code_file)],
+                        [interp, str(code_file)],
                         capture_output=True, text=True,
                         timeout=time_limit_sec + 2,
                         cwd=str(work_dir),
                     )
+                    if proc.returncode != 9009:
+                        break
+                    proc = None  # 9009 = 命令不存在，继续尝试下一个
                 except FileNotFoundError:
+                    proc = None
+                    continue
+                except subprocess.TimeoutExpired:
                     return ExperimentResult(
-                        status="runtime_error",
-                        stderr="Python 解释器未找到",
+                        status="timeout",
+                        stderr=f"代码执行超时（{time_limit_sec}秒）",
+                        execution_time_ms=time_limit_sec * 1000,
                     )
-            except subprocess.TimeoutExpired:
+            if proc is None:
                 return ExperimentResult(
-                    status="timeout",
-                    stderr=f"代码执行超时（{time_limit_sec}秒）",
-                    execution_time_ms=time_limit_sec * 1000,
+                    status="runtime_error",
+                    stderr="Python 解释器未找到",
                 )
 
             elapsed = (_time.time() - start) * 1000

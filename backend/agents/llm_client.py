@@ -74,9 +74,12 @@ class LLMClient:
     ) -> str:
         """非流式对话——收集所有 chunk 后返回完整文本。"""
         chunks: list[str] = []
-        async for chunk in self.chat_stream(system=system, user=user, model=model):
+        async for chunk in self.chat_stream(system=system, user=user, model=model, temperature=temperature):
             chunks.append(chunk)
-        return "".join(chunks)
+        result = "".join(chunks)
+        if not result.strip():
+            logger.warning("[LLMClient] chat 返回空内容 (temperature=%.2f)", temperature)
+        return result
 
     async def chat_json(
         self,
@@ -100,6 +103,7 @@ class LLMClient:
         system: str,
         user: str,
         model: Optional[str] = None,
+        temperature: float = 0.3,
         response_format: Optional[dict[str, str]] = None,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[str]:
@@ -116,7 +120,7 @@ class LLMClient:
 
         try:
             if self.primary == "deepseek":
-                async for chunk in self._call_deepseek(system, user):
+                async for chunk in self._call_deepseek(system, user, temperature=temperature):
                     yield chunk
                 provider = "deepseek"
             else:
@@ -126,6 +130,7 @@ class LLMClient:
                     try:
                         async for chunk in self._call_spark(
                             system, user, model,
+                            temperature=temperature,
                             response_format=response_format,
                             response_schema=response_schema,
                         ):
@@ -145,7 +150,7 @@ class LLMClient:
                         raise RuntimeError(f"严格模式：讯飞星火调用失败（已重试{self.max_retries}次），拒绝切换备用模型") from last_error
                     logger.warning("[LLMClient] Spark 全部重试失败，切换至 DeepSeek")
                     try:
-                        async for chunk in self._call_deepseek(system, user):
+                        async for chunk in self._call_deepseek(system, user, temperature=temperature):
                             yield chunk
                         provider = "deepseek"
                         return
@@ -169,6 +174,7 @@ class LLMClient:
         system: str,
         user: str,
         model: Optional[str] = None,
+        temperature: float = 0.3,
         response_format: Optional[dict[str, str]] = None,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[str]:
@@ -206,6 +212,9 @@ class LLMClient:
             })
         elif response_format is not None:
             payload["response_format"] = response_format
+        else:
+            # 流式模式使用传入的 temperature
+            payload["temperature"] = temperature
 
         async with httpx.AsyncClient(timeout=self._timeout()) as client:
             if response_format is not None or response_schema is not None:
@@ -254,6 +263,7 @@ class LLMClient:
                 yield content
                 return
 
+            chunk_count = 0
             async with client.stream(
                 "POST", api_url,
                 headers={
@@ -266,6 +276,7 @@ class LLMClient:
                         {"role": "system", "content": system},
                         {"role": "user", "content": user},
                     ],
+                    "temperature": temperature,
                     "stream": True,
                 },
             ) as response:
@@ -279,17 +290,21 @@ class LLMClient:
                             chunk = json.loads(data)
                             content = chunk["choices"][0]["delta"].get("content", "")
                             if content:
+                                chunk_count += 1
                                 yield content
                         except (json.JSONDecodeError, KeyError):
                             continue
+            if chunk_count == 0:
+                logger.warning("[LLMClient] Spark 流式响应未返回任何内容块")
 
     # ── DeepSeek ──────────────────────────────────────────────
 
-    async def _call_deepseek(self, system: str, user: str) -> AsyncIterator[str]:
+    async def _call_deepseek(self, system: str, user: str, temperature: float = 0.3) -> AsyncIterator[str]:
         api_key = os.getenv("DEEPSEEK_API_KEY", "")
         if not api_key:
             raise RuntimeError("DeepSeek API 未配置：缺少 DEEPSEEK_API_KEY，请检查 .env 文件")
 
+        chunk_count = 0
         async with httpx.AsyncClient(timeout=self._timeout()) as client:
             async with client.stream(
                 "POST",
@@ -304,6 +319,7 @@ class LLMClient:
                         {"role": "system", "content": system},
                         {"role": "user", "content": user},
                     ],
+                    "temperature": temperature,
                     "stream": True,
                 },
             ) as response:
@@ -317,9 +333,12 @@ class LLMClient:
                             chunk = json.loads(data)
                             content = chunk["choices"][0]["delta"].get("content", "")
                             if content:
+                                chunk_count += 1
                                 yield content
                         except (json.JSONDecodeError, KeyError):
                             continue
+        if chunk_count == 0:
+            logger.warning("[LLMClient] DeepSeek 流式响应未返回任何内容块")
 
     # ── 内部方法 ──────────────────────────────────────────────
 

@@ -17,13 +17,13 @@ const { Text } = Typography
  * @param {boolean} props.loading - 加载中
  */
 export default function MindMapViewer({ content = '', options = {}, loading = false }) {
-  const containerRef = useRef(null)
+  const svgRef = useRef(null)
   const markmapRef = useRef(null)
   const [error, setError] = useState(null)
   const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
-    if (!content || !containerRef.current) return
+    if (!content || !svgRef.current) return
 
     setError(null)
 
@@ -35,8 +35,9 @@ export default function MindMapViewer({ content = '', options = {}, loading = fa
         if (markmapRef.current) {
           markmapRef.current.setData(root)
         } else {
+          // Markmap.create 需要 SVG 元素，不是 div
           markmapRef.current = Markmap.create(
-            containerRef.current,
+            svgRef.current,
             {
               autoFit: true,
               duration: 500,
@@ -46,7 +47,7 @@ export default function MindMapViewer({ content = '', options = {}, loading = fa
           )
         }
       } catch (err) {
-        console.error('MindMap rendering error:', err)
+        console.error('[MindMapViewer] rendering error:', err)
         setError(err.message || '思维导图渲染失败')
       }
     })()
@@ -87,9 +88,13 @@ export default function MindMapViewer({ content = '', options = {}, loading = fa
   }
 
   return (
-    <div
-      ref={containerRef}
-      style={{ width: '100%', minHeight: 400, height: '60vh' }}
-    />
+    <div style={{ width: '100%', minHeight: 400, height: '60vh', position: 'relative' }}>
+      <svg
+        ref={svgRef}
+        width="100%"
+        height="100%"
+        style={{ position: 'absolute', top: 0, left: 0 }}
+      />
+    </div>
   )
 }

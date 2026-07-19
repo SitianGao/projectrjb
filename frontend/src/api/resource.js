@@ -91,6 +91,6 @@ export async function generateTaskResource(courseId, taskId, data = {}) {
   return client.post(
     `/resources/courses/${encodeURIComponent(courseId)}/tasks/${encodeURIComponent(taskId)}`,
     data,
-    { timeout: 120000 }, // 2 分钟，LLM 生成需要较长时间
+    { timeout: 300000 }, // 5 分钟，LLM 生成需要较长时间
   )
 }
