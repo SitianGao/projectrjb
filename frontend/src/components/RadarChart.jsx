@@ -10,7 +10,7 @@ export const DIMENSIONS = [
   { key: 'goalClarity', label: '目标明确',   icon: '🏆', color: '#eb2f96', description: '学习目标的清晰与规划程度' },
 ]
 
-const RADAR_CENTER = 160
+const RADAR_CENTER = 200
 const RADAR_RADIUS = 100
 const RADAR_LEVELS = 4
 
@@ -138,7 +138,7 @@ export default function RadarChart({ dimensions = {}, dimensionDefs, animated = 
       {/* 标签 */}
       {angles.map((a, i) => {
         const dim = dims[i]
-        const labelR = RADAR_RADIUS + 28
+        const labelR = RADAR_RADIUS + 40
         const lx = RADAR_CENTER + labelR * Math.cos(a)
         const ly = RADAR_CENTER + labelR * Math.sin(a)
         const textAnchor = lx < RADAR_CENTER - 20 ? 'end' : lx > RADAR_CENTER + 20 ? 'start' : 'middle'

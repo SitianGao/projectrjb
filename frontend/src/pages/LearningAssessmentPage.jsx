@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Result, Select, Skeleton, Typography, message } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 import { SCOPE_OPTIONS } from '../services/evaluationService'
 import { fetchAssessmentDashboard } from '../services/assessmentMockData'
@@ -11,7 +10,6 @@ import AssessmentDiagnosisPanel from '../components/assessment/AssessmentDiagnos
 import AssessmentTrendChart from '../components/assessment/AssessmentTrendChart'
 import AssessmentErrorChart from '../components/assessment/AssessmentErrorChart'
 import AssessmentWeakPoints from '../components/assessment/AssessmentWeakPoints'
-import AssessmentImprovementPlan from '../components/assessment/AssessmentImprovementPlan'
 import './LearningAssessmentPage.css'
 
 const { Title, Text } = Typography
@@ -44,6 +42,8 @@ export default function LearningAssessmentPage() {
         scope,
         studentId: course?.student_id || studentId,
       })
+      console.log(6666666,result);
+      
       setData(result)
     } catch (err) {
       setError(err.message || '加载失败')
@@ -104,7 +104,6 @@ export default function LearningAssessmentPage() {
           <div className="assessment-header-top">
             <div className="assessment-header-info">
               <Title level={2}>学习评估</Title>
-              <Text>基于近期学习行为、练习与测评结果生成的个性化学习诊断</Text>
             </div>
             <div className="assessment-filters">
               <Select
@@ -120,13 +119,6 @@ export default function LearningAssessmentPage() {
                 style={{ width: 150 }}
                 options={SCOPE_OPTIONS}
               />
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={loadData}
-                loading={loading}
-              >
-                刷新
-              </Button>
             </div>
           </div>
         </div>
@@ -158,11 +150,6 @@ export default function LearningAssessmentPage() {
             onPractice={handlePractice}
             onTutor={handleTutor}
           />
-        </div>
-
-        {/* 第五行：强化计划 */}
-        <div className="assessment-plan-section">
-          <AssessmentImprovementPlan improvementPlan={data?.improvement_plan} loading={loading} />
         </div>
       </div>
     </div>

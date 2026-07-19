@@ -1,9 +1,11 @@
 /**
- * 学习评估仪表盘 — Mock 数据适配层
+ * 学习评估仪表盘 —— 数据接入层
  *
- * 后续接入真实 EvaluateAgent 时，只需将 fetchAssessmentDashboard()
- * 内的实现替换为 API 调用即可，组件层无需改动。
+ * 真实接口：GET /api/evaluate/assessment-dashboard
+ * 当接口失败时回退到 MOCK_DATA，保证页面可用（便于离线/后端异常时调试）。
  */
+
+import client from '../api/client'
 
 const MOCK_DATA = {
   overview: {
@@ -117,21 +119,27 @@ const MOCK_DATA = {
   ],
 }
 
-// 模拟网络延迟
-function delay(ms = 600) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 /**
  * 获取学习评估仪表盘数据
- * @param {object} params - { courseId, stageId, scope }
+ * @param {object} params - { courseId, scope, studentId }
  * @returns {Promise<object>}
  */
 export async function fetchAssessmentDashboard(params = {}) {
-  // TODO: 后续替换为真实 API 调用
-  // return client.get('/evaluate/dashboard', { params })
-  await delay()
-  return { ...MOCK_DATA }
+  const { courseId, scope, studentId } = params
+  try {
+    return await client.get('/evaluate/assessment-dashboard', {
+      params: {
+        student_id: studentId,
+        course_id: courseId,
+        scope,
+      },
+    })
+  } catch (err) {
+    // 后端异常时回退到 Mock 数据，保证页面可渲染
+    // eslint-disable-next-line no-console
+    console.warn('[assessment] 接口失败，回退到 Mock 数据：', err?.message || err)
+    return { ...MOCK_DATA }
+  }
 }
 
 export default MOCK_DATA
