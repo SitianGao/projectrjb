@@ -15,6 +15,7 @@ import {
   CheckCircleOutlined,
   FileTextOutlined,
   RobotOutlined,
+  RocketOutlined,
 } from '@ant-design/icons'
 import LoadingSkeleton from './components/LoadingSkeleton'
 import NotificationCenter from './components/NotificationCenter'
@@ -66,6 +67,7 @@ function AuthLayout() {
     { label: 'AI 学习助手', path: activeCourse?.id ? `/course/${activeCourse.id}/ai-workspace` : '/ai-workspace', match: (p) => p.includes('/ai-workspace') || p.includes('/chat'), icon: <RobotOutlined /> },
     { label: '学习评估', path: '/assessment/dashboard', match: (p) => p.startsWith('/assessment') || p.includes('/assessment') || p.includes('/test') || p === '/evaluate', icon: <CheckCircleOutlined /> },
     { label: '我的学习资料', path: '/resources', match: (p) => p === '/resources' || p.startsWith('/resources?') || p.startsWith('/resources/'), icon: <FileTextOutlined /> },
+    { label: '产品主页', path: '/landing', match: (p) => p === '/landing', icon: <RocketOutlined /> },
   ]
 
   // 用户下拉菜单项
@@ -219,7 +221,6 @@ function AuthLayout() {
             <Route path="/course/:courseId/test" element={<CourseScopedRoute><EvaluatePage /></CourseScopedRoute>} />
             <Route path="/course/:courseId/assessment/report" element={<CourseScopedRoute><EvaluatePage /></CourseScopedRoute>} />
             <Route path="/course/:courseId/wrongbook" element={<CourseScopedRoute><WrongBookPage /></CourseScopedRoute>} />
-            <Route path="/landing" element={<LandingPage />} />
 
             <Route path="/docs" element={<DocsPage />} />
             <Route path="/assessment/dashboard" element={<LearningAssessmentPage />} />
@@ -284,6 +285,13 @@ export default function App() {
       <Route path="/register" element={
         <Suspense fallback={<LoadingSkeleton type="detail" />}>
           <RegisterPage />
+        </Suspense>
+      } />
+
+      {/* 产品主页 — 公开访问，不需要登录 */}
+      <Route path="/landing" element={
+        <Suspense fallback={<LoadingSkeleton type="detail" />}>
+          <LandingPage />
         </Suspense>
       } />
 
