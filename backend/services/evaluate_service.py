@@ -1686,6 +1686,8 @@ class EvaluateService:
             test_accuracy,
             task_completion,
             learning_consistency,
+            error_correction,
+            practice_ability,
         )
         previous_scores = self._previous_report_scores(db, student_id)
         trend = _build_trend(previous_scores + [overall])
@@ -2467,12 +2469,16 @@ def _weighted_overall(
     test_accuracy: int,
     task_completion: int,
     learning_consistency: int,
+    error_correction: int = 0,
+    practice_ability: int = 0,
 ) -> int:
     return _clamp(round(
-        _clamp(knowledge_mastery) * 0.4
-        + _clamp(test_accuracy) * 0.25
-        + _clamp(task_completion) * 0.2
-        + _clamp(learning_consistency) * 0.15
+        _clamp(knowledge_mastery) * 0.30
+        + _clamp(test_accuracy) * 0.20
+        + _clamp(task_completion) * 0.15
+        + _clamp(learning_consistency) * 0.10
+        + _clamp(error_correction) * 0.15
+        + _clamp(practice_ability) * 0.10
     ))
 
 

@@ -514,6 +514,8 @@ class EvalDimensions(BaseModel):
     test_accuracy: Optional[int] = Field(default=None, ge=0, le=100)
     task_completion: Optional[int] = Field(default=None, ge=0, le=100)
     learning_consistency: Optional[int] = Field(default=None, ge=0, le=100)
+    error_correction: Optional[int] = Field(default=None, ge=0, le=100)
+    practice_ability: Optional[int] = Field(default=None, ge=0, le=100)
 
 
 class WeaknessDetail(BaseModel):

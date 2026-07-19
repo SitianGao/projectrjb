@@ -10,6 +10,8 @@ export default function EvaluationDimensionCards({ dimensions = [] }) {
           test_accuracy: '测评正确率',
           task_completion: '任务完成度',
           learning_consistency: '学习连续性',
+          error_correction: '纠错能力',
+          practice_ability: '实践能力',
         }[key] || key,
         score: value,
         comment: '基于当前课程范围内的有效学习数据计算。',
