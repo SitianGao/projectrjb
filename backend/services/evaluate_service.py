@@ -1267,38 +1267,89 @@ class EvaluateService:
             current_completion=task_completion,
         )
 
-        # 5. 知识点掌握度列表（雷达图）
+        # 5. 知识点掌握度列表（雷达图）— 使用6个维度
         knowledge_mastery_list = [
-            {
-                "name": item.get("topic") or "综合",
-                "mastery": _clamp(item.get("score", 0)),
-            }
-            for item in topic_scores
+            {"name": "知识掌握度", "mastery": _clamp(knowledge_mastery_score)},
+            {"name": "测评正确率", "mastery": _clamp(dimensions_block.get("test_accuracy", 0))},
+            {"name": "任务完成度", "mastery": _clamp(task_completion)},
+            {"name": "学习连续性", "mastery": _clamp(dimensions_block.get("learning_consistency", 0))},
+            {"name": "纠错能力", "mastery": _clamp(dimensions_block.get("error_correction", 0))},
+            {"name": "实践能力", "mastery": _clamp(dimensions_block.get("practice_ability", 0))},
         ]
 
-        # 6. 诊断信息（优势 / 薄弱）
+        # 6. 诊断信息（优势 / 薄弱）— 基于6个维度
+        all_dims = [
+            {"name": "知识掌握度", "score": _clamp(knowledge_mastery_score)},
+            {"name": "测评正确率", "score": _clamp(dimensions_block.get("test_accuracy", 0))},
+            {"name": "任务完成度", "score": _clamp(task_completion)},
+            {"name": "学习连续性", "score": _clamp(dimensions_block.get("learning_consistency", 0))},
+            {"name": "纠错能力", "score": _clamp(dimensions_block.get("error_correction", 0))},
+            {"name": "实践能力", "score": _clamp(dimensions_block.get("practice_ability", 0))},
+        ]
         diagnosis = {
             "strengths": [
-                {
-                    "name": s.get("name", ""),
-                    "mastery": _clamp(s.get("score", 0)),
-                }
-                for s in strengths
+                {"name": d["name"], "mastery": d["score"]}
+                for d in all_dims if d["score"] >= 70
             ],
             "weaknesses": [
-                {
-                    "name": w.get("name", ""),
-                    "mastery": _clamp(w.get("score", 0)),
-                    "reason": w.get("reason", ""),
-                }
-                for w in weaknesses
+                {"name": d["name"], "mastery": d["score"], "reason": ""}
+                for d in all_dims if d["score"] < 60
             ],
         }
 
-        # 7. 薄弱知识点详细卡片
-        weak_points = self._build_weak_points(
-            db, resolved_student_id, weaknesses
-        )
+        # 7. 薄弱维度详细卡片（基于6维雷达图）
+        data_summary = structured.get("data_summary") or {}
+        ds_questions = data_summary.get("questions_answered", 0)
+        ds_tasks_total = data_summary.get("total_tasks", 0)
+        ds_tasks_done = data_summary.get("unique_tasks_completed", 0)
+        ds_streak = report.get("streak_days") or 0
+
+        dim_scores = {
+            "知识掌握度": _clamp(knowledge_mastery_score),
+            "测评正确率": _clamp(dimensions_block.get("test_accuracy", 0)),
+            "任务完成度": _clamp(task_completion),
+            "学习连续性": _clamp(dimensions_block.get("learning_consistency", 0)),
+            "纠错能力": _clamp(dimensions_block.get("error_correction", 0)),
+            "实践能力": _clamp(dimensions_block.get("practice_ability", 0)),
+        }
+        dim_evidence = {
+            "知识掌握度": [f"当前课程知识点平均掌握度 {knowledge_mastery_score}%", f"共 {len(topic_scores)} 个知识点参与评估"],
+            "测评正确率": [f"基于 {ds_questions} 次作答记录", f"测评正确率 {dim_scores['测评正确率']}%"],
+            "任务完成度": [f"已完成 {ds_tasks_done} / {ds_tasks_total} 个学习任务", f"任务完成率 {task_completion}%"],
+            "学习连续性": [f"连续学习 {ds_streak} 天", f"学习连续性得分 {dim_scores['学习连续性']}%"],
+            "纠错能力": [f"错题本中 {len(wrong_questions)} 道题", f"纠错能力得分 {dim_scores['纠错能力']}%"],
+            "实践能力": [f"代码实践得分 {dim_scores['实践能力']}%", "基于作答表现和代码练习综合评估"],
+        }
+        dim_reasons = {
+            "知识掌握度": "部分知识点掌握不牢固，需要加强复习",
+            "测评正确率": "作答正确率偏低，需注意审题和知识点理解",
+            "任务完成度": "学习任务完成率不足，建议加快学习节奏",
+            "学习连续性": "学习连续性不够，建议保持每日学习习惯",
+            "纠错能力": "错题订正率偏低，建议及时复习错题本",
+            "实践能力": "代码实践次数不足，建议多动手练习",
+        }
+        dim_suggestions = {
+            "知识掌握度": ["回顾薄弱知识点讲义", "完成知识点专项练习", "向AI导师请教不理解的部分"],
+            "测评正确率": ["重新做错题", "复习相关知识点", "进行模拟测评"],
+            "任务完成度": ["查看未完成任务列表", "制定每日学习计划", "优先完成当前阶段任务"],
+            "学习连续性": ["设置每日学习提醒", "每天至少完成一个小任务", "保持学习打卡习惯"],
+            "纠错能力": ["定期复习错题本", "对错题进行归类总结", "完成错题专项练习"],
+            "实践能力": ["完成代码实验", "动手实现课堂示例", "尝试修改参数观察结果"],
+        }
+        weak_points = []
+        for name, score in dim_scores.items():
+            if score < 70:
+                weak_points.append({
+                    "knowledge_point_id": f"dim_{name}",
+                    "name": name,
+                    "mastery": score,
+                    "evidence": dim_evidence.get(name, []),
+                    "reason": dim_reasons.get(name, ""),
+                    "suggestions": dim_suggestions.get(name, []),
+                    "actions": {"review_resource_id": None, "exercise_task_id": None},
+                })
+        # 按分数从低到高排序
+        weak_points.sort(key=lambda x: x["mastery"])
 
         # 8. 个性化强化计划（由 review_plan 转换）
         improvement_plan = self._build_improvement_plan(review_plan)
@@ -1311,7 +1362,7 @@ class EvaluateService:
             "completion_change": 0,
             "latest_score": _clamp(overall_score),
             "score_change": _clamp(score_delta),
-            "weak_knowledge_count": len(weaknesses),
+            "weak_knowledge_count": len(weak_points),
             "weak_change": 0,
         }
 
@@ -1370,6 +1421,13 @@ class EvaluateService:
             "mastery": _clamp(current_mastery),
             "completion": _clamp(current_completion),
         })
+        # 保证至少3个数据点（不足时用当前值向前填充）
+        while len(points) < 3:
+            points.insert(0, {
+                "score": _clamp(current_score),
+                "mastery": _clamp(current_mastery),
+                "completion": _clamp(current_completion),
+            })
         # 控制最多 8 个点
         if len(points) > 8:
             points = points[-8:]
@@ -1597,6 +1655,19 @@ class EvaluateService:
         streak_days = _compute_streak_days(records)
         learning_consistency = _clamp(min(streak_days, 7) / 7 * 100)
 
+        # 纠错能力：错题订正率（已掌握错题 / 总错题）
+        wrong_total = len(wrong_questions)
+        wrong_mastered = len([w for w in wrong_questions if w.status == "mastered"])
+        error_correction = _clamp(round(wrong_mastered / wrong_total * 100)) if wrong_total else 0
+
+        # 实践能力：基于代码类资源完成数和答题记录综合计算
+        code_records = [r for r in complete_records if r.resource_id and "code" in (r.action or "").lower()]
+        code_answer_records = [r for r in answer_records if r.resource_id]
+        code_count = len(code_records) + len([r for r in records if r.action == "experiment"])
+        practice_raw = _average_score(code_answer_records) if code_answer_records else 0
+        practice_bonus = min(code_count * 5, 30)
+        practice_ability = _clamp(round(practice_raw * 0.7 + practice_bonus))
+
         overall = _weighted_overall(
             knowledge_mastery,
             test_accuracy,
@@ -1616,6 +1687,8 @@ class EvaluateService:
             _dimension("test_accuracy", "测评正确率", test_accuracy, None, f"基于 {questions_answered} 次作答记录计算。"),
             _dimension("task_completion", "任务完成度", task_completion, None, f"已完成 {completed_count} / {total_tasks} 个唯一学习任务。"),
             _dimension("learning_consistency", "学习连续性", learning_consistency, None, f"连续学习 {streak_days} 天，学习时长不直接等同掌握程度。"),
+            _dimension("error_correction", "纠错能力", error_correction, None, f"错题本中 {wrong_mastered}/{wrong_total} 题已掌握。"),
+            _dimension("practice_ability", "实践能力", practice_ability, None, f"基于 {code_count} 次代码实践和答题表现综合计算。"),
         ]
         strengths, weaknesses = _split_knowledge_diagnosis(
             knowledge_scores,
@@ -1675,6 +1748,8 @@ class EvaluateService:
                 "test_accuracy": test_accuracy,
                 "task_completion": task_completion,
                 "learning_consistency": learning_consistency,
+                "error_correction": error_correction,
+                "practice_ability": practice_ability,
             },
             "dimension_cards": dimensions,
             "strengths": strengths,

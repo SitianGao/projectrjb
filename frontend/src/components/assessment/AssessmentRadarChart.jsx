@@ -43,7 +43,7 @@ export default function AssessmentRadarChart({ knowledgeMastery, loading }) {
             dimensions={values}
             dimensionDefs={dimensions}
             animated
-            size={320}
+            size={400}
           />
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px 16px', marginTop: 12 }}>
             {knowledgeMastery.map((item) => (

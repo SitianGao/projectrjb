@@ -5,7 +5,7 @@ import {
 } from 'antd'
 import {
   AppstoreOutlined, BookOutlined, BranchesOutlined, CheckCircleOutlined,
-  CodeOutlined, ExperimentOutlined, FileTextOutlined, MessageOutlined,
+  ExperimentOutlined, FileTextOutlined, MessageOutlined,
   PlayCircleOutlined, PlusOutlined, ProfileOutlined, ReadOutlined,
   ReloadOutlined, RightOutlined, SwapOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
@@ -344,8 +344,6 @@ export default function HomePage() {
                 onClick={() => navigate(currentCourse ? `/course/${currentCourse.id}/assessment/report` : '/assessment/tests')} />
               <CourseShortcut icon={<FileTextOutlined />} title="学习资源" desc="讲义、导图、PPT 和练习题" color="#20C7B7"
                 onClick={() => navigate(currentCourse ? `/resources?courseId=${currentCourse.id}` : '/resources')} />
-              <CourseShortcut icon={<CodeOutlined />} title="代码挑战" desc="用编程题验证掌握程度" color="#F59E0B"
-                onClick={() => navigate('/code-practice')} />
               <CourseShortcut icon={<ExperimentOutlined />} title="代码实验" desc="交互式实验，调参观察结果" color="#89b4fa"
                 onClick={() => navigate('/code-experiment')} />
               <CourseShortcut icon={<ProfileOutlined />} title="学习画像" desc="调整目标、基础和学习偏好" color="#EF5DA8"
