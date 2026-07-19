@@ -117,13 +117,6 @@ function ResourcePanel() {
   )
 }
 
-function courseTitleFromGoal(goal) {
-  const title = String(goal || '')
-    .replace(/^(我希望|我的目标是|学习目标是|学习|掌握|提升|提高|巩固)/, '')
-    .trim()
-  return (title || '个性化学习课程').slice(0, 24)
-}
-
 // ==================== 学习路径面板 ====================
 function LearningPathPanel({ initialPathData = null, studentId }) {
   const [pathData, setPathData] = useState(initialPathData)
@@ -445,7 +438,6 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
       if (activeCourse?.id) {
         try {
           await updateCourse(activeCourse.id, {
-            title: courseTitleFromGoal(goal || pathData.goal),
             goal: goal || pathData.goal || '',
           })
         } catch {

@@ -1,4 +1,5 @@
 import client from './client'
+import { invalidateHomeDashboard } from '../utils/dashboardEvents'
 
 /**
  * 学习评估相关 API
@@ -12,7 +13,9 @@ import client from './client'
 
 // 发起评估任务 → 返回 { task_id }
 export async function generateEvaluation(data) {
-  return client.post('/evaluate/start', data)
+  const result = await client.post('/evaluate/start', data)
+  invalidateHomeDashboard(data.course_id, 'assessment_completed')
+  return result
 }
 
 // 获取学生评估报告
@@ -62,7 +65,11 @@ export async function getEvaluationReports({ student_id, course_id, limit = 20 }
 }
 
 export async function recordLearning(data) {
-  return client.post('/evaluate/record', data)
+  const result = await client.post('/evaluate/record', data)
+  if (data.action !== 'view') {
+    invalidateHomeDashboard(data.course_id, 'learning_recorded')
+  }
+  return result
 }
 
 export async function adaptLearningJourney(data) {
@@ -92,7 +99,9 @@ export async function submitExerciseAnswer(data) {
 }
 
 export async function regenerateEvaluation(data) {
-  return client.post('/evaluate/start', data)
+  const result = await client.post('/evaluate/start', data)
+  invalidateHomeDashboard(data.course_id, 'assessment_completed')
+  return result
 }
 
 export async function previewPathAdjustment(evaluationId) {
@@ -101,6 +110,19 @@ export async function previewPathAdjustment(evaluationId) {
 
 export async function applyPathAdjustment(evaluationId) {
   return client.post(`/evaluate/reports/${evaluationId}/path-adjustments/apply`)
+}
+
+export async function createEvaluationResource(evaluationId, payload) {
+  return client.post(`/evaluate/reports/${evaluationId}/resources`, payload)
+}
+
+export async function createWrongBookResource(payload) {
+  return client.post('/evaluate/wrong-book/resources', payload)
+}
+
+// 获取报告对比
+export async function compareReports(reportId) {
+  return client.get(`/evaluate/reports/${reportId}/compare`)
 }
 
 // 获取学习进度统计（保留兼容，后端可能合并入 report 接口）
@@ -123,5 +145,14 @@ export async function generateEvaluationStream(data) {
 
 // 提交自评
 export async function submitSelfEval(data) {
-  return client.post('/evaluate/self', data)
+  const result = await client.post('/evaluate/self', data)
+  invalidateHomeDashboard(data.course_id, 'assessment_completed')
+  return result
+}
+
+// 统一仪表盘摘要（首页/路径/评估三页共用）
+export async function getDashboardSummary(studentId, courseId = '', userId = '') {
+  return client.get(`/evaluate/dashboard/${studentId}`, {
+    params: { course_id: courseId, user_id: userId },
+  })
 }

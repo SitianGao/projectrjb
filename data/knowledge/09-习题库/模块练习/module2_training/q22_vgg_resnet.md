@@ -228,8 +228,8 @@ def train_model(model, train_loader, test_loader, criterion, optimizer,
         test_acc = 100. * test_correct / test_total
         test_accs.append(test_acc)
         print(f"  [{model_name}] Epoch {epoch+1}/{n_epochs} "
-              f"Loss={avg_loss:.4f} TrainAcc={train_acc:.2f}% "
-              f"TestAcc={test_acc:.2f}%")
+              f"损失={avg_loss:.4f} 训练精度={train_acc:.2f}% "
+              f"测试精度={test_acc:.2f}%")
 
     return train_losses, test_accs
 

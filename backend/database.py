@@ -109,18 +109,56 @@ def _ensure_sqlite_compat_columns():
             row[1]
             for row in conn.execute(text("PRAGMA table_info(resources)")).fetchall()
         }
-        if "source_refs" not in columns:
-            conn.execute(text("ALTER TABLE resources ADD COLUMN source_refs TEXT DEFAULT '[]'"))
-            logger.info("数据库迁移完成：resources.source_refs")
-        if "artifact_url" not in columns:
-            conn.execute(text("ALTER TABLE resources ADD COLUMN artifact_url VARCHAR(500)"))
-            logger.info("数据库迁移完成：resources.artifact_url")
-        if "mime_type" not in columns:
-            conn.execute(text("ALTER TABLE resources ADD COLUMN mime_type VARCHAR(100)"))
-            logger.info("数据库迁移完成：resources.mime_type")
-        if "stage_id" not in columns:
-            conn.execute(text("ALTER TABLE resources ADD COLUMN stage_id VARCHAR(64)"))
-            logger.info("数据库迁移完成：resources.stage_id")
+        resource_migrations = {
+            "source_refs": "TEXT DEFAULT '[]'",
+            "artifact_url": "VARCHAR(500)",
+            "mime_type": "VARCHAR(100)",
+            "course_id": "VARCHAR(36)",
+            "stage_id": "VARCHAR(64)",
+            "task_id": "VARCHAR(100)",
+            "parent_resource_id": "VARCHAR(36)",
+            "trigger_source": "VARCHAR(40) DEFAULT 'manual'",
+            "trigger_context": "TEXT DEFAULT '{}'",
+            "variant_type": "VARCHAR(50)",
+            "generation_version": "VARCHAR(30) DEFAULT '1'",
+            "generation_status": "VARCHAR(20) DEFAULT 'ready'",
+            "generation_source": "VARCHAR(30) DEFAULT 'agent'",
+            "fallback_type": "VARCHAR(50)",
+            "idempotency_key": "VARCHAR(64)",
+        }
+        for column, ddl in resource_migrations.items():
+            if column not in columns:
+                conn.execute(text(f"ALTER TABLE resources ADD COLUMN {column} {ddl}"))
+                logger.info("数据库迁移完成：resources.%s", column)
+
+        conn.execute(text("""
+            UPDATE resources
+            SET course_id = (
+                SELECT courses.id
+                FROM courses
+                WHERE courses.student_id = resources.student_id
+                LIMIT 1
+            )
+            WHERE course_id IS NULL
+        """))
+        conn.execute(text("""
+            UPDATE resources
+            SET generation_version = '1'
+            WHERE generation_version IS NULL OR generation_version = ''
+        """))
+        conn.execute(text("""
+            UPDATE resources
+            SET generation_status = 'ready'
+            WHERE generation_status IS NULL OR generation_status = ''
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_resources_context_lookup "
+            "ON resources (student_id, task_id, type, difficulty, generation_version)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_resources_idempotency_key "
+            "ON resources (idempotency_key)"
+        ))
 
         wrong_columns = {
             row[1]
@@ -148,6 +186,102 @@ def _ensure_sqlite_compat_columns():
                 if column not in wrong_columns:
                     conn.execute(text(f"ALTER TABLE wrong_questions ADD COLUMN {column} {ddl}"))
                     logger.info("数据库迁移完成：wrong_questions.%s", column)
+
+        # ── 第1轮改造：EvaluationReport 新增字段 ──
+        eval_columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(evaluation_reports)")).fetchall()
+        }
+        eval_migrations = {
+            "has_sufficient_data": "BOOLEAN DEFAULT 0 NOT NULL",
+            "insufficient_reason": "TEXT DEFAULT ''",
+            "generation_source": "VARCHAR(30) DEFAULT 'rule'",
+            "provider": "VARCHAR(50)",
+            "model": "VARCHAR(100)",
+            "fallback_used": "BOOLEAN DEFAULT 0 NOT NULL",
+            "fallback_reason": "TEXT",
+        }
+        for column, ddl in eval_migrations.items():
+            if column not in eval_columns:
+                conn.execute(text(f"ALTER TABLE evaluation_reports ADD COLUMN {column} {ddl}"))
+                logger.info("数据库迁移完成：evaluation_reports.%s", column)
+
+        # ── 第2轮改造：EvaluationReport 新增字段 ──
+        eval_v2_migrations = {
+            "course_id": "VARCHAR(36)",
+            "evidence_hash": "VARCHAR(64)",
+            "evidence_count": "INTEGER DEFAULT 0",
+            "evidence_summary": "TEXT DEFAULT '{}'",
+            "trigger": "VARCHAR(20) DEFAULT 'auto'",
+            "scope_type": "VARCHAR(30) DEFAULT 'last_30_days'",
+            "scope_start_at": "DATETIME",
+            "scope_end_at": "DATETIME",
+            "supersedes_report_id": "VARCHAR(36)",
+            "statistics_json": "TEXT DEFAULT '{}'",
+            "agent_result_json": "TEXT DEFAULT '{}'",
+        }
+        for column, ddl in eval_v2_migrations.items():
+            if column not in eval_columns:
+                conn.execute(text(f"ALTER TABLE evaluation_reports ADD COLUMN {column} {ddl}"))
+                logger.info("数据库迁移完成：evaluation_reports.%s", column)
+
+        # 删除旧评估报告（第1+2轮改造）
+        if eval_columns:
+            deleted = conn.execute(text(
+                "DELETE FROM evaluation_reports WHERE has_sufficient_data = 0 AND evidence_hash IS NULL"
+            )).rowcount
+            if deleted:
+                logger.info("数据库清理完成：删除 %d 份旧评估报告", deleted)
+
+        # ── 第3轮改造：新增表 ──
+        for table_name, ddl in [
+            ("path_adjustment_logs", """
+                CREATE TABLE IF NOT EXISTS path_adjustment_logs (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    course_id TEXT,
+                    learning_path_id TEXT,
+                    source_evaluation_id TEXT,
+                    adjustment_key TEXT,
+                    action TEXT NOT NULL,
+                    knowledge_point TEXT,
+                    target_stage_id TEXT,
+                    target_task_id TEXT,
+                    suggested_resource_type TEXT,
+                    before_state TEXT DEFAULT '{}',
+                    after_state TEXT DEFAULT '{}',
+                    reason TEXT,
+                    priority TEXT DEFAULT 'medium',
+                    status TEXT DEFAULT 'suggested',
+                    applied_at DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """),
+            ("profile_update_logs", """
+                CREATE TABLE IF NOT EXISTS profile_update_logs (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    course_id TEXT,
+                    student_id TEXT NOT NULL,
+                    source_evaluation_id TEXT,
+                    field TEXT NOT NULL,
+                    before_value TEXT,
+                    after_value TEXT,
+                    reason TEXT,
+                    confidence REAL DEFAULT 0.0,
+                    evidence_refs TEXT DEFAULT '[]',
+                    status TEXT DEFAULT 'suggested',
+                    applied_at DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """),
+        ]:
+            existing = conn.execute(text(
+                f"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{table_name}'"
+            )).scalar()
+            if not existing:
+                conn.execute(text(ddl))
+                logger.info("数据库迁移完成：创建表 %s", table_name)
 
 
 def seed_demo_data():

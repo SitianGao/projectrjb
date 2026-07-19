@@ -119,109 +119,94 @@ export function buildStageLearningTasks(stage) {
   const objectives = normalizeStringList(stage.objectives)
   const topics = normalizeStringList(stage.topics)
   const rawTasks = uniqueRawTasks(stage)
-  const lectureTasks = pickTasks(rawTasks, (type, task, index) =>
-    /document|reading|study|lecture|text|resource/.test(type)
-    || (!/exercise|quiz|test|exam|code|mindmap|diagram|interactive_classroom|classroom|openmaic/.test(type) && index < Math.max(1, rawTasks.length - 1)),
-  )
-  const diagramTasks = pickTasks(rawTasks, (type) => /mindmap|diagram|graph|map/.test(type))
-  const classroomTasks = pickTasks(rawTasks, (type) => /interactive_classroom|classroom|openmaic/.test(type))
-  const quizTasks = pickTasks(rawTasks, (type) => /exercise|quiz|practice|check/.test(type))
-  const examTasks = pickTasks(rawTasks, (type) => /test|exam|assessment/.test(type))
 
-  const lectureLines = joinTaskText(lectureTasks)
-  const diagramLines = joinTaskText(diagramTasks)
-  const classroomLines = joinTaskText(classroomTasks)
-  const quizLines = joinTaskText(quizTasks)
-  const examLines = joinTaskText(examTasks)
+  // ── v3: Use real agent-generated tasks instead of a fixed template ──
+  if (rawTasks.length > 0) {
+    const sequence = rawTasks
+      // Filter out goal/objective tasks — objectives belong in stage intro
+      .filter((task) => {
+        const type = String(task.type || task.task_type || task.resource_type || '').toLowerCase()
+        return type !== 'goal' && type !== 'objective'
+      })
+      .map((task, index) => {
+        const type = String(task.type || task.task_type || task.resource_type || '').toLowerCase()
+        const title = task.title || task.task || task.description || `任务 ${index + 1}`
+        const description = task.description || task.task || ''
+        const estimatedMinutes = toMinutes(task)
+        const status = normalizeStatus(task.status)
+        const isDynamic = Boolean(task.dynamic_source)
+        const unlockCondition = task.unlock_condition || null
 
-  const sequence = [
-    {
-      id: `${stageId}-goal`,
-      type: 'objective',
-      title: '学习目标',
-      objective: objectives[0] || stage.description || `理解${stage.title || '当前阶段'}的学习目标`,
-      content: [
-        `### 本阶段目标`,
-        ...(objectives.length ? objectives.map((item) => `- ${item}`) : [`- ${stage.description || `建立对「${stage.title || '当前知识点'}」的整体认识。`}`]),
-        topics.length ? `\n### 关键知识点\n${topics.map((item) => `- ${item}`).join('\n')}` : '',
-      ].filter(Boolean).join('\n'),
-      estimatedMinutes: 10,
-      status: slotStatus([], 'active'),
-    },
-    {
-      id: `${stageId}-lecture`,
-      type: 'lecture',
-      title: '核心讲义',
-      objective: `掌握${stage.title || '当前阶段'}的核心概念和基本方法`,
-      content: [
-        `### 核心知识内容`,
-        stage.description || `围绕「${stage.title || '当前阶段'}」完成概念阅读、例题理解和笔记整理。`,
-        lectureLines.length ? `\n### 学习任务\n${lectureLines.map((item) => `- ${item}`).join('\n')}` : '',
-      ].filter(Boolean).join('\n'),
-      estimatedMinutes: lectureTasks.reduce((sum, task) => sum + toMinutes(task, 25), 0) || 25,
-      status: slotStatus(lectureTasks),
-    },
-    {
-      id: `${stageId}-diagram`,
-      type: 'diagram',
-      title: '概念图解',
-      objective: '把知识点之间的关系整理成可视化结构',
-      content: [
-        `### 概念关系`,
-        topics.length ? topics.map((item, index) => `${index + 1}. ${item}`).join('\n') : '将本阶段概念按“定义 - 性质 - 应用 - 易错点”整理成结构图。',
-        diagramLines.length ? `\n### 图解任务\n${diagramLines.map((item) => `- ${item}`).join('\n')}` : '',
-      ].filter(Boolean).join('\n'),
-      estimatedMinutes: diagramTasks.reduce((sum, task) => sum + toMinutes(task, 15), 0) || 15,
-      status: slotStatus(diagramTasks),
-    },
-  ]
+        // Map backend task_type to frontend display type
+        let frontendType = 'document'
+        if (/exercise|quiz|practice|check/.test(type)) frontendType = 'quiz'
+        else if (/mindmap|diagram|graph|map/.test(type)) frontendType = 'diagram'
+        else if (/interactive_classroom|classroom|openmaic/.test(type)) frontendType = 'interactive_classroom'
+        else if (/test|exam|assessment/.test(type)) frontendType = 'exam'
+        else if (/code/.test(type)) frontendType = 'code'
+        else if (/weakness_fix/.test(type)) frontendType = 'quiz'
+        else if (/document|reading|lecture/.test(type)) frontendType = 'document'
 
-  if (classroomTasks.length) {
-    const firstClassroomTask = classroomTasks[0]
-    sequence.push({
-      id: String(firstClassroomTask.task_id || firstClassroomTask.id || `${stageId}-interactive-classroom`),
-      type: 'interactive_classroom',
-      title: firstClassroomTask.title || 'OpenMAIC 在线课堂',
-      objective: firstClassroomTask.description || `通过互动课堂掌握${stage.title || '当前阶段'}的关键过程`,
-      content: [
-        `### 互动课堂任务`,
-        classroomLines.length
-          ? classroomLines.map((item) => `- ${item}`).join('\n')
-          : '- 进入 OpenMAIC 在线课堂完成讲授、模拟实验、AI 提问和知识检查。',
-      ].join('\n'),
-      estimatedMinutes: classroomTasks.reduce((sum, task) => sum + toMinutes(task, 25), 0) || 25,
-      status: slotStatus(classroomTasks),
-    })
+        // Build content from task data
+        const contentParts = []
+        if (description) contentParts.push(`### ${title}\n\n${description}`)
+        if (isDynamic) {
+          const sourceLabel = String(task.dynamic_source || '').replace('evaluation_weakness:', '评估薄弱点: ').replace('profile_gap:', '知识缺口: ').replace('interest:', '兴趣方向: ')
+          contentParts.push(`\n> 🤖 **AI 根据近期学习诊断新增**\n> 来源：${sourceLabel}`)
+        }
+        const content = contentParts.join('\n') || `### ${title}`
+
+        return {
+          id: task.task_id || task.id || `${stageId}-task-${index}`,
+          type: frontendType,
+          title,
+          objective: description || title,
+          content,
+          estimatedMinutes,
+          status,
+          dynamicSource: task.dynamic_source || null,
+          unlockCondition,
+          difficulty: task.difficulty || null,
+        }
+      })
+
+    return sanitizeSequence(sequence)
   }
 
-  sequence.push(
+  // ── Fallback: no agent-generated tasks → minimal defaults ──
+  return sanitizeSequence([
     {
-      id: `${stageId}-check`,
+      id: `${stageId}-document`,
+      type: 'document',
+      title: '核心讲义',
+      objective: `掌握${stage.title || '当前阶段'}的核心概念`,
+      content: [
+        `### 核心知识内容`,
+        stage.description || `围绕「${stage.title || '当前阶段'}」完成概念阅读和笔记整理。`,
+        topics.length ? `\n### 关键知识点\n${topics.map((item) => `- ${item}`).join('\n')}` : '',
+      ].filter(Boolean).join('\n'),
+      estimatedMinutes: 25,
+      status: 'active',
+    },
+    {
+      id: `${stageId}-exercise`,
       type: 'quiz',
       title: '知识检查',
-      objective: '通过小测确认概念是否真正掌握',
-      content: [
-        `### 自检任务`,
-        quizLines.length ? quizLines.map((item) => `- ${item}`).join('\n') : '- 用自己的话解释本阶段 2 个核心概念。\n- 完成 3 道基础练习，并标记不确定的问题。',
-      ].join('\n'),
-      estimatedMinutes: quizTasks.reduce((sum, task) => sum + toMinutes(task, 20), 0) || 20,
-      status: slotStatus(quizTasks),
+      objective: '确认概念是否真正掌握',
+      content: '- 用自己的话解释本阶段 2 个核心概念。\n- 完成基础练习，标记不确定的问题。',
+      estimatedMinutes: 20,
+      status: 'pending',
     },
     {
       id: `${stageId}-assessment`,
       type: 'exam',
       title: '阶段测评',
-      objective: '完成阶段测评并决定是否进入下一阶段',
-      content: [
-        `### 阶段测评`,
-        examLines.length ? examLines.map((item) => `- ${item}`).join('\n') : '- 回顾本阶段笔记。\n- 完成阶段测评。\n- 根据错题结果决定是否回看核心讲义。',
-      ].join('\n'),
-      estimatedMinutes: examTasks.reduce((sum, task) => sum + toMinutes(task, 30), 0) || 30,
-      status: slotStatus(examTasks, 'locked'),
+      objective: '完成阶段测评',
+      content: '- 回顾本阶段笔记。\n- 完成阶段测评。\n- 根据错题结果决定是否回看。',
+      estimatedMinutes: 30,
+      status: 'locked',
     },
-  )
-
-  return sanitizeSequence(sequence)
+  ])
 }
 
 export function getCurrentStage(path) {

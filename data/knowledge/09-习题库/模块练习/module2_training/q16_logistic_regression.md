@@ -98,7 +98,7 @@ class LogisticRegressionGD:
             self.losses.append(loss)
 
             if self.verbose and (i + 1) % 200 == 0:
-                print(f"  Iteration {i+1}/{self.n_iters}, Loss: {loss:.4f}")
+                print(f"  迭代 {i+1}/{self.n_iters}, 损失: {loss:.4f}")
 
         return self
 
@@ -130,8 +130,8 @@ def plot_decision_boundary(ax, model, X, y, title, is_sklearn=True):
     ax.contourf(xx, yy, Z, alpha=0.3, cmap=plt.cm.RdBu)
     ax.scatter(X[:, 0], X[:, 1], c=y, cmap=plt.cm.RdBu, edgecolors="k", s=30)
     ax.set_title(title)
-    ax.set_xlabel("Feature 1")
-    ax.set_ylabel("Feature 2")
+    ax.set_xlabel("特征1")
+    ax.set_ylabel("特征2")
 
 
 def solve():
@@ -177,15 +177,15 @@ def solve():
 
     # 决策边界对比
     plot_decision_boundary(axes[0], manual_lr, X_test, y_test,
-                           "Manual Logistic Regression", is_sklearn=False)
+                           "手动实现逻辑回归", is_sklearn=False)
     plot_decision_boundary(axes[1], sk_lr, X_test, y_test,
-                           "sklearn Logistic Regression", is_sklearn=True)
+                           "sklearn逻辑回归", is_sklearn=True)
 
     # 损失曲线
     axes[2].plot(range(1, len(manual_lr.losses) + 1), manual_lr.losses, "b-", linewidth=1)
-    axes[2].set_title("Training Loss (Cross-Entropy)")
-    axes[2].set_xlabel("Iteration")
-    axes[2].set_ylabel("Loss")
+    axes[2].set_title("训练损失 (交叉熵)")
+    axes[2].set_xlabel("迭代次数")
+    axes[2].set_ylabel("损失")
     axes[2].grid(True, alpha=0.3)
 
     plt.tight_layout()

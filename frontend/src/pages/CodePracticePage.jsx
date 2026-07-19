@@ -14,6 +14,7 @@ import JudgeResult from '../components/JudgeResult'
 import { getProblems, getProblemDetail, submitCode } from '../api/judge'
 import { useAuth } from '../contexts/AuthContext'
 import LoadingSkeleton from '../components/LoadingSkeleton'
+import { invalidateHomeDashboard } from '../utils/dashboardEvents'
 
 const { Sider, Content } = Layout
 const { Text } = Typography
@@ -35,7 +36,7 @@ const LANGUAGE_STARTER = {
 export default function CodePracticePage() {
   const { problemId: routeProblemId } = useParams()
   const navigate = useNavigate()
-  const { studentId } = useAuth()
+  const { studentId, activeCourse } = useAuth()
 
   // Problem list
   const [problems, setProblems] = useState([])
@@ -133,12 +134,13 @@ export default function CodePracticePage() {
         code,
       })
       setJudgeResult(result)
+      invalidateHomeDashboard(activeCourse?.id, 'code_submitted')
     } catch (err) {
       message.error(err?.message || '判题失败，请稍后重试')
     } finally {
       setJudging(false)
     }
-  }, [code, currentProblem, language, studentId])
+  }, [activeCourse, code, currentProblem, language, studentId])
 
   const handleReset = () => {
     setCode(LANGUAGE_STARTER[language] || '')

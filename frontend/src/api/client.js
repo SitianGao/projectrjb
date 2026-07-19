@@ -46,8 +46,12 @@ client.interceptors.response.use(
     }
 
     if (error.response) {
-      const { status, data } = error.response
+      const { status, data, config } = error.response
       const msg = data?.detail || data?.message || `请求失败 (${status})`
+      error.code = data?.code || error.code
+      error.status = status
+      error.requestUrl = `${config?.baseURL || ''}${config?.url || ''}`
+      error.message = msg
 
       switch (status) {
         case 401:

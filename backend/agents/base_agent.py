@@ -60,6 +60,7 @@ class BaseAgent(ABC):
             raise RuntimeError("LLM client is not configured")
 
         attempts = 1 if config.LLM_STRICT_MODE else 3
+        last_error = None
         for attempt in range(attempts):
             try:
                 logger.info("[%s] LLM call attempt %d", self.agent_name, attempt + 1)
@@ -72,11 +73,13 @@ class BaseAgent(ABC):
                     yield chunk
                 return
             except Exception as e:
+                last_error = e
                 logger.error("[%s] Attempt %d failed: %s", self.agent_name, attempt + 1, e)
                 if attempt == attempts - 1:
-                    if config.LLM_STRICT_MODE:
-                        raise
-                    yield f"[提示: 内容生成失败（已重试{attempts}次），请稍后重新尝试。]"
+                    # 最终失败必须 raise，禁止 yield 中文提示
+                    raise RuntimeError(
+                        f"[{self.agent_name}] LLM 调用失败（已重试{attempts}次）"
+                    ) from last_error
                 else:
                     await __import__("asyncio").sleep(2 ** attempt)
 

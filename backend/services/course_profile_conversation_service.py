@@ -77,10 +77,10 @@ DIMENSIONS = [
     ("interest_directions", "兴趣方向", False, "AI 将继续了解你感兴趣的应用方向"),
     ("cognitive_style", "认知或理解偏好", True, "AI 将继续了解你更偏好图示、案例、推导还是实践"),
     ("preferred_resources", "资源偏好", True, "AI 将继续询问你更喜欢图文、代码、视频还是互动实验"),
-    ("assessment_preference", "测评偏好", True, "AI 将继续了解你更喜欢小测、项目还是阶段测评"),
+    ("assessment_preference", "测评偏好", False, "AI 将继续了解你更喜欢小测、项目还是阶段测评"),
     ("session_duration_minutes", "单次学习时长", False, "AI 将继续确认你每次适合学习多久"),
     ("sessions_per_week", "每周学习频率", False, "AI 将继续确认你每周大约学习几次"),
-    ("weekly_available_hours", "每周可投入时间", True, "AI 将继续确认你每周能投入多少小时"),
+    ("weekly_available_hours", "每周可投入时间", False, "AI 将继续确认你每周能投入多少小时"),
     ("target_duration_weeks", "目标学习周期", True, "AI 将继续确认你希望几周内完成目标"),
     ("preferred_study_time", "偏好学习时间", False, "AI 将继续确认你通常适合什么时候学习"),
 ]
@@ -231,7 +231,7 @@ class CourseProfileConversationService:
         missing_optional = [item for item in dimension_state if not item["required"] and not item["filled"]]
         completed_required = len(REQUIRED_DIMENSION_KEYS) - len(missing_required)
         completion_rate = round(completed_required / len(REQUIRED_DIMENSION_KEYS), 2) if REQUIRED_DIMENSION_KEYS else 0.0
-        can_confirm = completion_rate >= 0.85 and not missing_required
+        can_confirm = completion_rate >= 0.75 and len(missing_required) <= 1
 
         # 7. 覆盖 LLM 的 assistant_reply（如果模型说"画像完整"但后端判断不完整）
         reply = result.assistant_reply or ""
@@ -467,7 +467,7 @@ def build_profile_state(course: Course, profile: dict | None, messages: list[dic
     missing_optional = [item for item in dimensions if not item["required"] and not item["filled"]]
     completed_required = len([item for item in dimensions if item["required"] and item["filled"]])
     completeness = round(completed_required / len(REQUIRED_DIMENSION_KEYS), 2) if REQUIRED_DIMENSION_KEYS else 0.0
-    can_confirm = completeness >= 0.85 and not missing_required
+    can_confirm = completeness >= 0.75 and len(missing_required) <= 1
     restored_messages = messages or []
     if not restored_messages:
         restored_messages = [{

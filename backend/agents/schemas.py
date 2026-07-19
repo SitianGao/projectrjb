@@ -92,13 +92,16 @@ class ProfileOutput(BaseModel):
 
 class LearningTask(BaseModel):
     task_id: str
-    task_type: str  # document | exercise | mindmap | code | assessment | interactive_classroom
+    task_type: str  # document | exercise | mindmap | code | assessment | interactive_classroom | weakness_fix
     title: str
     description: str = ""
     estimated_minutes: int = Field(default=30, ge=5, le=480)
     difficulty: str = "初级"
     status: str = "not_started"
     prerequisite_task_ids: list[str] = Field(default_factory=list)
+    # ── v3 个性化字段 ──
+    dynamic_source: Optional[str] = None  # "evaluation_weakness:<kp>" | "profile_gap:<area>" | "interest:<dir>" | null
+    unlock_condition: Optional[str] = None  # 人类可读的解锁条件，如"完成前置任务 X"
 
 
 class StageData(BaseModel):
@@ -114,6 +117,8 @@ class StageData(BaseModel):
     unlock_conditions: list[str] = Field(default_factory=list)
     tasks: list[LearningTask] = Field(default_factory=list)
     resource_blueprint: list[dict] = Field(default_factory=list)
+    # ── v3 个性化字段 ──
+    adaptation_reason: str = ""  # "为什么为你这样安排"——引用画像/评估数据
 
 
 class LearningPathOutput(BaseModel):
@@ -125,6 +130,8 @@ class LearningPathOutput(BaseModel):
     current_stage: int = Field(default=1, ge=1)
     estimated_days: int = Field(default=14, ge=1)
     adaptation: dict = Field(default_factory=dict)
+    # ── v3 个性化字段 ──
+    adaptation_summary: str = ""  # 整体路径个性化设计思路
 
 
 class PathAdjustment(BaseModel):
@@ -229,22 +236,69 @@ class PptContent(BaseModel):
     slides: list[SlideData] = Field(default_factory=list)
 
 
+class ResourcePreview(BaseModel):
+    """Deterministic preview stats generated after validation."""
+    schema_version: int = 1
+    question_count: int = 0
+    slide_count: int = 0
+    branch_count: int = 0
+    node_count: int = 0
+    scene_count: int = 0
+    interaction_count: int = 0
+    estimated_minutes: int = 0
+    file_count: int = 0
+    test_count: int = 0
+
+
+class SourceProvenance(BaseModel):
+    grounded: bool = False
+    retrieval_query: str = ""
+    knowledge_base_id: str = ""
+    knowledge_base_version: str = ""
+    collection_name: str = ""
+    retrieved_documents: list[dict] = Field(default_factory=list)
+    fallback_used: bool = False
+    fallback_reason: str | None = None
+    provenance_status: str = "legacy_orphan"  # legacy_orphan | current_validated
+
+
+class GenerationMeta(BaseModel):
+    agent_name: str = "ResourceAgent"
+    provider: str = "deepseek"
+    model: str = "deepseek-chat"
+    run_id: str = ""
+    request_id: str = ""
+    duration_ms: int = 0
+    fallback_used: bool = False
+    generated_at: str = ""
+
+
 class ResourceMeta(BaseModel):
-    """单个资源的公共元数据。"""
+    """单个资源的公共元数据 — ResourceEnvelope。"""
     resource_id: str = ""
     user_id: str = ""
     course_id: str = ""
+    path_id: str = ""
     stage_id: str = ""
+    stage_title: str = ""
     task_id: str = ""
-    knowledge_point_ids: list[str] = Field(default_factory=list)
-    resource_type: str  # document | exercise | mindmap | ppt
+    resource_type: str  # document | exercise | mindmap | ppt | interactive_classroom | code
+    schema_version: int = 1
     title: str
     summary: str = ""
+    topic: str = ""
     difficulty: str = "中级"
-    estimated_minutes: int = Field(default=30, ge=1)
-    status: str = "completed"
-    version: int = Field(default=1, ge=1)
+    status: str = "ready"  # draft | generating | ready | failed
     content: dict = Field(default_factory=dict)
+    preview: ResourcePreview = Field(default_factory=ResourcePreview)
+    artifacts: dict = Field(default_factory=dict)
+    source_provenance: SourceProvenance = Field(default_factory=SourceProvenance)
+    generation_meta: GenerationMeta = Field(default_factory=GenerationMeta)
+    knowledge_point_ids: list[str] = Field(default_factory=list)
+    estimated_minutes: int = Field(default=30, ge=1)
+    version: int = Field(default=1, ge=1)
+    created_at: str = ""
+    updated_at: str = ""
 
 
 class ResourceGenerationOutput(BaseModel):
@@ -253,6 +307,183 @@ class ResourceGenerationOutput(BaseModel):
     topic: str = ""
     difficulty: str = "中级"
     total: int = 0
+    knowledge_sources: list[dict] = Field(default_factory=list)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Per-type content schemas (Pydantic validation before save)
+# ═══════════════════════════════════════════════════════════════════════
+
+class DocumentContent(BaseModel):
+    learning_objectives: list[str] = Field(default_factory=list)
+    sections: list[SectionData] = Field(default_factory=list)
+    summary: str = ""
+    common_mistakes: list[str] = Field(default_factory=list)
+    review_questions: list[str] = Field(default_factory=list)
+
+class ExerciseContent(BaseModel):
+    instructions: str = ""
+    questions: list[ExerciseQuestion] = Field(default_factory=list)
+
+class MindmapContent(BaseModel):
+    root: MindmapNode
+
+class PptContent(BaseModel):
+    theme: str = ""
+    slides: list[SlideData] = Field(default_factory=list)
+
+class InteractiveClassroomContent(BaseModel):
+    classroom_id: str = ""
+    title: str = ""
+    summary: str = ""
+    scenes: list[dict] = Field(default_factory=list)
+    estimated_minutes: int = 25
+    difficulty: str = "中级"
+    knowledge_point_ids: list[str] = Field(default_factory=list)
+
+class CodeContent(BaseModel):
+    """旧版代码内容 Schema（向后兼容）。"""
+    language: str = "python"
+    code: str = ""
+    explanation: str = ""
+    output: str = ""
+    test_cases: list[dict] = Field(default_factory=list)
+
+
+class EditableParameter(BaseModel):
+    """可调实验参数。"""
+    name: str = ""                # 变量名 "learning_rate"
+    label: str = ""               # 中文标签 "学习率"
+    default_value: float | int | str = 0.01
+    allowed_values: list = Field(default_factory=list)
+    explanation: str = ""
+
+
+class CodeExperimentStep(BaseModel):
+    """代码实验步骤。"""
+    step_id: str = ""
+    title: str = ""
+    instruction: str = ""
+    code_snippet: str = ""
+    expected_result: str = ""
+    hint: str | None = None
+
+
+class CodeExperimentContent(BaseModel):
+    """交互式代码实验内容 Schema。
+
+    支持五种实验模式：
+    - code_guide: 代码导读型（分步拆解代码）
+    - param_experiment: 参数实验型（调参观察结果）
+    - code_completion: 关键代码补全型
+    - error_diagnosis: 错误诊断型
+    - mini_project: 小型项目型
+    """
+    # 基本信息
+    title: str = ""
+    scenario: str = ""
+    experiment_mode: str = "code_guide"  # code_guide | param_experiment | code_completion | error_diagnosis | mini_project
+    difficulty: str = "中级"
+    estimated_minutes: int = 30
+
+    # 学习目标
+    learning_objectives: list[str] = Field(default_factory=list)
+    knowledge_points: list[str] = Field(default_factory=list)
+    prerequisite_knowledge: list[str] = Field(default_factory=list)
+
+    # 实验步骤（代码导读型核心）
+    steps: list[CodeExperimentStep] = Field(default_factory=list)
+
+    # 完整代码 & 可编辑参数
+    starter_code: str = ""
+    editable_parameters: list[EditableParameter] = Field(default_factory=list)
+
+    # 观察与诊断
+    observation_questions: list[str] = Field(default_factory=list)
+    common_errors: list[str] = Field(default_factory=list)
+    expected_phenomena: list[str] = Field(default_factory=list)
+
+    # 代码补全型
+    blanks: list[dict] = Field(default_factory=list)
+
+    # 错误诊断型
+    buggy_code: str = ""
+    bug_description: str = ""
+    fix_hint: str = ""
+
+    # 可视化
+    visualization_type: str | None = None
+
+    # 个性化
+    personalization_reason: str = ""
+
+    # 向后兼容旧字段
+    language: str = "python"
+    code: str = ""
+    explanation: str = ""
+    output: str = ""
+    test_cases: list[dict] = Field(default_factory=list)
+
+
+# Content schema registry
+CONTENT_SCHEMAS = {
+    "document": DocumentContent,
+    "exercise": ExerciseContent,
+    "mindmap": MindmapContent,
+    "ppt": PptContent,
+    "interactive_classroom": InteractiveClassroomContent,
+    "code": CodeExperimentContent,
+}
+
+
+def validate_resource_content(resource_type: str, content: dict) -> tuple[bool, str, dict]:
+    """Validate content against its type schema. Returns (valid, error, preview)."""
+    schema_class = CONTENT_SCHEMAS.get(resource_type)
+    if schema_class is None:
+        return True, "", {}  # Unknown types pass through
+
+    try:
+        validated = schema_class(**content) if isinstance(content, dict) else schema_class.model_validate_json(str(content))
+        preview = generate_content_preview(resource_type, validated)
+        return True, "", preview
+    except Exception as e:
+        return False, str(e)[:200], {}
+
+
+def generate_content_preview(resource_type: str, content) -> dict:
+    """Generate deterministic preview stats from validated content."""
+    preview = {}
+    if resource_type == "document":
+        preview["estimated_minutes"] = max(5, sum(len(s.paragraphs) for s in (content.sections or [])) * 3)
+    elif resource_type == "exercise":
+        preview["question_count"] = len(content.questions or [])
+    elif resource_type == "mindmap":
+        preview["branch_count"] = _count_mindmap_nodes(content.root) - 1 if content.root else 0
+        preview["node_count"] = _count_mindmap_nodes(content.root) if content.root else 0
+    elif resource_type == "ppt":
+        preview["slide_count"] = len(content.slides or [])
+    elif resource_type == "interactive_classroom":
+        preview["scene_count"] = len(content.scenes or [])
+        preview["interaction_count"] = sum(1 for s in (content.scenes or []) if s.get("scene_type") in ("simulation", "quiz", "discussion"))
+    elif resource_type == "code":
+        # 优先使用实验模式字段
+        exp_code = getattr(content, 'starter_code', '') or getattr(content, 'code', '')
+        preview["file_count"] = 1 if exp_code else 0
+        preview["test_count"] = len(getattr(content, 'test_cases', []) or [])
+        preview["step_count"] = len(getattr(content, 'steps', []) or [])
+        preview["param_count"] = len(getattr(content, 'editable_parameters', []) or [])
+        preview["experiment_mode"] = getattr(content, 'experiment_mode', 'code_guide')
+    preview.setdefault("schema_version", 1)
+    return preview
+
+
+def _count_mindmap_nodes(node) -> int:
+    if not node:
+        return 0
+    count = 1
+    for child in (node.children or []):
+        count += _count_mindmap_nodes(child)
+    return count
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -268,20 +499,20 @@ class EvalDataSummary(BaseModel):
 
 
 class EvalOverall(BaseModel):
-    score: int = Field(default=0, ge=0, le=100)
+    score: Optional[int] = Field(default=None, ge=0, le=100)  # None when insufficient data
     previous_score: Optional[int] = None
     score_delta: Optional[int] = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     level: str = ""
-    short_term_trend: str = "stable"
-    long_term_trend: str = "stable"
+    short_term_trend: str = "insufficient_data"
+    long_term_trend: str = "insufficient_data"
 
 
 class EvalDimensions(BaseModel):
-    knowledge_mastery: int = Field(default=0, ge=0, le=100)
-    test_accuracy: int = Field(default=0, ge=0, le=100)
-    task_completion: int = Field(default=0, ge=0, le=100)
-    learning_consistency: int = Field(default=0, ge=0, le=100)
+    knowledge_mastery: Optional[int] = Field(default=None, ge=0, le=100)
+    test_accuracy: Optional[int] = Field(default=None, ge=0, le=100)
+    task_completion: Optional[int] = Field(default=None, ge=0, le=100)
+    learning_consistency: Optional[int] = Field(default=None, ge=0, le=100)
 
 
 class WeaknessDetail(BaseModel):
@@ -299,8 +530,30 @@ class StrengthDetail(BaseModel):
     score: int = Field(default=80, ge=0, le=100)
 
 
+class ProfileUpdateSuggestion(BaseModel):
+    """EvaluateAgent 提出的画像更新建议。只建议，不直接修改。"""
+    field: str                                           # 画像字段名
+    old_value: str = ""
+    new_value: str = ""
+    reason: str = ""
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence_refs: list[str] = Field(default_factory=list)
+
+
+class PathAdjustmentSuggestion(BaseModel):
+    """EvaluateAgent 提出的路径调整建议。"""
+    action: str                                          # insert_remedial_task | review_prerequisite | reduce_difficulty | increase_difficulty | postpone_stage | unlock_stage
+    knowledge_point: str = ""
+    reason: str = ""
+    priority: str = "medium"                             # high | medium | low
+    target_stage_id: str = ""
+    target_task_id: str = ""
+    suggested_resource_type: str = "exercise"
+    evidence_refs: list[str] = Field(default_factory=list)
+
+
 class EvaluationOutput(BaseModel):
-    """EvaluateAgent 输出 —— 完整评估报告。"""
+    """EvaluateAgent 输出 —— 完整评估报告（第3轮扩展）。"""
     evaluation_id: str
     user_id: str
     course_id: str
@@ -313,5 +566,8 @@ class EvaluationOutput(BaseModel):
     summary: str = ""
     recommendations: list[str] = Field(default_factory=list)
     path_adjustments: list[PathAdjustment] = Field(default_factory=list)
+    path_adjustment_suggestions: list[PathAdjustmentSuggestion] = Field(default_factory=list)
     profile_updates: list[dict] = Field(default_factory=list)
+    profile_update_suggestions: list[ProfileUpdateSuggestion] = Field(default_factory=list)
+    intervention_actions: list[dict] = Field(default_factory=list)
     generated_at: str = ""

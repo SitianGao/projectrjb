@@ -3,9 +3,9 @@ export function createLocalAgentJob(id = `job-${Date.now()}`) {
     id,
     status: 'created',
     steps: [
-      { key: 'profile', title: 'ProfileAgent 确认画像', status: 'waiting' },
-      { key: 'planner', title: 'PlannerAgent 生成学习路径', status: 'waiting' },
-      { key: 'resource', title: 'ResourceAgent 生成资源蓝图', status: 'waiting' },
+      { key: 'profile', title: 'AI 画像助手 — 确认画像', status: 'waiting' },
+      { key: 'planner', title: 'AI 学习规划助手 — 生成学习路径', status: 'waiting' },
+      { key: 'resource', title: 'AI 资源助手 — 生成资源蓝图', status: 'waiting' },
       { key: 'done', title: '生成结果确认', status: 'waiting' },
     ],
   }

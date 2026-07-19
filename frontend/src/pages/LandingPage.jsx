@@ -24,7 +24,7 @@ const { Title, Text, Paragraph } = Typography
 // 核心功能
 const MODULES = [
   { key: 'profile', icon: <BarChartOutlined />, title: '学习画像', desc: '六维雷达图 + 评分趋势，全面掌握学习状态与进步轨迹', route: '/home', color: '#fa8c16' },
-  { key: 'resource', icon: <BookOutlined />, title: '学习资源', desc: '海量资源库，涵盖文档、练习题、思维导图，支持 AI 智能生成', route: '/resources', color: '#1677ff' },
+  { key: 'resource', icon: <BookOutlined />, title: '我的学习资料', desc: '讲义、练习题、思维导图，支持 AI 智能生成', route: '/resources', color: '#1677ff' },
   { key: 'path', icon: <CompassOutlined />, title: '学习路径', desc: 'AI 根据学习画像定制个性化路线，分阶段达成学习目标', route: '/learning-path/1', color: '#52c41a' },
   { key: 'tutor', icon: <RobotOutlined />, title: '智能辅导', desc: 'AI 辅导老师随时待命，解答疑问、批改作业，提供个性化学习建议', route: '/', color: '#8b5cf6' },
   { key: 'evaluate', icon: <TrophyOutlined />, title: '学习评估', desc: '综合评分 + 知识点掌握度分析，精准定位强弱项，追踪学习趋势', route: '/home', color: '#eb2f96' },

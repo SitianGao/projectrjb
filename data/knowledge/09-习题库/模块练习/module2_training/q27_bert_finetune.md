@@ -259,8 +259,8 @@ def solve():
         metrics, _, _ = evaluate(model, test_loader, device)
         print(
             f"Epoch {epoch + 1}/{num_epochs} | "
-            f"Loss: {avg_loss:.4f} | "
-            f"Acc: {metrics['accuracy']:.4f} | "
+            f"损失: {avg_loss:.4f} | "
+            f"精度: {metrics['accuracy']:.4f} | "
             f"F1: {metrics['f1']:.4f}"
         )
 

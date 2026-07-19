@@ -121,13 +121,13 @@ def solve():
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
     # 子图1: 精度-深度曲线
-    axes[0].plot(depths, train_accs, "bo-", label="Train Accuracy", linewidth=2)
-    axes[0].plot(depths, test_accs, "rs-", label="Test Accuracy", linewidth=2)
+    axes[0].plot(depths, train_accs, "bo-", label="训练精度", linewidth=2)
+    axes[0].plot(depths, test_accs, "rs-", label="测试精度", linewidth=2)
     axes[0].axvline(x=best_depth, color="green", linestyle="--",
-                    label=f"Best depth={best_depth}")
-    axes[0].set_xlabel("Tree Depth")
-    axes[0].set_ylabel("Accuracy")
-    axes[0].set_title("Decision Tree: Accuracy vs Depth")
+                    label=f"最佳深度={best_depth}")
+    axes[0].set_xlabel("树深度")
+    axes[0].set_ylabel("准确率")
+    axes[0].set_title("决策树: 精度与深度关系")
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
 
@@ -136,19 +136,19 @@ def solve():
     axes[1].barh(range(top_n), importances[indices[:top_n]][::-1], color="steelblue")
     axes[1].set_yticks(range(top_n))
     axes[1].set_yticklabels([feature_names[i] for i in indices[:top_n]][::-1])
-    axes[1].set_xlabel("Feature Importance")
-    axes[1].set_title("Random Forest: Top Feature Importances")
+    axes[1].set_xlabel("特征重要性")
+    axes[1].set_title("随机森林: 特征重要性排名")
 
     # 子图3: 交叉验证对比
     axes[2].bar(
-        ["Decision Tree", "Random Forest"],
+        ["决策树", "随机森林"],
         [cv_dt.mean(), cv_rf.mean()],
         yerr=[cv_dt.std(), cv_rf.std()],
         capsize=5, color=["#4C72B0", "#DD8452"],
         alpha=0.8
     )
-    axes[2].set_ylabel("Accuracy")
-    axes[2].set_title("5-Fold Cross Validation Comparison")
+    axes[2].set_ylabel("准确率")
+    axes[2].set_title("5折交叉验证对比")
     axes[2].set_ylim(0.7, 1.0)
     axes[2].grid(True, alpha=0.3, axis="y")
 

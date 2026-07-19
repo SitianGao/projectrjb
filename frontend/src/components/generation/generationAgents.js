@@ -1,6 +1,7 @@
 export const AGENTS = [
   {
     name: 'ProfileAgent',
+    displayName: 'AI 画像助手',
     role: '画像分析师',
     icon: '🧑',
     bg: 'rgba(108,92,231,0.1)',
@@ -10,6 +11,7 @@ export const AGENTS = [
   },
   {
     name: 'PlannerAgent',
+    displayName: 'AI 学习规划助手',
     role: '路径规划师',
     icon: '🗺️',
     bg: 'rgba(59,130,246,0.1)',
@@ -19,6 +21,7 @@ export const AGENTS = [
   },
   {
     name: 'ResourceAgent',
+    displayName: 'AI 资源助手',
     role: '资源生成器',
     icon: '📦',
     bg: 'rgba(34,197,94,0.1)',
@@ -28,6 +31,7 @@ export const AGENTS = [
   },
   {
     name: 'TutorAgent',
+    displayName: 'AI 学习导师',
     role: 'AI 导师',
     icon: '🤖',
     bg: 'rgba(249,115,22,0.1)',
@@ -37,6 +41,7 @@ export const AGENTS = [
   },
   {
     name: 'EvaluateAgent',
+    displayName: 'AI 学习评估助手',
     role: '评估引擎',
     icon: '📊',
     bg: 'rgba(236,72,153,0.1)',

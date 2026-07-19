@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { message } from 'antd'
 import { sendCourseProfileMessage } from '../services/profileConversationService'
-import { getCourseProfileConversationState } from '../services/courseProfileService'
+import {
+  getCourseProfileConversationState,
+  getCurrentCourseProfileConversation,
+} from '../services/courseProfileService'
 
 function storageKey(courseId) {
   return `courseProfileConversation:${courseId}`
@@ -15,16 +18,18 @@ function readStored(courseId) {
   }
 }
 
-export function useProfileConversation(courseId, { onProfileResult } = {}) {
+export function useProfileConversation(courseId, { onProfileResult, initialConversationId } = {}) {
   const stored = useMemo(() => readStored(courseId), [courseId])
-  const [conversationId] = useState(() => stored?.conversationId || `profile-${courseId || 'new'}-draft`)
+  const [conversationId, setConversationId] = useState(() => (
+    initialConversationId || stored?.conversationId || null
+  ))
   const [messages, setMessages] = useState(stored?.messages || [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const pendingRef = useRef(false)
 
   const persist = useCallback((nextMessages) => {
-    if (!courseId) return
+    if (!courseId || !conversationId) return
     sessionStorage.setItem(storageKey(courseId), JSON.stringify({ conversationId, messages: nextMessages }))
   }, [conversationId, courseId])
 
@@ -41,6 +46,22 @@ export function useProfileConversation(courseId, { onProfileResult } = {}) {
   }, [])
 
   useEffect(() => {
+    if (!courseId || conversationId) return undefined
+    let cancelled = false
+    getCurrentCourseProfileConversation(courseId)
+      .then((current) => {
+        if (!cancelled) setConversationId(current?.conversation_id || `profile-${courseId}-draft`)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setConversationId(`profile-${courseId}-draft`)
+          setError(err)
+        }
+      })
+    return () => { cancelled = true }
+  }, [conversationId, courseId])
+
+  useEffect(() => {
     if (!courseId || !conversationId) return undefined
     let cancelled = false
     getCourseProfileConversationState(courseId, conversationId)
@@ -53,13 +74,17 @@ export function useProfileConversation(courseId, { onProfileResult } = {}) {
         }
         onProfileResult?.(state)
       })
-      .catch(() => {})
+      .catch((err) => setError(err))
     return () => { cancelled = true }
   }, [conversationId, courseId, mergeMessages, onProfileResult, persist])
 
   const send = useCallback(async (content) => {
     const text = String(content || '').trim()
     if (!text || loading || pendingRef.current) return
+    if (!courseId || !conversationId) {
+      message.error('画像会话正在恢复，请稍后重试')
+      return
+    }
     pendingRef.current = true
     const clientMessageId = `cm-${Date.now()}-${Math.random().toString(16).slice(2)}`
     const optimisticMessage = {

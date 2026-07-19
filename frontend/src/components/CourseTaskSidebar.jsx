@@ -1,7 +1,7 @@
 import { Tooltip } from 'antd'
 import {
-  AimOutlined,
   BookOutlined,
+  BulbOutlined,
   CheckCircleFilled,
   EditOutlined,
   LockOutlined,
@@ -11,14 +11,13 @@ import {
 } from '@ant-design/icons'
 
 const TASK_TYPES = {
-  objective: { label: '学习目标', icon: <AimOutlined /> },
-  goal: { label: '学习目标', icon: <AimOutlined /> },
-  lecture: { label: '核心讲义', icon: <BookOutlined /> },
   document: { label: '核心讲义', icon: <BookOutlined /> },
+  lecture: { label: '核心讲义', icon: <BookOutlined /> },
   diagram: { label: '概念图解', icon: <NodeIndexOutlined /> },
   mindmap: { label: '概念图解', icon: <NodeIndexOutlined /> },
   quiz: { label: '知识检查', icon: <EditOutlined /> },
   exercise: { label: '知识检查', icon: <EditOutlined /> },
+  weakness_fix: { label: '专项补救', icon: <BulbOutlined /> },
   exam: { label: '阶段测评', icon: <CheckCircleFilled /> },
   assessment: { label: '阶段测评', icon: <CheckCircleFilled /> },
   code: { label: '代码实操', icon: <EditOutlined /> },
@@ -147,7 +146,11 @@ export default function CourseTaskSidebar({
           return (
             <Tooltip
               key={task.id || idx}
-              title={status === 'locked' ? '请先完成前置任务' : task.title}
+              title={
+                status === 'locked'
+                  ? (task.unlockCondition || '请先完成前置任务')
+                  : task.title
+              }
             >
               <button
                 onClick={() => isClickable && onSelectTask?.(task)}
@@ -186,12 +189,24 @@ export default function CourseTaskSidebar({
 
                 {/* Content */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 10, color: '#9CA3AF',
-                    textTransform: 'uppercase', letterSpacing: 0.5,
-                    marginBottom: 2,
-                  }}>
-                    {typeConfig.label}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                    <span style={{
+                      fontSize: 10, color: '#9CA3AF',
+                      textTransform: 'uppercase', letterSpacing: 0.5,
+                    }}>
+                      {typeConfig.label}
+                    </span>
+                    {/* Dynamic source tag — AI-generated based on evaluation/profile */}
+                    {task.dynamicSource && (
+                      <span style={{
+                        fontSize: 9, color: '#6C5CE7',
+                        background: 'linear-gradient(135deg, #F0EBFF, #E8E0FF)',
+                        padding: '1px 6px', borderRadius: 6,
+                        fontWeight: 600,
+                      }}>
+                        🤖 AI 新增
+                      </span>
+                    )}
                   </div>
                   <div style={{
                     fontSize: 13, fontWeight: status === 'active' ? 600 : 400,

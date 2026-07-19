@@ -55,7 +55,7 @@ export default function GenerationAgentPopover({ activeStepIndex }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
-                {agent.name}
+                {agent.displayName || agent.name}
               </div>
               <div style={{ fontSize: 11, color: '#9CA3AF' }}>{agent.role}</div>
             </div>

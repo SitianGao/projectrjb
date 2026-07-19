@@ -32,8 +32,13 @@ class InitializeCourseRequest(BaseModel):
     message: str = ""
 
 
+class StudySessionStartRequest(BaseModel):
+    task_id: str | None = None
+
+
 def _event(event_type: str, **payload) -> str:
-    return f"data: {json.dumps({'type': event_type, **payload}, ensure_ascii=False)}\n\n"
+    from core.sse import sse_event
+    return sse_event(event_type, **payload)
 
 
 @router.post("/{course_id}/initialize/stream")
@@ -297,6 +302,21 @@ async def get_course_learning_path(
     user=Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    state = course_learning_service.resolve_active_learning_state(
+        db,
+        user=user,
+        course_id=course_id,
+    )
+    if not state.get("path"):
+        return ok({
+            "course": state["course"],
+            "learning_goal": state["learning_goal"],
+            "path": None,
+            "progress": state["progress"],
+            "course_status": state["course_status"],
+            "continue_target": state["continue_target"],
+            "generation": None,
+        })
     context = course_learning_service.get_learning_context(
         db,
         user=user,
@@ -306,9 +326,23 @@ async def get_course_learning_path(
         "course": context["course"],
         "path": context["path"],
         "progress": context["path_progress"],
+        "course_status": context["course_status"],
         "continue_target": context["continue_target"],
         "generation": context["generation"],
     })
+
+
+@router.get("/{course_id}/learning-state")
+async def get_course_learning_state(
+    course_id: str,
+    user=Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return ok(course_learning_service.resolve_active_learning_state(
+        db,
+        user=user,
+        course_id=course_id,
+    ))
 
 
 @router.get("/{course_id}/learn/{task_id}")
@@ -355,6 +389,36 @@ async def complete_course_task(
         ),
         "学习进度已保存",
     )
+
+
+@router.post("/{course_id}/study-sessions")
+async def start_study_session(
+    course_id: str,
+    request: StudySessionStartRequest,
+    user=Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return ok(course_learning_service.start_study_session(
+        db,
+        user=user,
+        course_id=course_id,
+        task_id=request.task_id,
+    ))
+
+
+@router.post("/{course_id}/study-sessions/{session_id}/close")
+async def close_study_session(
+    course_id: str,
+    session_id: str,
+    user=Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return ok(course_learning_service.close_study_session(
+        db,
+        user=user,
+        course_id=course_id,
+        session_id=session_id,
+    ))
 
 
 @router.get("/{course_id}/learning-path/generation")

@@ -270,13 +270,13 @@ class YOLOLoss(nn.Module):
 
         # 标注
         target_box = targets[..., 0:5]
-        obj_mask = targets[..., 4]  # objectness mask: (batch, S, S)
+        obj_mask = targets[..., 4]  # 目标掩码: (batch, S, S)
         target_class = targets[..., 10:]
 
         # 简化: 使用box1负责预测有目标的网格
         obj_mask_bool = (obj_mask > 0.5)
 
-        # 坐标损失 (只有有目标的网格)
+        # 坐标损失 (仅含目标的网格)
         if obj_mask_bool.sum() > 0:
             coord_loss = F.mse_loss(
                 pred_box1[..., :4][obj_mask_bool],
@@ -365,13 +365,13 @@ def solve():
     print(f"NMS前: {len(test_boxes)} 个框")
     for b in test_boxes:
         print(f"  ({b['x']:.2f},{b['y']:.2f}) {b['w']:.2f}x{b['h']:.2f} "
-              f"conf={b['confidence']:.2f} class={b['class_id']}")
+              f"置信度={b['confidence']:.2f} 类别={b['class_id']}")
 
     filtered = nms(test_boxes, iou_threshold=0.5)
     print(f"\nNMS后: {len(filtered)} 个框")
     for b in filtered:
         print(f"  ({b['x']:.2f},{b['y']:.2f}) {b['w']:.2f}x{b['h']:.2f} "
-              f"conf={b['confidence']:.2f} class={b['class_id']}")
+              f"置信度={b['confidence']:.2f} 类别={b['class_id']}")
 
     # ---- 5. 损失函数与训练演示 ----
     print("\n" + "=" * 60)
@@ -388,17 +388,17 @@ def solve():
         # 在(3,3)网格放入一个目标
         for b in range(4):
             targets[b, 3, 3, 0:4] = torch.tensor([0.43, 0.43, 0.1, 0.1])
-            targets[b, 3, 3, 4] = 1.0  # objectness
-            targets[b, 3, 3, 10 + (b % num_classes)] = 1.0  # class
+            targets[b, 3, 3, 4] = 1.0  # 目标存在标志
+            targets[b, 3, 3, 10 + (b % num_classes)] = 1.0  # 类别
 
         predictions = model(images)
         loss = criterion(predictions, targets)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print(f"  Step {step+1}: Loss = {loss.item():.4f}")
+        print(f"  步骤 {step+1}: 损失 = {loss.item():.4f}")
 
-    # ---- 6. 解码预测演示 ----
+    # ---- 6. 预测解码演示 ----
     print("\n" + "=" * 60)
     print("预测解码演示")
     print("=" * 60)
@@ -415,7 +415,7 @@ def solve():
         for i, b in enumerate(final_boxes[:5]):
             print(f"  框{i+1}: ({b['x']:.3f},{b['y']:.3f}) "
                   f"{b['w']:.3f}x{b['h']:.3f} "
-                  f"conf={b['confidence']:.3f} class={b['class_id']}")
+                  f"置信度={b['confidence']:.3f} 类别={b['class_id']}")
 
 
 if __name__ == "__main__":

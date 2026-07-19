@@ -16,6 +16,7 @@ from api.response import ApiError, ok
 from database import get_db
 from deps import profile_service
 from models.auth import Course
+from models.student import CourseProfileConversationMessage
 
 
 router = APIRouter()
@@ -225,6 +226,31 @@ async def get_course_profile_conversation_state(
     state = build_profile_state(course, profile, messages=messages, agent_run=latest_agent_run)
     state["conversation"] = {"conversation_id": conversation_id}
     return ok(state)
+
+
+@router.get("/courses/{course_id}/profile/conversations/current")
+async def get_current_course_profile_conversation(
+    course_id: str,
+    user=Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    _course_for_user(db, user, course_id)
+    latest = (
+        db.query(CourseProfileConversationMessage)
+        .filter(
+            CourseProfileConversationMessage.user_id == str(user.id),
+            CourseProfileConversationMessage.course_id == course_id,
+        )
+        .order_by(CourseProfileConversationMessage.created_at.desc())
+        .first()
+    )
+    conversation_id = latest.conversation_id if latest else f"profile-{course_id}-draft"
+    route = f"/course/{course_id}/profile/setup?conversationId={conversation_id}"
+    return ok({
+        "conversation_id": conversation_id,
+        "status": "confirmed" if latest else "draft",
+        "route": route,
+    })
 
 
 @router.post("/courses/{course_id}/profile/conversations/{conversation_id}/messages")

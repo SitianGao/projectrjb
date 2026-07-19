@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Button, Card, Progress, Space, Tag, Typography } from 'antd'
 import {
   CheckCircleFilled,
@@ -30,6 +29,7 @@ export default function StageCard({
   resources = [],
   onContinue,
   onViewDetail,
+  onTaskOpen,
   expanded = false,
   onToggle,
 }) {
@@ -116,6 +116,22 @@ export default function StageCard({
               </div>
             )}
 
+            {/* Adaptation reason — "为什么为你这样安排" */}
+            {stage?.adaptation_reason && (
+              <div style={{
+                marginBottom: 12, padding: '10px 14px',
+                background: 'linear-gradient(135deg, #FFF7ED, #FFF1F2)',
+                borderRadius: 10, border: '1px solid #FED7AA',
+              }}>
+                <Text strong style={{ fontSize: 12, color: '#EA580C', display: 'block', marginBottom: 4 }}>
+                  💡 为什么为你这样安排
+                </Text>
+                <Text style={{ fontSize: 12, color: '#9A3412', lineHeight: 1.6 }}>
+                  {stage.adaptation_reason}
+                </Text>
+              </div>
+            )}
+
             {/* Knowledge tags */}
             {topics.length > 0 && (
               <div style={{ marginBottom: 12 }}>
@@ -128,6 +144,87 @@ export default function StageCard({
                   ))}
                   {extraTopics > 0 && <Tag style={{ borderRadius: 6, fontSize: 12 }}>+{extraTopics}</Tag>}
                 </Space>
+              </div>
+            )}
+
+            {tasks.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <Text strong style={{ fontSize: 13, color: 'var(--text-primary)', display: 'block', marginBottom: 8 }}>
+                  学习任务
+                </Text>
+                <div style={{ display: 'grid', gap: 6 }}>
+                  {tasks.map((task) => {
+                    const locked = task.status === 'locked'
+                    const triggerSource = task.trigger_source || task.triggerSource
+                    const isDynamic = Boolean(
+                      task.dynamic_source
+                      || task.dynamicSource
+                      || ['evaluation', 'path_adjustment'].includes(triggerSource),
+                    )
+                    const adjustmentReason = task.adjustment_reason
+                      || task.adjustmentReason
+                      || (isDynamic ? task.description : '')
+                    const contentReady = Boolean(
+                      task.resource_id
+                      || task.content_preparation_status === 'ready'
+                      || task.contentPreparationStatus === 'ready',
+                    )
+                    return (
+                      <button
+                        key={task.task_id || task.id}
+                        type="button"
+                        disabled={locked}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onTaskOpen?.(task)
+                        }}
+                        title={locked ? (task.unlock_condition || task.unlockCondition || '请先完成前置任务') : ''}
+                        style={{
+                          width: '100%',
+                          minHeight: 38,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          padding: '8px 10px',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          background: task.status === 'active' ? 'var(--tint-primary)' : 'var(--bg-card)',
+                          color: locked ? 'var(--text-muted)' : 'var(--text-primary)',
+                          cursor: locked ? 'not-allowed' : 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ minWidth: 0, display: 'grid', gap: 4 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {task.title || task.description || '学习任务'}
+                            {isDynamic && (
+                              <Tag color="purple" style={{ fontSize: 10, borderRadius: 6, margin: 0, lineHeight: '16px' }}>
+                                AI 学习诊断后新增
+                              </Tag>
+                            )}
+                          </span>
+                          {isDynamic && (
+                            <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                              {adjustmentReason && (
+                                <Text type="secondary" style={{ fontSize: 11 }}>
+                                  调整原因：{adjustmentReason}
+                                </Text>
+                              )}
+                              <Tag
+                                color={contentReady ? 'success' : 'processing'}
+                                style={{ fontSize: 10, borderRadius: 6, margin: 0, lineHeight: '16px' }}
+                              >
+                                {contentReady ? '内容已准备' : '内容准备中'}
+                              </Tag>
+                            </span>
+                          )}
+                        </span>
+                        {locked ? <LockFilled /> : <RightOutlined />}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )}
 

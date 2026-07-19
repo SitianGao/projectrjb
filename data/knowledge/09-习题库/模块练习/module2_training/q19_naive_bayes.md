@@ -173,7 +173,7 @@ def solve():
     print("alpha参数对精度的影响")
     print("=" * 60)
     alphas = [0.01, 0.1, 0.5, 1.0, 2.0, 5.0]
-    print(f"{'alpha':<10} {'Manual Acc':>12} {'sklearn Acc':>12}")
+    print(f"{'alpha':<10} {'手动实现精度':>12} {'sklearn精度':>12}")
     print("-" * 36)
     for a in alphas:
         m_nb = MultinomialNBManual(alpha=a)

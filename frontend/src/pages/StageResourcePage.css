@@ -1,229 +1,148 @@
-/* ===== 阶段资源页 ===== */
-
-/* 深色模式 */
-[data-theme='dark'] .stage-resource-page {
-  background: #0f0f1a;
-  color: rgba(255,255,255,0.95);
+.task-resource-page {
+  min-height: 100%;
+  padding: 20px 24px 48px;
+  background: #f6f7fb;
 }
 
-/* 页面背景 */
-[data-theme='dark'] div[style*="background: #F6F7FB"] {
-  background: #0f0f1a !important;
+.task-resource-container {
+  max-width: 1120px;
+  margin: 0 auto;
 }
 
-/* 标题 */
-[data-theme='dark'] .ant-typography {
-  color: rgba(255,255,255,0.95);
+.task-resource-state {
+  max-width: 760px;
+  margin: 56px auto;
+  padding: 28px;
 }
 
-/* 次要文本 */
-[data-theme='dark'] .ant-typography.ant-typography-secondary {
-  color: rgba(255,255,255,0.5);
+.task-resource-breadcrumb {
+  margin-bottom: 16px;
 }
 
-/* 卡片 */
-[data-theme='dark'] .ant-card {
-  background: #1a1a2e;
-  border-color: rgba(255,255,255,0.08);
+.task-resource-breadcrumb span {
+  cursor: pointer;
 }
 
-[data-theme='dark'] .ant-card-head {
-  color: rgba(255,255,255,0.95);
-  border-bottom-color: rgba(255,255,255,0.06);
+.task-context-card,
+.generation-card,
+.learning-resource-card,
+.variant-card,
+.related-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
 }
 
-[data-theme='dark'] .ant-card-body {
-  color: rgba(255,255,255,0.95);
+.task-context-card {
+  margin-bottom: 20px;
 }
 
-/* 面包屑 */
-[data-theme='dark'] .ant-breadcrumb {
-  color: rgba(255,255,255,0.65);
+.task-context-card .ant-card-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 24px;
 }
 
-[data-theme='dark'] .ant-breadcrumb a {
-  color: #a78bfa;
+.task-context-main {
+  min-width: 0;
 }
 
-[data-theme='dark'] .ant-breadcrumb a:hover {
-  color: #c4b5fd;
+.task-context-main h3 {
+  margin: 10px 0 4px;
+  color: #111827;
 }
 
-[data-theme='dark'] .ant-breadcrumb-separator {
-  color: rgba(255,255,255,0.3);
+.task-context-main .ant-typography {
+  margin-bottom: 0;
+  color: #6b7280;
 }
 
-/* 按钮 */
-[data-theme='dark'] .ant-btn-default {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.15);
-  color: rgba(255,255,255,0.95);
+.generation-card {
+  max-width: 720px;
+  margin: 32px auto;
 }
 
-[data-theme='dark'] .ant-btn-default:hover {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.25);
-  color: rgba(255,255,255,0.95);
+.generation-card .ant-card-body {
+  padding: 32px 40px;
 }
 
-[data-theme='dark'] .ant-btn-text {
-  color: rgba(255,255,255,0.65);
+.generation-card h4 {
+  margin: 0 0 24px;
 }
 
-[data-theme='dark'] .ant-btn-text:hover {
-  color: rgba(255,255,255,0.95);
-  background: rgba(255,255,255,0.06);
+.task-resource-alert {
+  margin-bottom: 16px;
+  border-radius: 12px;
 }
 
-[data-theme='dark'] .ant-btn-link {
-  color: #a78bfa;
+.learning-resource-card {
+  margin-bottom: 16px;
 }
 
-[data-theme='dark'] .ant-btn-link:hover {
-  color: #c4b5fd;
+.learning-resource-card > .ant-card-body {
+  padding: 24px 28px;
 }
 
-/* 标签 */
-[data-theme='dark'] .ant-tag {
-  background: rgba(108,92,231,0.12);
-  border-color: rgba(108,92,231,0.2);
-  color: #a78bfa;
+.resource-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-/* 进度条 */
-[data-theme='dark'] .ant-progress-bg {
-  background: #6C5CE7;
+.resource-heading h3 {
+  margin: 4px 0 0;
+  color: #111827;
 }
 
-/* 结果页 */
-[data-theme='dark'] .ant-result-title {
-  color: rgba(255,255,255,0.95);
+.variant-card,
+.related-card {
+  margin-bottom: 16px;
 }
 
-[data-theme='dark'] .ant-result-subtitle {
-  color: rgba(255,255,255,0.65);
+.variant-card .ant-btn,
+.related-card .ant-btn {
+  border-radius: 8px;
 }
 
-/* 空状态 */
-[data-theme='dark'] .ant-empty-description {
-  color: rgba(255,255,255,0.5);
+.task-resource-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0 24px;
 }
 
-[data-theme='dark'] .ant-empty-image {
-  opacity: 0.6;
+.task-resource-actions .ant-btn {
+  min-height: 40px;
+  border-radius: 10px;
 }
 
-/* 加载状态 */
-[data-theme='dark'] .ant-spin {
-  color: #6C5CE7;
+.task-resource-actions .ant-btn-primary {
+  background: #6c5ce7;
 }
 
-/* 消息提示 */
-[data-theme='dark'] .ant-message-notice-content {
-  background: #1a1a2e;
-  border: 1px solid rgba(255,255,255,0.08);
-}
+@media (max-width: 760px) {
+  .task-resource-page {
+    padding: 14px 12px 32px;
+  }
 
-/* 模态框 */
-[data-theme='dark'] .ant-modal-content {
-  background: #1a1a2e;
-}
+  .task-context-card .ant-card-body,
+  .resource-heading,
+  .task-resource-actions {
+    flex-direction: column;
+  }
 
-[data-theme='dark'] .ant-modal-header {
-  background: #1a1a2e;
-  border-bottom-color: rgba(255,255,255,0.06);
-}
+  .generation-card .ant-card-body,
+  .learning-resource-card > .ant-card-body {
+    padding: 20px;
+  }
 
-[data-theme='dark'] .ant-modal-title {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-modal-close {
-  color: rgba(255,255,255,0.65);
-}
-
-/* 抽屉 */
-[data-theme='dark'] .ant-drawer-content {
-  background: #1a1a2e;
-}
-
-[data-theme='dark'] .ant-drawer-header {
-  background: #1a1a2e;
-  border-bottom-color: rgba(255,255,255,0.06);
-}
-
-[data-theme='dark'] .ant-drawer-title {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-drawer-close {
-  color: rgba(255,255,255,0.65);
-}
-
-[data-theme='dark'] .ant-drawer-body {
-  color: rgba(255,255,255,0.95);
-}
-
-/* Markdown 渲染器 */
-[data-theme='dark'] .markdown-body {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .markdown-body pre {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.08);
-}
-
-[data-theme='dark'] .markdown-body code {
-  background: rgba(255,255,255,0.06);
-  color: #a78bfa;
-}
-
-[data-theme='dark'] .markdown-body blockquote {
-  border-left-color: #6C5CE7;
-  color: rgba(255,255,255,0.65);
-}
-
-[data-theme='dark'] .markdown-body table th {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.08);
-}
-
-[data-theme='dark'] .markdown-body table td {
-  border-color: rgba(255,255,255,0.06);
-}
-
-/* 任务列表项 */
-[data-theme='dark'] div[style*="background: #F0FDF4"] {
-  background: rgba(34,197,94,0.1) !important;
-  border-color: rgba(34,197,94,0.2) !important;
-}
-
-[data-theme='dark'] div[style*="background: #F3F0FF"] {
-  background: rgba(108,92,231,0.1) !important;
-  border-color: rgba(108,92,231,0.2) !important;
-}
-
-[data-theme='dark'] div[style*="background: #F9FAFB"] {
-  background: rgba(255,255,255,0.03) !important;
-  border-color: rgba(255,255,255,0.06) !important;
-}
-
-/* 分页 */
-[data-theme='dark'] .ant-pagination-item {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.1);
-}
-
-[data-theme='dark'] .ant-pagination-item a {
-  color: rgba(255,255,255,0.95);
-}
-
-[data-theme='dark'] .ant-pagination-item-active {
-  background: #6C5CE7;
-  border-color: #6C5CE7;
-}
-
-[data-theme='dark'] .ant-pagination-item-active a {
-  color: #fff;
+  .task-resource-actions .ant-btn {
+    width: 100%;
+  }
 }

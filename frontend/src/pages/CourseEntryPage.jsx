@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Avatar, Button, Card, Empty, Progress, Skeleton, Space, Typography, message } from 'antd'
+import { Alert, Avatar, Button, Card, Empty, Progress, Skeleton, Space, Tag, Typography, message } from 'antd'
 import {
   ArrowRightOutlined,
   BookOutlined,
@@ -9,9 +9,8 @@ import {
   ProfileOutlined,
   RightOutlined,
 } from '@ant-design/icons'
-import { getLearningPath } from '../api/planner'
+import { getCourseLearningState } from '../api/courseLearning'
 import { useAuth } from '../contexts/AuthContext'
-import { getCurrentLearningTarget, getPathProgress } from '../utils/courseLearning'
 import './CourseEntryPage.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -52,16 +51,31 @@ function formatRecentTime(value) {
   return `${diffDays} 天前学习`
 }
 
-function calcProgress(path) {
-  return getPathProgress(path).percent
+function actionText(status) {
+  switch (status) {
+    case 'completed':
+      return '查看学习总结'
+    case 'not_started':
+      return '开始学习'
+    case 'profile_incomplete':
+      return '完善课程画像'
+    case 'path_missing':
+      return '生成学习路径'
+    default:
+      return '继续学习'
+  }
 }
 
-function getCourseLearningTarget(course, path) {
-  if (!course) return '/courses'
-  if (!path?.stages?.length) return `/course/${course.id}/path`
-  const { task } = getCurrentLearningTarget(path)
-  if (!task?.id) return `/course/${course.id}/path`
-  return `/course/${course.id}/learn/${encodeURIComponent(task.id)}`
+function statusTag(status) {
+  const map = {
+    completed: ['success', '已完成'],
+    learning: ['processing', '学习中'],
+    not_started: ['default', '未开始'],
+    path_missing: ['warning', '尚未生成路径'],
+    profile_incomplete: ['warning', '画像待完善'],
+  }
+  const [color, label] = map[status] || ['default', '待确认']
+  return <Tag color={color}>{label}</Tag>
 }
 
 export default function CourseEntryPage() {
@@ -71,6 +85,7 @@ export default function CourseEntryPage() {
   const [enteringId, setEnteringId] = useState(null)
   const [loadingMeta, setLoadingMeta] = useState(true)
   const [courseMeta, setCourseMeta] = useState({})
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   const visibleCourses = useMemo(() => normalizeCourses(courses), [courses])
   const currentCourse = useMemo(() => {
@@ -86,8 +101,12 @@ export default function CourseEntryPage() {
       try {
         const entries = await Promise.all(
           visibleCourses.map(async (course) => {
-            const path = await getLearningPath(course.student_id).catch(() => null)
-            return [course.id, { path, progress: calcProgress(path) }]
+            try {
+              const state = await getCourseLearningState(course.id)
+              return [course.id, { state, error: null }]
+            } catch (error) {
+              return [course.id, { state: null, error }]
+            }
           }),
         )
         if (!cancelled) setCourseMeta(Object.fromEntries(entries))
@@ -97,14 +116,24 @@ export default function CourseEntryPage() {
     }
     loadMeta()
     return () => { cancelled = true }
-  }, [visibleCourses])
+  }, [visibleCourses, reloadNonce])
 
   const enterCourse = useCallback(async (course) => {
     if (!course) return
     setEnteringId(course.id)
     try {
       if (course.id !== activeCourse?.id) await activateCourse(course.id)
-      navigate(getCourseLearningTarget(course, courseMeta[course.id]?.path))
+      const meta = courseMeta[course.id]
+      if (meta?.error) {
+        message.error('学习状态加载失败，请重新加载')
+        return
+      }
+      const route = meta?.state?.continue_target?.route
+      if (!route) {
+        message.error('暂时没有可进入的学习内容')
+        return
+      }
+      navigate(route)
     } catch (error) {
       message.error(error.message || '进入课程失败')
     } finally {
@@ -149,26 +178,38 @@ export default function CourseEntryPage() {
           <>
             {currentCourse && (
               <Card className="current-course-card">
+                {courseMeta[currentCourse.id]?.error && (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="学习状态加载失败"
+                    action={<Button size="small" onClick={() => setReloadNonce((value) => value + 1)}>重新加载</Button>}
+                    style={{ marginBottom: 16 }}
+                  />
+                )}
                 <div className="current-course-layout">
                   <Avatar className="course-avatar current">{getCourseIcon(currentCourse)}</Avatar>
                   <div className="current-course-copy">
                     <Text className="current-label">当前课程</Text>
-                    <Title level={3}>{currentCourse.title}</Title>
-                    <Paragraph>{currentCourse.goal || '继续完善课程目标，系统会根据画像推荐学习路径。'}</Paragraph>
+                    <Title level={3}>{courseMeta[currentCourse.id]?.state?.course?.course_name || currentCourse.title}</Title>
+                    <Paragraph>
+                      学习目标：{courseMeta[currentCourse.id]?.state?.learning_goal || currentCourse.goal || '继续完善课程目标，系统会根据画像推荐学习路径。'}
+                    </Paragraph>
                     <Space size={18} wrap>
-                      <Text><BookOutlined /> 当前章节：{courseMeta[currentCourse.id]?.path?.stages?.[0]?.title || '等待生成路径'}</Text>
+                      <Text><BookOutlined /> 当前章节：{courseMeta[currentCourse.id]?.state?.current_stage?.title || '等待生成路径'}</Text>
                       <Text><ClockCircleOutlined /> {formatRecentTime(currentCourse.updated_at || currentCourse.updatedAt)}</Text>
+                      {statusTag(courseMeta[currentCourse.id]?.state?.course_status)}
                     </Space>
                   </div>
                   <div className="current-course-actions">
                     <Progress
                       type="circle"
-                      percent={courseMeta[currentCourse.id]?.progress || 0}
+                      percent={courseMeta[currentCourse.id]?.state?.progress?.percent ?? 0}
                       strokeColor="#6C5CE7"
                       size={92}
                     />
                     <Button type="primary" icon={<ArrowRightOutlined />} loading={enteringId === currentCourse.id} onClick={() => enterCourse(currentCourse)}>
-                      继续学习
+                      {actionText(courseMeta[currentCourse.id]?.state?.course_status)}
                     </Button>
                     <Button icon={<ProfileOutlined />} onClick={() => navigate(`/course/${currentCourse.id}/path`)}>
                       查看路径
@@ -187,10 +228,16 @@ export default function CourseEntryPage() {
                   </div>
                   <Title level={5}>{course.title}</Title>
                   <Paragraph>{course.goal || '尚未设置明确目标'}</Paragraph>
-                  <Progress percent={courseMeta[course.id]?.progress || 0} showInfo={false} strokeColor="#20C7B7" />
+                  {courseMeta[course.id]?.error ? (
+                    <Text type="danger">学习状态加载失败</Text>
+                  ) : (
+                    <Progress percent={courseMeta[course.id]?.state?.progress?.percent ?? 0} showInfo={false} strokeColor="#20C7B7" />
+                  )}
                   <div className="compact-course-footer">
                     <Text>{formatRecentTime(course.updated_at || course.updatedAt)}</Text>
-                    <Button type="link" onClick={() => enterCourse(course)}>进入课程</Button>
+                    <Button type="link" onClick={() => enterCourse(course)}>
+                      {actionText(courseMeta[course.id]?.state?.course_status)}
+                    </Button>
                   </div>
                 </Card>
               ))}

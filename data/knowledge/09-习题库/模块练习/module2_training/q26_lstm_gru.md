@@ -1,4 +1,4 @@
-# 合并的权重矩阵 (4 * hidden_size for f, i, g, o)
+# 合并的权重矩阵 (4 * hidden_size 对应 f, i, g, o)
 
 > 来源模块: module2_training
 > 原始文件: q26_lstm_gru.py
@@ -68,7 +68,7 @@ class ManualLSTMCell(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
 
-        # 合并的权重矩阵 (4 * hidden_size for f, i, g, o)
+        # 合并的权重矩阵 (4 * hidden_size 对应 f, i, g, o)
         self.W_ih = nn.Parameter(torch.randn(input_size, 4 * hidden_size) * 0.01)
         self.W_hh = nn.Parameter(torch.randn(hidden_size, 4 * hidden_size) * 0.01)
         self.bias_ih = nn.Parameter(torch.zeros(4 * hidden_size))
@@ -107,7 +107,7 @@ class ManualGRUCell(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
 
-        # 重置门和更新门 (2 * hidden_size for r, z)
+        # 重置门和更新门 (2 * hidden_size 对应 r, z)
         self.W_ih_rz = nn.Parameter(torch.randn(input_size, 2 * hidden_size) * 0.01)
         self.W_hh_rz = nn.Parameter(torch.randn(hidden_size, 2 * hidden_size) * 0.01)
         self.bias_rz = nn.Parameter(torch.zeros(2 * hidden_size))
@@ -299,9 +299,9 @@ def solve():
 
     # ---- 2. 创建模型 ----
     models = {
-        "Manual LSTM": ManualLSTMClassifier(vocab_size, embed_dim,
+        "手动LSTM": ManualLSTMClassifier(vocab_size, embed_dim,
                                              hidden_size, num_classes),
-        "Manual GRU": ManualGRUClassifier(vocab_size, embed_dim,
+        "手动GRU": ManualGRUClassifier(vocab_size, embed_dim,
                                            hidden_size, num_classes),
         "PyTorch LSTM": PytorchLSTMClassifier(vocab_size, embed_dim,
                                                hidden_size, num_classes),
@@ -344,8 +344,8 @@ def solve():
     for name, res in results.items():
         ax1.plot(res["losses"], label=name, linewidth=1.5)
     ax1.set_xlabel("Epoch")
-    ax1.set_ylabel("Loss")
-    ax1.set_title("Training Loss")
+    ax1.set_ylabel("损失")
+    ax1.set_title("训练损失")
     ax1.legend()
     ax1.grid(True, alpha=0.3)
 
@@ -354,8 +354,8 @@ def solve():
     accs = [results[n]["acc"] for n in names]
     colors = ["#4C72B0", "#DD8452", "#55A868", "#C44E52"]
     bars = ax2.bar(names, accs, color=colors[:len(names)], alpha=0.8)
-    ax2.set_ylabel("Test Accuracy")
-    ax2.set_title("Test Accuracy Comparison")
+    ax2.set_ylabel("测试精度")
+    ax2.set_title("测试精度对比")
     ax2.set_ylim(0, 1.0)
     ax2.grid(True, alpha=0.3, axis="y")
     for bar, acc in zip(bars, accs):

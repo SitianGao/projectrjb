@@ -1,4 +1,4 @@
-# Depthwise: 每个通道独立卷积
+# 逐通道卷积: 每个通道独立卷积
 
 > 来源模块: module2_training
 > 原始文件: q23_mobilenet.py
@@ -56,14 +56,14 @@ class DepthwiseSeparableConv(nn.Module):
 
     def __init__(self, in_channels, out_channels, stride=1):
         super(DepthwiseSeparableConv, self).__init__()
-        # Depthwise: 每个通道独立卷积
+        # 逐通道卷积: 每个通道独立卷积
         self.depthwise = nn.Conv2d(
             in_channels, in_channels,
             kernel_size=3, stride=stride, padding=1,
             groups=in_channels, bias=False
         )
         self.bn1 = nn.BatchNorm2d(in_channels)
-        # Pointwise: 1x1卷积融合通道
+        # 逐点卷积: 1x1卷积融合通道
         self.pointwise = nn.Conv2d(
             in_channels, out_channels,
             kernel_size=1, stride=1, padding=0, bias=False
@@ -260,7 +260,7 @@ def solve():
     print("\n" + "=" * 60)
     print("参数量与计算量对比")
     print("=" * 60)
-    print(f"{'指标':<25} {'MobileNet':>15} {'StandardConv':>15}")
+    print(f"{'指标':<25} {'MobileNet':>15} {'标准卷积':>15}")
     print("-" * 56)
     print(f"{'参数量':<25} {mobile_params:>15,} {std_params:>15,}")
     print(f"{'FLOPs(单张图片)':<25} {mobile_flops:>15,} {std_flops:>15,}")
@@ -276,14 +276,14 @@ def solve():
     )
     std_acc = train_and_evaluate(
         stdnet, train_loader, test_loader, device,
-        n_epochs=n_epochs, name="StandardConvNet"
+        n_epochs=n_epochs, name="标准卷积网络"
     )
 
     # ---- 5. 最终对比 ----
     print("\n" + "=" * 60)
     print("最终对比结果")
     print("=" * 60)
-    print(f"{'指标':<25} {'MobileNet':>15} {'StandardConv':>15}")
+    print(f"{'指标':<25} {'MobileNet':>15} {'标准卷积':>15}")
     print("-" * 56)
     print(f"{'参数量':<25} {mobile_params:>15,} {std_params:>15,}")
     print(f"{'测试精度':<25} {mobile_acc:>14.2f}% {std_acc:>14.2f}%")
@@ -297,7 +297,7 @@ def solve():
     st_conv = StandardConv(64, 128)
     ds_params = sum(p.numel() for p in ds_conv.parameters())
     st_params = sum(p.numel() for p in st_conv.parameters())
-    print(f"  输入: 64通道, 输出: 128通道, kernel: 3x3")
+    print(f"  输入: 64通道, 输出: 128通道, 卷积核: 3x3")
     print(f"  深度可分离卷积参数: {ds_params:,}")
     print(f"  标准卷积参数:       {st_params:,}")
     print(f"  压缩比:             {st_params/ds_params:.2f}x")

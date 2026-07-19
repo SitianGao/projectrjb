@@ -64,7 +64,7 @@ class PatchEmbedding(nn.Module):
         return x
 
 
-# ------------------ Multi-Head Self-Attention ------------------
+# ------------------ 多头自注意力 ------------------
 class MultiHeadSelfAttention(nn.Module):
     """多头自注意力机制"""
 
@@ -86,7 +86,7 @@ class MultiHeadSelfAttention(nn.Module):
         qkv = qkv.permute(2, 0, 3, 1, 4)  # (3, B, heads, N, head_dim)
         q, k, v = qkv[0], qkv[1], qkv[2]
 
-        # Scaled dot-product attention
+        # 缩放点积注意力
         scale = self.head_dim ** -0.5
         attn = (q @ k.transpose(-2, -1)) * scale  # (B, heads, N, N)
         attn = attn.softmax(dim=-1)
@@ -117,7 +117,7 @@ class MLP(nn.Module):
 
 # ------------------ Transformer Encoder Block ------------------
 class TransformerEncoderBlock(nn.Module):
-    """Transformer Encoder Block"""
+    """Transformer编码器块"""
 
     def __init__(self, embed_dim=64, num_heads=4, mlp_hidden_dim=128, dropout=0.1):
         super().__init__()
@@ -159,14 +159,14 @@ class VisionTransformer(nn.Module):
         self.pos_embed = nn.Parameter(torch.randn(1, num_patches + 1, embed_dim) * 0.02)
         self.pos_drop = nn.Dropout(dropout)
 
-        # Transformer Encoder
+        # Transformer编码器
         self.blocks = nn.ModuleList([
             TransformerEncoderBlock(embed_dim, num_heads, mlp_hidden_dim, dropout)
             for _ in range(num_layers)
         ])
         self.norm = nn.LayerNorm(embed_dim)
 
-        # Classification Head
+        # 分类头
         self.head = nn.Linear(embed_dim, num_classes)
 
     def forward(self, x):
@@ -182,7 +182,7 @@ class VisionTransformer(nn.Module):
         # 添加位置编码
         x = self.pos_drop(x + self.pos_embed)
 
-        # Transformer Encoder blocks
+        # Transformer编码器块
         for block in self.blocks:
             x = block(x)
 
@@ -251,8 +251,8 @@ def train_model(model, train_loader, test_loader, num_epochs=10, lr=1e-3, device
 
         print(
             f"Epoch [{epoch + 1:2d}/{num_epochs}] | "
-            f"Train Loss: {avg_train_loss:.4f} Acc: {train_acc:.4f} | "
-            f"Test Loss: {avg_test_loss:.4f} Acc: {test_acc:.4f}"
+            f"训练损失: {avg_train_loss:.4f} 精度: {train_acc:.4f} | "
+            f"测试损失: {avg_test_loss:.4f} 精度: {test_acc:.4f}"
         )
 
     print("=" * 60)

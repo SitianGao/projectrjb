@@ -1,4 +1,4 @@
-# 前向和后向使用独立的RNN cell
+# 前向和后向使用独立的RNN单元
 
 > 来源模块: module2_training
 > 原始文件: q25_rnn_birnn.py
@@ -117,7 +117,7 @@ class ManualBiRNN(nn.Module):
     def __init__(self, input_size, hidden_size):
         super(ManualBiRNN, self).__init__()
         self.hidden_size = hidden_size
-        # 前向和后向使用独立的RNN cell
+        # 前向和后向使用独立的RNN单元
         self.forward_cell = ManualRNNCell(input_size, hidden_size)
         self.backward_cell = ManualRNNCell(input_size, hidden_size)
 
@@ -240,7 +240,7 @@ def train_model(model, X_train, y_train, X_test, y_test,
                 test_pred = model(X_test)
                 test_mse = criterion(test_pred, y_test).item()
             print(f"  [{name}] Epoch {epoch+1}/{n_epochs} "
-                  f"TrainLoss={loss.item():.6f} TestMSE={test_mse:.6f}")
+                  f"训练损失={loss.item():.6f} 测试MSE={test_mse:.6f}")
 
     model.eval()
     with torch.no_grad():
@@ -266,11 +266,11 @@ def solve():
     output_size = 5
 
     models = {
-        "Manual RNN": SequencePredictor(input_size, hidden_size, output_size,
+        "手动RNN": SequencePredictor(input_size, hidden_size, output_size,
                                          "manual_rnn"),
         "PyTorch RNN": SequencePredictor(input_size, hidden_size, output_size,
                                           "pytorch_rnn"),
-        "Manual Bi-RNN": SequencePredictor(input_size, hidden_size, output_size,
+        "手动Bi-RNN": SequencePredictor(input_size, hidden_size, output_size,
                                             "manual_birnn"),
         "PyTorch Bi-RNN": SequencePredictor(input_size, hidden_size, output_size,
                                              "pytorch_birnn"),
@@ -302,9 +302,9 @@ def solve():
     print("=" * 60)
     with torch.no_grad():
         test_input = torch.randn(1, 20, 1)
-        manual_rnn_out, _ = models["Manual RNN"].rnn(test_input)
+        manual_rnn_out, _ = models["手动RNN"].rnn(test_input)
         pytorch_rnn_out, _ = models["PyTorch RNN"].rnn(test_input)
-        print(f"Manual RNN输出形状: {manual_rnn_out.shape}")
+        print(f"手动RNN输出形状: {manual_rnn_out.shape}")
         print(f"PyTorch RNN输出形状: {pytorch_rnn_out.shape}")
         print(f"两者输出形状一致: {manual_rnn_out.shape == pytorch_rnn_out.shape}")
 
@@ -326,13 +326,13 @@ def solve():
         true_input = X_test[sample_idx].squeeze().numpy()
         true_output = y_test[sample_idx].squeeze().numpy()
 
-        ax.plot(t_input, true_input, "b-", label="Input", linewidth=2)
-        ax.plot(t_output, true_output, "g-", label="Ground Truth", linewidth=2)
-        ax.plot(t_output, pred, "r--", label="Prediction", linewidth=2)
+        ax.plot(t_input, true_input, "b-", label="输入", linewidth=2)
+        ax.plot(t_output, true_output, "g-", label="真实值", linewidth=2)
+        ax.plot(t_output, pred, "r--", label="预测值", linewidth=2)
         ax.set_title(name)
         ax.legend(fontsize=8)
-        ax.set_xlabel("Time Step")
-        ax.set_ylabel("Value")
+        ax.set_xlabel("时间步")
+        ax.set_ylabel("值")
 
     plt.tight_layout()
     plt.savefig("q25_rnn_birnn.png", dpi=150, bbox_inches="tight")

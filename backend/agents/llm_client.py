@@ -103,9 +103,16 @@ class LLMClient:
         response_format: Optional[dict[str, str]] = None,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[str]:
-        """流式对话——根据 LLM_PRIMARY 选择主模型，失败自动切换备选。"""
+        """流式对话——根据 LLM_PRIMARY 选择主模型，失败自动切换备选。
+
+        异常语义（Step 2 修复）：
+        - Provider 不可用或调用失败时必须 raise，禁止 yield 中文提示
+        - 重试/切换信息只写日志，不混入模型内容
+        - LLM_STRICT_MODE=true 时不切换备用模型
+        """
         start = time.monotonic()
         provider = self.primary
+        errors: list[str] = []
 
         try:
             if self.primary == "deepseek":
@@ -114,36 +121,40 @@ class LLMClient:
                 provider = "deepseek"
             else:
                 spark_failed = False
+                last_error = None
                 for attempt in range(self.max_retries):
                     try:
-                        stream = self._call_spark(
+                        async for chunk in self._call_spark(
                             system, user, model,
                             response_format=response_format,
                             response_schema=response_schema,
-                        )
-                        async for chunk in stream:
+                        ):
                             yield chunk
                         self._record_usage(start, model or os.getenv("SPARK_MODEL", "4.0Ultra"), "spark")
                         return
-                    except Exception as e:
+                    except (httpx.HTTPError, httpx.TimeoutException, OSError, RuntimeError) as e:
                         spark_failed = True
+                        last_error = e
                         logger.warning("[LLMClient] Spark attempt %d/%d failed: %s", attempt + 1, self.max_retries, e)
                         if attempt < self.max_retries - 1:
-                            yield f"[提示: 讯飞星火响应超时，正在重试（第{attempt + 1}/{self.max_retries}次）...]\n"
                             await asyncio.sleep(self.retry_base_delay * (2 ** attempt))
 
                 if spark_failed:
+                    errors.append(f"Spark: {last_error}")
                     if config.LLM_STRICT_MODE:
-                        raise RuntimeError("严格模式：讯飞星火调用失败，拒绝切换备用模型")
+                        raise RuntimeError(f"严格模式：讯飞星火调用失败（已重试{self.max_retries}次），拒绝切换备用模型") from last_error
                     logger.warning("[LLMClient] Spark 全部重试失败，切换至 DeepSeek")
-                    yield "[提示: 讯飞星火服务暂时不可用，正在切换至备用模型...]\n"
                     try:
                         async for chunk in self._call_deepseek(system, user):
                             yield chunk
                         provider = "deepseek"
-                    except Exception as e2:
+                        return
+                    except (httpx.HTTPError, httpx.TimeoutException, OSError, RuntimeError) as e2:
+                        errors.append(f"DeepSeek(fallback): {e2}")
                         logger.error("[LLMClient] 备用模型也失败: %s", e2)
-                        yield "[提示: AI 服务暂时不可用，当前将使用模板资源，建议稍后重新生成。]"
+            # 所有路径都失败
+            error_detail = "; ".join(errors) if errors else "未知错误"
+            raise RuntimeError(f"所有 LLM Provider 调用失败：{error_detail}")
         finally:
             elapsed = int((time.monotonic() - start) * 1000)
             usage = self._last_usage or UsageStats()
@@ -277,8 +288,7 @@ class LLMClient:
     async def _call_deepseek(self, system: str, user: str) -> AsyncIterator[str]:
         api_key = os.getenv("DEEPSEEK_API_KEY", "")
         if not api_key:
-            yield "[提示: DeepSeek API Key 未配置，请检查 .env 文件]"
-            return
+            raise RuntimeError("DeepSeek API 未配置：缺少 DEEPSEEK_API_KEY，请检查 .env 文件")
 
         async with httpx.AsyncClient(timeout=self._timeout()) as client:
             async with client.stream(

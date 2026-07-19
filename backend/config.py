@@ -36,6 +36,26 @@ SPARK_MODEL = os.getenv("SPARK_MODEL", "4.0Ultra")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
+# 讯飞在线语音合成（与星火大模型密码不是同一组凭证）。
+XFYUN_TTS_APP_ID = os.getenv("XFYUN_TTS_APP_ID", "")
+XFYUN_TTS_API_KEY = os.getenv("XFYUN_TTS_API_KEY", "")
+XFYUN_TTS_API_SECRET = os.getenv("XFYUN_TTS_API_SECRET", "")
+XFYUN_TTS_VOICE = os.getenv("XFYUN_TTS_VOICE", "xiaoyan")
+
+# ── 星火 PPT API 配置 ───────────────────────────────────
+SPARK_PPT_API_KEY = os.getenv("SPARK_PPT_API_KEY", "")
+SPARK_PPT_API_URL = os.getenv(
+    "SPARK_PPT_API_URL",
+    "https://zwapi.xfyun.cn/api/ppt/v2",
+)
+SPARK_PPT_DOWNLOAD_DIR = os.getenv(
+    "SPARK_PPT_DOWNLOAD_DIR",
+    str(Path(__file__).resolve().parent / "storage" / "ppt"),
+)
+SPARK_PPT_ENABLED = os.getenv("SPARK_PPT_ENABLED", "true").lower() not in {
+    "0", "false", "no", "off",
+}
+
 # ── LLM 调用配置 ────────────────────────────────────
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "30"))
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
@@ -43,7 +63,7 @@ LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "3"))
 # 画像达到该完整度后，才允许进入学习路径生成阶段。
 # ProfileService 与 PlannerService 必须共享同一门槛，避免出现画像停止追问、
 # 但路径仍无法生成的业务断层。
-PROFILE_READY_THRESHOLD = 0.85
+PROFILE_READY_THRESHOLD = 0.75
 
 # 向量库配置
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_data")

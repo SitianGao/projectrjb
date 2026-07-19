@@ -459,5 +459,229 @@ async def _run_async(cmd: List[str]) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
 
+# ══════════════════════════════════════════════════════════
+# 实验运行（非判题，用于交互式代码实验）
+# ══════════════════════════════════════════════════════════
+
+@dataclass
+class ExperimentResult:
+    """实验运行结果"""
+    status: str = "success"       # success | runtime_error | timeout | safety_error
+    stdout: str = ""
+    stderr: str = ""
+    metrics: Dict[str, Any] = field(default_factory=dict)
+    chart_data: Dict[str, Any] = field(default_factory=dict)
+    observations: List[str] = field(default_factory=list)
+    execution_time_ms: float = 0
+
+
+# 用于从代码输出中提取结构化数据的标记前缀
+_CHART_MARKER = "__CHART_DATA__:"
+_METRICS_MARKER = "__METRICS__:"
+
+
+def _parse_experiment_output(stdout: str) -> tuple[dict, dict, list[str]]:
+    """从实验输出中解析 chart_data、metrics 和 observations。
+
+    支持两种方式：
+    1. 代码显式输出 __CHART_DATA__:{json} 和 __METRICS__:{json} 标记
+    2. 自动从 epoch/loss 等常见模式中提取数据
+    """
+    chart_data = {}
+    metrics = {}
+    observations = []
+
+    # ── 解析显式标记 ──
+    for line in stdout.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith(_CHART_MARKER):
+            try:
+                chart_data = json.loads(stripped[len(_CHART_MARKER):])
+            except json.JSONDecodeError:
+                pass
+        elif stripped.startswith(_METRICS_MARKER):
+            try:
+                metrics = json.loads(stripped[len(_METRICS_MARKER):])
+            except json.JSONDecodeError:
+                pass
+
+    # ── 自动解析：从输出中提取 epoch/loss 对 ──
+    if not chart_data:
+        loss_points = []
+        acc_points = []
+        for line in stdout.split("\n"):
+            # 匹配 "epoch 10, loss = 0.532" 或 "Epoch 10: loss=0.532" 等模式
+            m = re.search(
+                r'[Ee]poch\s*[:\s]*(\d+).*?loss\s*[:\=]\s*([\d.eE+-]+)',
+                line, re.IGNORECASE
+            )
+            if m:
+                loss_points.append({
+                    "epoch": int(m.group(1)),
+                    "loss": float(m.group(2)),
+                })
+            # 匹配 accuracy
+            m2 = re.search(
+                r'[Ee]poch\s*[:\s]*(\d+).*?acc(?:uracy)?\s*[:\=]\s*([\d.eE+-]+)',
+                line, re.IGNORECASE
+            )
+            if m2:
+                acc_points.append({
+                    "epoch": int(m2.group(1)),
+                    "acc": float(m2.group(2)),
+                })
+
+        if loss_points:
+            chart_data["loss_curve"] = loss_points
+        if acc_points:
+            chart_data["accuracy_curve"] = acc_points
+
+    # ── 自动解析 metrics ──
+    if not metrics:
+        # 尝试从输出中提取 final loss
+        final_loss_match = re.search(
+            r'final\s*(?:loss|mse)\s*[:\=]\s*([\d.eE+-]+)',
+            stdout, re.IGNORECASE
+        )
+        if final_loss_match:
+            metrics["final_loss"] = float(final_loss_match.group(1))
+
+        final_acc_match = re.search(
+            r'final\s*acc(?:uracy)?\s*[:\=]\s*([\d.eE+-]+)',
+            stdout, re.IGNORECASE
+        )
+        if final_acc_match:
+            metrics["accuracy"] = float(final_acc_match.group(1))
+
+    # ── 生成观察结论 ──
+    if chart_data.get("loss_curve"):
+        points = chart_data["loss_curve"]
+        if len(points) >= 2:
+            first_loss = points[0]["loss"]
+            last_loss = points[-1]["loss"]
+            if last_loss < first_loss * 0.1:
+                observations.append("损失值大幅下降，模型收敛良好")
+            elif last_loss < first_loss * 0.5:
+                observations.append("损失值稳步下降")
+            elif last_loss >= first_loss:
+                observations.append("损失值未下降，可能存在学习率过大或模型问题")
+
+            # 检测震荡
+            oscillations = 0
+            for i in range(2, len(points)):
+                if (points[i]["loss"] - points[i-1]["loss"]) * (points[i-1]["loss"] - points[i-2]["loss"]) < 0:
+                    oscillations += 1
+            if oscillations > len(points) * 0.5:
+                observations.append("损失曲线出现明显震荡，建议降低学习率")
+
+    if metrics.get("accuracy"):
+        acc = metrics["accuracy"]
+        if acc > 0.9:
+            observations.append(f"模型准确率 {acc:.1%}，表现优秀")
+        elif acc > 0.7:
+            observations.append(f"模型准确率 {acc:.1%}，表现良好")
+        else:
+            observations.append(f"模型准确率 {acc:.1%}，仍有提升空间")
+
+    return chart_data, metrics, observations
+
+
+class ExperimentRunner:
+    """实验代码运行器 —— 仅支持 Python，不使用判题逻辑。"""
+
+    def __init__(self, sandbox: SandboxService):
+        self.sandbox = sandbox
+
+    async def run(
+        self,
+        code: str,
+        time_limit_sec: int = 30,
+        memory_limit_mb: int = 256,
+    ) -> ExperimentResult:
+        """运行实验代码，返回结构化结果。"""
+        import time as _time
+        start = _time.time()
+
+        # 安全检查
+        cfg = JudgeConfig(
+            time_limit_sec=time_limit_sec,
+            memory_limit_mb=memory_limit_mb,
+        )
+        safety_error = self.sandbox._check_safety(code, "python", cfg)
+        if safety_error:
+            return ExperimentResult(
+                status="safety_error",
+                stderr=safety_error,
+            )
+
+        work_dir = Path(tempfile.mkdtemp(prefix="eduagent_experiment_"))
+        try:
+            code_file = work_dir / "experiment.py"
+            code_file.write_text(code, encoding="utf-8")
+
+            try:
+                proc = subprocess.run(
+                    ["python3", str(code_file)],
+                    capture_output=True, text=True,
+                    timeout=time_limit_sec + 2,
+                    cwd=str(work_dir),
+                )
+            except FileNotFoundError:
+                # Windows 可能没有 python3，尝试 python
+                try:
+                    proc = subprocess.run(
+                        ["python", str(code_file)],
+                        capture_output=True, text=True,
+                        timeout=time_limit_sec + 2,
+                        cwd=str(work_dir),
+                    )
+                except FileNotFoundError:
+                    return ExperimentResult(
+                        status="runtime_error",
+                        stderr="Python 解释器未找到",
+                    )
+            except subprocess.TimeoutExpired:
+                return ExperimentResult(
+                    status="timeout",
+                    stderr=f"代码执行超时（{time_limit_sec}秒）",
+                    execution_time_ms=time_limit_sec * 1000,
+                )
+
+            elapsed = (_time.time() - start) * 1000
+            stdout = proc.stdout or ""
+            stderr = proc.stderr or ""
+
+            if proc.returncode != 0:
+                return ExperimentResult(
+                    status="runtime_error",
+                    stdout=stdout,
+                    stderr=stderr[:2000],
+                    execution_time_ms=round(elapsed, 1),
+                )
+
+            # 解析输出
+            chart_data, metrics, observations = _parse_experiment_output(stdout)
+
+            return ExperimentResult(
+                status="success",
+                stdout=stdout,
+                stderr=stderr,
+                metrics=metrics,
+                chart_data=chart_data,
+                observations=observations,
+                execution_time_ms=round(elapsed, 1),
+            )
+
+        except Exception as exc:
+            logger.exception(f"实验运行异常: {exc}")
+            return ExperimentResult(
+                status="runtime_error",
+                stderr=str(exc)[:1000],
+            )
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
+
+
 # 模块单例
 default_sandbox = SandboxService()
+default_experiment_runner = ExperimentRunner(default_sandbox)

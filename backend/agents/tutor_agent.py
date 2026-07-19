@@ -21,6 +21,7 @@ from core.agent_context import AgentContext
 from agents.schemas import TutorResponse
 from agents.prompts.tutor_prompts import (
     TUTOR_SYSTEM_PROMPT,
+    TUTOR_STREAM_SYSTEM_PROMPT,
     TUTOR_ACTION_PROMPTS,
 )
 from core.knowledge_service import knowledge_service
@@ -86,6 +87,7 @@ class TutorAgent(BaseAgent):
         context: Optional[List[str]] = None,
         explanation_style: str = "auto",
         profile: Optional[dict] = None,
+        **kwargs,
     ) -> str:
         """
         智能辅导问答。
@@ -98,42 +100,121 @@ class TutorAgent(BaseAgent):
         Returns:
             JSON 字符串: {answer, explanation_style, references, diagrams}
         """
-        # ---- Day 10: 安全过滤 ----
+        chunks: list[str] = []
+        async for chunk in self.tutor_stream(
+            question=question,
+            context=context,
+            explanation_style=explanation_style,
+            profile=profile,
+            **kwargs,
+        ):
+            chunks.append(chunk)
+        return "".join(chunks)
+
+    async def tutor_stream(
+        self,
+        question: str,
+        context: Optional[List[str]] = None,
+        explanation_style: str = "auto",
+        profile: Optional[dict] = None,
+        learning_context: str = "",
+        **kwargs,
+    ):
+        """
+        流式智能辅导问答 —— 逐 token 产出。
+
+        与 tutor() 的唯一区别：不收集完整回答后才返回，
+        而是每拿到一个 LLM token 就 yield 出去。
+
+        Yields:
+            str: LLM token chunks (for delta SSE events).
+                  On safety rejection or rule fallback, yields the full
+                  answer as a single chunk.
+        """
         from safety.content_filter import check_safety
+
         filter_result = check_safety(question, context="tutor_question")
         if not filter_result["safe"]:
-            return json.dumps({
-                "answer": f"⚠️ {filter_result['reason']}",
-                "explanation_style": "auto",
-                "references": [],
-                "diagrams": [],
-                "blocked": True,
-                "block_reason": filter_result["category"],
-            }, ensure_ascii=False)
+            yield f"⚠️ {filter_result['reason']}"
+            return
 
         profile_inner = (profile or {}).get("profile", profile or {})
         knowledge = profile_inner.get("knowledge_level", "中级")
 
-        style_instruction = STYLE_PROMPTS.get(explanation_style, STYLE_PROMPTS["auto"])
+        # action-specific instruction
+        action = kwargs.get("action", "ask")
+        action_instruction = TUTOR_ACTION_PROMPTS.get(action, TUTOR_ACTION_PROMPTS["ask"])
+        selected_text = kwargs.get("selected_text") or ""
+        if "{selected_text}" in action_instruction:
+            action_instruction = action_instruction.format(selected_text=selected_text or "（无选中文本）")
+
+        # RAG knowledge context
         context_text = "\n".join(context or [])
 
-        user_prompt = (
-            f"学生认知水平: {knowledge}\n"
-            f"问题: {question}\n\n"
-            + (f"参考知识:\n{context_text}\n\n" if context_text else "")
-            + style_instruction
+        # ── Build rich user prompt with learning context ─────────
+        user_prompt_parts = []
+
+        # 1. Learning context (course / stage / task / profile)
+        if learning_context:
+            user_prompt_parts.append(f"## 学生学习上下文\n{learning_context}")
+
+        # 2. Student knowledge level
+        if not learning_context or "学生水平" not in learning_context:
+            user_prompt_parts.append(f"学生认知水平: {knowledge}")
+
+        # 3. Conversation history
+        history = kwargs.get("conversation_history") or kwargs.get("history")
+        if history and isinstance(history, list) and len(history) > 0:
+            recent = history[-6:]  # Last 6 rounds
+            history_lines = []
+            for item in recent:
+                if isinstance(item, dict):
+                    role = "学生" if item.get("role") == "user" else "导师"
+                    content = str(item.get("content", ""))[:300]
+                    history_lines.append(f"{role}: {content}")
+                elif isinstance(item, str):
+                    history_lines.append(f"学生: {item[:300]}")
+            if history_lines:
+                user_prompt_parts.append(f"## 最近对话\n" + "\n".join(history_lines))
+
+        # 4. The student's question
+        user_prompt_parts.append(f"## 学生问题\n{question}")
+
+        # 5. Knowledge base references
+        if context_text:
+            user_prompt_parts.append(f"## 课程知识库参考资料\n{context_text}")
+
+        # 6. Action instruction
+        user_prompt_parts.append(f"## 回答要求\n{action_instruction}")
+
+        # 7. Style hint (if not auto)
+        if explanation_style != "auto":
+            style_hint = STYLE_PROMPTS.get(explanation_style, "")
+            if style_hint:
+                user_prompt_parts.append(f"\n解释风格偏好: {style_hint[:200]}")
+
+        user_prompt = "\n\n".join(user_prompt_parts)
+        # 强制自然语言输出（防止模型输出 JSON）
+        user_prompt += (
+            "\n\n⚠️ 输出格式要求：你的回答必须是学生可以直接阅读的纯文本。"
+            "禁止输出 JSON。禁止输出 ```json 代码块。"
+            "直接以自然语言开始回答，就像老师在和学生说话一样。"
         )
 
         if self.llm:
             try:
-                chunks = []
-                async for chunk in self.call_llm(user_prompt):
-                    chunks.append(chunk)
-                return "".join(chunks)
+                async for chunk in self.call_llm(
+                    user_prompt,
+                    system_prompt=TUTOR_STREAM_SYSTEM_PROMPT,
+                ):
+                    yield chunk
+                return
             except Exception:
                 pass
 
-        return self._rule_based_tutor(question, explanation_style, knowledge, context or [])
+        # Rule-based fallback → yield plain text answer, not JSON
+        fallback_answer = self._build_plain_fallback(question, explanation_style, knowledge, context or [])
+        yield fallback_answer
 
     # ------------------------------------------------------------------
     # RAG 集成入口 v1（Day 8 核心）—— 向后兼容，支持可选 course_id
@@ -642,6 +723,71 @@ class TutorAgent(BaseAgent):
             confidence=0.3,
             explanation_style=explanation_style,
         )
+
+    # ------------------------------------------------------------------
+    # Plain-text fallback (for streaming)
+    # ------------------------------------------------------------------
+    def _build_plain_fallback(
+        self,
+        question: str,
+        style: str,
+        knowledge: str,
+        context: list,
+    ) -> str:
+        """Rule-based fallback that returns plain text (not JSON)."""
+        non_academic_keywords = ["天气", "吃饭", "电影", "游戏", "音乐", "八卦"]
+        if any(kw in question for kw in non_academic_keywords):
+            return (
+                "我是学习辅导助手 😊，专注于帮助你解决课程学习中的问题。\n\n"
+                "你可以问我：\n"
+                "- 某个概念的定义和原理\n"
+                "- 公式的推导过程\n"
+                "- 代码实现的思路\n"
+                "- 知识点的对比分析\n\n"
+                "有什么学习上的问题我可以帮你吗？"
+            )
+
+        if style == "auto":
+            if "区别" in question or "对比" in question:
+                style = "analogy"
+            elif "推导" in question or "公式" in question:
+                style = "formula"
+            elif "流程" in question or "步骤" in question:
+                style = "visual"
+            else:
+                style = "analogy"
+
+        templates = {
+            "analogy": (
+                f"就像我们日常生活中的一个场景……\n\n"
+                f"'{question}'可以用一个生活类比来理解：\n\n"
+                f"想象你在……\n\n"
+                f"这个类比中的每个元素分别对应……\n\n"
+                f"核心要点: 日常场景 ↔ 知识点"
+            ),
+            "formula": (
+                f"我们从基本定义出发来推导 '{question}'：\n\n"
+                f"## 推导步骤\n\n"
+                f"1. 定义: ...\n"
+                f"2. 代入: ...\n"
+                f"3. 推导: ...\n"
+                f"4. 结论: ...\n\n"
+                f"> 建议核实: 具体公式符号请以教材为准。"
+            ),
+            "visual": (
+                f"'{question}' 的流程结构如下：\n\n"
+                f"1. **输入**: ...\n"
+                f"2. **处理**: ...\n"
+                f"3. **输出**: ..."
+            ),
+            "story": (
+                f"让我为你讲一个小故事，帮助你理解 '{question}'：\n\n"
+                f"从前有一个初学者小明，他在学习过程中遇到了一个难题……\n\n"
+                f"（故事展开，将知识点作为解决问题的线索）\n\n"
+                f"最后小明发现，原来……就是……！"
+            ),
+        }
+        return templates.get(style, templates["analogy"])
 
     # ------------------------------------------------------------------
     # 规则化兜底 v1（保持向后兼容）

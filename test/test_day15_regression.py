@@ -66,11 +66,16 @@ for r in resources:
         if f not in r:
             errors.append(f'ResourceAgent resource missing field: {f}')
     if r['type'] == 'exercise':
-        try:
-            json.loads(r['content'])
-        except json.JSONDecodeError:
-            errors.append('ResourceAgent exercise is not valid JSON')
-    if 'placeholder' in r['content'].lower() or 'to be generated' in r['content'].lower():
+        content = r['content']
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except json.JSONDecodeError:
+                content = None
+        if not isinstance(content, dict) or not isinstance(content.get('questions'), list):
+            errors.append('ResourceAgent exercise is not valid structured content')
+    content_text = json.dumps(r['content'], ensure_ascii=False) if isinstance(r['content'], dict) else r['content']
+    if 'placeholder' in content_text.lower() or 'to be generated' in content_text.lower():
         errors.append(f'ResourceAgent {r["type"]} contains placeholder text')
 print(f'  ResourceAgent: {len(resources)} resource types, all fields [PASS]')
 

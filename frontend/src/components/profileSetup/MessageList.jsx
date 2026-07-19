@@ -8,7 +8,11 @@ export default function MessageList({ messages, loading }) {
       {messages.map((message, index) => (
         <ChatMessageRenderer key={message.id || `${message.role}-${message.client_message_id || index}`} message={message} />
       ))}
-      {loading && <div className="profile-message-loading"><Spin size="small" /> ProfileAgent 正在分析你的学习信息...</div>}
+      {loading && (
+        <div className="profile-message-loading">
+          <Spin size="small" /> AI 画像助手正在分析你的学习信息...
+        </div>
+      )}
     </div>
   )
 }

@@ -9,15 +9,20 @@ import {
   SunOutlined,
   MoonOutlined,
   DesktopOutlined,
-  CodeOutlined,
+  ReadOutlined,
   BookOutlined,
+  BranchesOutlined,
   CheckCircleOutlined,
   FileTextOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import LoadingSkeleton from './components/LoadingSkeleton'
 import NotificationCenter from './components/NotificationCenter'
+import PageErrorBoundary from './components/PageErrorBoundary'
+import FloatingTutor from './components/FloatingTutor'
 import { useAuth } from './contexts/AuthContext'
 import { useTheme, THEMES } from './contexts/ThemeContext'
+import { TutorProvider } from './contexts/TutorContext.jsx'
 import './App.css'
 
 // 页面组件懒加载
@@ -28,8 +33,6 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const ProfileSetupPage = lazy(() => import('./pages/ProfileSetupPage'))
 const AIWorkspacePage = lazy(() => import('./pages/AIWorkspacePage'))
 const CourseEntryPage = lazy(() => import('./pages/CourseEntryPage'))
-const ResourceGenerationPage = lazy(() => import('./pages/ResourceGenerationPage'))
-
 const DocsPage = lazy(() => import('./pages/DocsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
@@ -44,7 +47,9 @@ const InteractiveClassroomPage = lazy(() => import('./pages/InteractiveClassroom
 const EditProfilePage = lazy(() => import('./pages/EditProfilePage'))
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
 const CodePracticePage = lazy(() => import('./pages/CodePracticePage'))
-const EvaluatePage = lazy(() => import('./pages/EvaluatePage'))
+const CodeExperimentPage = lazy(() => import('./pages/CodeExperimentPage'))
+const EvaluatePage = lazy(() => import('./pages/EvaluationReportPage'))
+const LearningAssessmentPage = lazy(() => import('./pages/LearningAssessmentPage'))
 
 const { Text } = Typography
 
@@ -56,9 +61,11 @@ function AuthLayout() {
   const { mode, setMode, resolved } = useTheme()
   const activeCoursePath = activeCourse?.id ? `/course/${activeCourse.id}` : '/courses'
   const navItems = [
-    { label: '资源中心', path: '/resources', match: (p) => p === '/resources' || p.startsWith('/resources?') || p.startsWith('/resources/'), icon: <FileTextOutlined /> },
-    { label: '在线测评', path: '/assessment/tests', match: (p) => p.startsWith('/assessment') || p.includes('/assessment') || p.includes('/test') || p === '/evaluate', icon: <CheckCircleOutlined /> },
-    { label: '代码练习', path: '/code-practice', match: (p) => p.startsWith('/code-practice'), icon: <CodeOutlined /> },
+    { label: '学习首页', path: '/home', match: (p) => p === '/home', icon: <ReadOutlined /> },
+    { label: '学习路径', path: activeCourse?.id ? `/course/${activeCourse.id}/path` : '/courses', match: (p) => p.includes('/path') || p.includes('/stage/') || p.includes('/task/') || p.includes('/learn/') || p.includes('/classroom/'), icon: <BranchesOutlined /> },
+    { label: 'AI 学习助手', path: activeCourse?.id ? `/course/${activeCourse.id}/ai-workspace` : '/ai-workspace', match: (p) => p.includes('/ai-workspace') || p.includes('/chat'), icon: <RobotOutlined /> },
+    { label: '学习评估', path: '/assessment/dashboard', match: (p) => p.startsWith('/assessment') || p.includes('/assessment') || p.includes('/test') || p === '/evaluate', icon: <CheckCircleOutlined /> },
+    { label: '我的学习资料', path: '/resources', match: (p) => p === '/resources' || p.startsWith('/resources?') || p.startsWith('/resources/'), icon: <FileTextOutlined /> },
   ]
 
   // 用户下拉菜单项
@@ -101,6 +108,7 @@ function AuthLayout() {
   ]
 
   return (
+    <TutorProvider>
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-page)' }}>
       {/* 顶部导航栏 */}
       <div className="top-bar">
@@ -193,10 +201,11 @@ function AuthLayout() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/onboarding/profile" element={<ProfileSetupPage mode="setup" />} />
             <Route path="/ai-workspace" element={<AIWorkspacePage />} />
-            <Route path="/generating" element={<ResourceGenerationPage />} />
+            <Route path="/generating" element={<Navigate to={activeCourse?.id ? `/course/${activeCourse.id}/ai-workspace` : '/ai-workspace'} replace />} />
+            <Route path="/resources/generate" element={<Navigate to={activeCourse?.id ? `/course/${activeCourse.id}/ai-workspace` : '/ai-workspace'} replace />} />
             <Route path="/study" element={<Navigate to="/home" replace />} />
-            <Route path="/course/:courseId" element={<StudyHomePage />} />
-            <Route path="/course/:courseId/learn/:taskId" element={<StudyHomePage />} />
+            <Route path="/course/:courseId" element={<CourseScopedRoute><StudyHomePage /></CourseScopedRoute>} />
+            <Route path="/course/:courseId/learn/:taskId" element={<CourseScopedRoute><StageResourcePage /></CourseScopedRoute>} />
             <Route path="/course/:courseId/classroom/:classroomId" element={<InteractiveClassroomPage />} />
             <Route path="/course/:courseId/profile/setup" element={<CourseScopedRoute><ProfileSetupPage mode="setup" /></CourseScopedRoute>} />
             <Route path="/course/:courseId/profile" element={<CourseScopedRoute><ProfileSetupPage mode="view" /></CourseScopedRoute>} />
@@ -213,7 +222,8 @@ function AuthLayout() {
             <Route path="/landing" element={<LandingPage />} />
 
             <Route path="/docs" element={<DocsPage />} />
-            <Route path="/assessment/tests" element={<EvaluatePage />} />
+            <Route path="/assessment/dashboard" element={<LearningAssessmentPage />} />
+            <Route path="/assessment/tests" element={<LearningAssessmentPage />} />
             <Route path="/assessment/report" element={<EvaluatePage />} />
             <Route path="/assessment/report/:reportId" element={<EvaluatePage />} />
             <Route path="/assessment/history" element={<EvaluatePage />} />
@@ -225,10 +235,14 @@ function AuthLayout() {
             <Route path="/change-password" element={<ChangePasswordPage />} />
             <Route path="/code-practice" element={<CodePracticePage />} />
             <Route path="/code-practice/:problemId" element={<CodePracticePage />} />
+            <Route path="/code-experiment" element={<CodeExperimentPage />} />
+            <Route path="/code-experiment/:experimentId" element={<CodeExperimentPage />} />
           </Routes>
         </Suspense>
+        <FloatingTutor />
       </div>
     </div>
+    </TutorProvider>
   )
 }
 
@@ -249,7 +263,7 @@ function CourseScopedRoute({ children }) {
     activateCourse(courseId).catch(() => {})
   }, [activateCourse, activeCourse?.id, courseId])
 
-  return children
+  return <PageErrorBoundary>{children}</PageErrorBoundary>
 }
 
 export default function App() {

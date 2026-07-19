@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Empty, message, Result, Spin } from 'antd'
 import { MessageOutlined, ReloadOutlined } from '@ant-design/icons'
-import {
-  completeCourseTask,
-  getCourseLearningContext,
-} from '../api/courseLearning'
+import { getLearningPath } from '../api/planner'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  buildStageLearningTasks,
+  findCurrentLearningTask,
+  getCurrentStage,
+  getTasksProgress,
+} from '../utils/courseLearning'
 import CourseContextHeader from '../components/CourseContextHeader'
 import CourseTaskSidebar from '../components/CourseTaskSidebar'
 import LearningContentPanel from '../components/LearningContentPanel'
@@ -18,11 +21,12 @@ import { InteractiveClassroomTaskContent } from './InteractiveClassroomPage'
 export default function StudyHomePage() {
   const navigate = useNavigate()
   const { courseId, taskId } = useParams()
-  const { activeCourse, courses, activateCourse } = useAuth()
+  const { studentId, activeCourse, courses, activateCourse } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [learningContext, setLearningContext] = useState(null)
+  const [pathData, setPathData] = useState(null)
   const [course, setCourse] = useState(activeCourse || null)
+  const [taskOverrides, setTaskOverrides] = useState({})
   const [completing, setCompleting] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -37,26 +41,25 @@ export default function StudyHomePage() {
         targetCourse = await activateCourse(courseId)
       }
 
-      if (!targetCourse?.id) {
+      if (!targetCourse?.student_id && !studentId) {
         throw new Error('当前课程上下文不存在，请重新选择课程')
       }
 
-      const context = await getCourseLearningContext(
-        targetCourse.id,
-        taskId ? decodeURIComponent(taskId) : null,
-      )
-      if (!context?.path?.stages?.length) {
+      const targetStudentId = targetCourse?.student_id || studentId
+      const path = await getLearningPath(targetStudentId)
+
+      if (!path?.stages?.length) {
         throw new Error('还没有生成学习路径，请先和 ChatBox 完成学习画像')
       }
 
       setCourse(targetCourse || activeCourse)
-      setLearningContext(context)
+      setPathData(path)
     } catch (err) {
       setError(err.message || '学习页面加载失败')
     } finally {
       setLoading(false)
     }
-  }, [activateCourse, activeCourse, courseId, courses, taskId])
+  }, [activateCourse, activeCourse, courseId, courses, studentId])
 
   useEffect(() => {
     const timer = setTimeout(loadData, 0)
@@ -65,25 +68,35 @@ export default function StudyHomePage() {
 
   // ── Derived data ──────────────────────────────────
 
-  const pathData = learningContext?.path || null
-  const currentStage = learningContext?.stage || null
-  const tasksState = useMemo(() => learningContext?.tasks || [], [learningContext?.tasks])
-  const currentTaskFromState = learningContext?.current_task || null
-  const currentTaskId = currentTaskFromState?.task_id || currentTaskFromState?.id || null
+  const currentStage = useMemo(() => getCurrentStage(pathData), [pathData])
+
+  const tasks = useMemo(() => buildStageLearningTasks(currentStage), [currentStage])
+
+  const tasksState = useMemo(() => (
+    tasks.map((task) => ({ ...task, ...(taskOverrides[task.id] || {}) }))
+  ), [taskOverrides, tasks])
+
+  const currentTaskId = useMemo(() => {
+    if (!tasksState.length) return null
+    const requestedTaskId = taskId ? decodeURIComponent(taskId) : null
+    if (requestedTaskId && tasksState.some((task) => task.id === requestedTaskId)) return requestedTaskId
+    return (findCurrentLearningTask(tasksState) || tasksState[0])?.id || null
+  }, [taskId, tasksState])
 
   useEffect(() => {
-    if (course?.id && currentTaskId && !taskId) {
+    if (course?.id && currentTaskId && taskId !== currentTaskId) {
       navigate(`/course/${course.id}/learn/${encodeURIComponent(currentTaskId)}`, { replace: true })
     }
   }, [course?.id, currentTaskId, navigate, taskId])
 
+  const currentTaskFromState = useMemo(() => tasksState.find((t) => t.id === currentTaskId) || null, [tasksState, currentTaskId])
   const currentTaskIdx = useMemo(() => tasksState.findIndex((t) => t.id === currentTaskId), [tasksState, currentTaskId])
-  const progress = learningContext?.progress || { completed: 0, total: 0, percent: 0 }
+  const progress = useMemo(() => getTasksProgress(tasksState), [tasksState])
 
   const courseName = useMemo(() => {
-    const raw = learningContext?.course?.name || course?.title || pathData?.goal || '当前课程'
+    const raw = pathData?.goal || course?.title || '人工智能'
     return String(raw).replace(/^学习|掌握/g, '').slice(0, 20) || '人工智能'
-  }, [learningContext, pathData, course])
+  }, [pathData, course])
 
   const currentTopic = currentTaskFromState?.title || currentStage?.title || ''
 
@@ -114,22 +127,26 @@ export default function StudyHomePage() {
 
   const handleComplete = useCallback(async (task) => {
     setCompleting(true)
-    try {
-      const result = await completeCourseTask(course.id, task.task_id || task.id)
-      message.success(result.idempotent ? '该任务已完成，进度保持不变' : '任务已完成，进度已保存')
-      if (result.next_task?.task_id) {
-        navigate(`/course/${course.id}/learn/${encodeURIComponent(result.next_task.task_id)}`)
-      } else if (result.continue_target) {
-        navigate(result.continue_target)
-      } else {
-        await loadData()
-      }
-    } catch (err) {
-      message.error(err.message || '任务完成失败')
-    } finally {
-      setCompleting(false)
+    await new Promise((r) => setTimeout(r, 500))
+
+    const idx = tasksState.findIndex((t) => t.id === task.id)
+    const next = idx >= 0 ? tasksState[idx + 1] : null
+    setTaskOverrides((prev) => {
+      const nextOverrides = { ...prev, [task.id]: { status: 'completed' } }
+      tasksState.forEach((item, index) => {
+        if (index !== idx && item.status === 'active') {
+          nextOverrides[item.id] = { ...(nextOverrides[item.id] || {}), status: 'pending' }
+        }
+      })
+      if (next) nextOverrides[next.id] = { ...(nextOverrides[next.id] || {}), status: 'active' }
+      return nextOverrides
+    })
+
+    if (idx < tasksState.length - 1) {
+      if (course?.id) navigate(`/course/${course.id}/learn/${encodeURIComponent(next.id)}`)
     }
-  }, [course, loadData, navigate])
+    setCompleting(false)
+  }, [course, navigate, tasksState])
 
   // ── Render ────────────────────────────────────────
 
@@ -159,7 +176,7 @@ export default function StudyHomePage() {
     )
   }
 
-  if (!pathData || !learningContext) {
+  if (!pathData) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: '#F6F7FB' }}>
         <Empty description="暂无学习数据" />
@@ -211,6 +228,7 @@ export default function StudyHomePage() {
             onPrev={handlePrev}
             onNext={handleNext}
             onComplete={handleComplete}
+            onSave={async (t) => { message.success('进度已保存') }}
             completing={completing}
           />
 

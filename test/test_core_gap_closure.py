@@ -199,10 +199,10 @@ async def test_resources_bind_to_exact_path_stage_and_keep_markdown_sources():
 
         saved = db.query(Resource).filter_by(id=result["items"][0]["id"]).one()
         assert saved.path_id == "stage-resource-path"
-        assert saved.stage_id == 2
+        assert saved.stage_id == "2"
         assert result["items"][0]["source_refs"][0]["source"] == "gradient_descent.md"
         assert calls[0]["stage_info"]["title"] == "梯度下降"
-        assert "梯度下降核心知识点" in calls[0]["knowledge_context"][0]
+        assert any("梯度下降核心知识点" in item for item in calls[0]["knowledge_context"])
     finally:
         db.close()
         engine.dispose()

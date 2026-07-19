@@ -545,3 +545,49 @@ queued | started | preparing | generating | persisting | formatting | completed 
 1. 后端 `/docs` 能打开。
 2. 前端 `/api/...` 请求能从 Network 里看到 200 或明确 4xx/5xx。
 3. 关闭 Mock 后，画像 -> 路径 -> 资源 -> 辅导 -> 评估主流程可以连续运行。
+
+## 9. 最终资源闭环 API
+
+所有端点都要求 `Authorization: Bearer <token>`。前端不得用查询参数伪造其他用户的 `student_id`。
+
+### 9.1 任务资源
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/resource/courses/{course_id}/tasks/{task_id}` | 查询任务绑定资源和生成状态 |
+| `POST` | `/api/resource/courses/{course_id}/tasks/{task_id}` | 通过统一 ResourceService 准备、复用或重新生成 |
+| `GET` | `/api/resource/{resource_id}` | 获取详情、课程/阶段/任务上下文、相关资源和下一任务 |
+
+任务生成请求支持 `resource_type`、`topic`、`stage_id`、`trigger_source`、`trigger_context`、`parent_resource_id`、`difficulty`、`variant_type`、`generation_version`、`force_regenerate`。默认 `force_regenerate=false`。
+
+### 9.2 我的学习资料
+
+`GET /api/resource/list` 及兼容别名 `/api/resources` 支持：
+
+- `keyword`、`course_id`、`stage_id`、`task_id`
+- `type`、`difficulty`
+- `generation_source`、`trigger_source`
+- `learning_status`、`favorite`
+- `created_from`、`created_to`
+- `sort=recent|recent_opened|recent_completed|name`
+
+响应项包含 `course_title`、`stage_title`、`task_title` 和当前用户的 `user_state`。
+
+`PATCH /api/resource/{resource_id}/state`：
+
+```json
+{
+  "is_favorite": true,
+  "learning_status": "completed"
+}
+```
+
+`POST /api/resource/{resource_id}/bookmark` 为旧客户端保留，内部切换同一 `resource_user_states` 记录。
+
+### 9.3 触发与来源
+
+后端 `trigger_source` 允许：`learning_task`、`evaluation`、`wrong_book`、`tutor`、`path_adjustment`、`manual_workspace`、`curated_course`、`legacy`。
+
+内容来源允许：`curated_seed`、`llm_generated`、`template_generated`、`legacy_unknown`。技术枚举只用于接口和审计，前端必须转换为用户可理解文案。
+
+幂等响应包含 `reused`。同一用户、任务、类型、难度和版本重复请求不会再次调用 LLM；`force_regenerate=true` 时创建带 `parent_resource_id` 和 `variant_type` 的新变体。

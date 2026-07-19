@@ -45,7 +45,7 @@ class QuizSubmitRequest(BaseModel):
 
 @router.post("/generate")
 async def generate_classroom(request: GenerateClassroomRequest, background_tasks: BackgroundTasks, user=Depends(require_user)):
-    task = task_service.create("互动课堂生成任务已创建")
+    task = task_service.create("互动课堂生成任务已创建", owner_user_id=user.id)
 
     async def run_task():
         db = SessionLocal()

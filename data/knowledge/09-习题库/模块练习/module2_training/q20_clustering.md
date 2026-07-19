@@ -151,7 +151,7 @@ def solve():
 
     # ---- 2. 聚类与评估 ----
     print("=" * 70)
-    print(f"{'数据集':<20} {'K-Means':>12} {'Agglo':>12} {'DBSCAN':>12}")
+    print(f"{'数据集':<20} {'K-Means':>12} {'层次聚类':>12} {'DBSCAN':>12}")
     print("=" * 70)
 
     fig, axes = plt.subplots(3, 3, figsize=(15, 13))
@@ -203,10 +203,10 @@ def solve():
         ax.set_xticks([])
         ax.set_yticks([])
 
-        # Agglomerative
+        # 层次聚类
         ax = axes[row, 1]
         ax.scatter(X[:, 0], X[:, 1], c=agg_labels, cmap="viridis", s=15, alpha=0.7)
-        ax.set_title(f"Agglomerative: {name}")
+        ax.set_title(f"层次聚类: {name}")
         ax.set_xticks([])
         ax.set_yticks([])
 
@@ -224,8 +224,8 @@ def solve():
     plt.close()
     print("\n图片已保存: q20_clustering.png")
 
-    # ---- 3. K-Means elbow method ----
-    print("\nK-Means Elbow Method (Blobs数据):")
+    # ---- 3. K-Means肘部法则 ----
+    print("\nK-Means肘部法则 (Blobs数据):")
     inertias = []
     K_range = range(2, 9)
     for k in K_range:
@@ -236,9 +236,9 @@ def solve():
 
     fig2, ax2 = plt.subplots(1, 1, figsize=(8, 5))
     ax2.plot(K_range, inertias, "bo-", linewidth=2)
-    ax2.set_xlabel("Number of Clusters (K)")
-    ax2.set_ylabel("SSE (Inertia)")
-    ax2.set_title("Elbow Method for K-Means")
+    ax2.set_xlabel("簇数量 (K)")
+    ax2.set_ylabel("SSE (惯性)")
+    ax2.set_title("K-Means肘部法则")
     ax2.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig("q20_elbow.png", dpi=150, bbox_inches="tight")

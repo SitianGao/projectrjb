@@ -3,8 +3,50 @@ import { Avatar, Button, Card, Input, Space, Typography } from 'antd'
 import { RobotOutlined, SendOutlined, UserOutlined } from '@ant-design/icons'
 import TutorQuickActions from './TutorQuickActions'
 import TutorInterventionCard from './TutorInterventionCard'
+import MarkdownRenderer from '../MarkdownRenderer'
 
 const { Text, Paragraph } = Typography
+
+/**
+ * Last-resort JSON stripping: if the content looks like JSON,
+ * try to extract the readable answer text from it.
+ */
+function stripJsonWrapper(text) {
+  if (!text || typeof text !== 'string') return text
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('```')) return text
+
+  // Try 1: JSON.parse
+  try {
+    let jsonStr = trimmed
+    const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim()
+    const start = jsonStr.indexOf('{')
+    const end = jsonStr.lastIndexOf('}')
+    if (start >= 0 && end > start) jsonStr = jsonStr.slice(start, end + 1)
+    const parsed = JSON.parse(jsonStr)
+    if (typeof parsed === 'object' && parsed !== null) {
+      const keys = ['answer', 'content', 'text', 'response', 'message', 'explanation']
+      for (const key of keys) {
+        if (typeof parsed[key] === 'string' && parsed[key].length > 5) return parsed[key]
+      }
+    }
+  } catch {}
+
+  // Try 2: regex for common answer keys
+  const m = trimmed.match(/"(?:answer|content|text|response|message|explanation)"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (m && m[1] && m[1].length > 5) return m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+
+  // Try 3: longest string value
+  const all = trimmed.match(/"((?:[^"\\]|\\.)*)"/g)
+  if (all) {
+    let best = ''
+    for (const s of all) { const u = s.slice(1, -1); if (u.length > best.length && !u.startsWith('{') && !u.startsWith('[')) best = u }
+    if (best.length > 10) return best.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  }
+
+  return text
+}
 
 export default function ClassroomTutorPanel({
   currentScene,
@@ -57,7 +99,7 @@ export default function ClassroomTutorPanel({
         {messages.map((msg, index) => (
           <div key={`${msg.role}-${index}`} className={`tutor-message tutor-${msg.role}`}>
             <Avatar size={28} icon={msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />} />
-            <Paragraph>{msg.content}</Paragraph>
+            {msg.role === 'assistant' ? <MarkdownRenderer content={stripJsonWrapper(msg.content)} compact /> : <Paragraph>{msg.content}</Paragraph>}
           </div>
         ))}
       </div>

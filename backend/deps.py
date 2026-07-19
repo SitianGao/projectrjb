@@ -27,6 +27,7 @@ from services.evaluate_service import EvaluateService
 from services.task_service import TaskService
 from services.classroom_service import ClassroomService
 from services.course_learning_service import CourseLearningService
+from services.ppt_generation_service import PptGenerationService
 from database import get_db
 
 # ── 全局单例 ──────────────────────────────────
@@ -49,6 +50,7 @@ evaluate_service = EvaluateService(profile_service, evaluate_agent)
 task_service = TaskService()
 classroom_service = ClassroomService(profile_service, evaluate_service, planner_service)
 course_learning_service = CourseLearningService(planner_service)
+ppt_generation_service = PptGenerationService()
 
 orchestrator = AgentOrchestrator(llm_client)
 orchestrator.register_agents(

@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  Button, Card, Empty, Segmented, Space, Spin, Tag, Typography, message,
-  Input, Select, Row, Col, Tabs, Statistic, Breadcrumb,
+  Alert, Button, Card, Progress, Segmented, Space, Spin, Typography, message,
+  Input, Select, Row, Col, Statistic, Breadcrumb,
 } from 'antd'
 import {
   ArrowLeftOutlined, ReloadOutlined, SearchOutlined,
   ClockCircleOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
-  HomeOutlined, BookOutlined, FilterOutlined,
+  HomeOutlined,
 } from '@ant-design/icons'
 import WrongQuestionCard from '../components/WrongQuestionCard'
-import { getWrongBook, updateWrongQuestion } from '../api/evaluate'
+import { createWrongBookResource, getWrongBook, updateWrongQuestion } from '../api/evaluate'
+import { getTaskStatus } from '../api/resource'
 import { useAuth } from '../contexts/AuthContext'
 
 const { Title, Text, Paragraph } = Typography
@@ -26,6 +27,8 @@ export default function WrongBookPage() {
   const [keyword, setKeyword] = useState('')
   const [filterCourse, setFilterCourse] = useState(courseId || '')
   const [sortBy, setSortBy] = useState('next_review')
+  const [resourceJob, setResourceJob] = useState(null)
+  const [generating, setGenerating] = useState(false)
 
   const currentCourse = useMemo(() => {
     if (courseId) return courses?.find((c) => String(c.id) === String(courseId)) || activeCourse
@@ -111,6 +114,35 @@ export default function WrongBookPage() {
     } catch (err) { message.error(err.message) }
   }, [studentId, load])
 
+  const pollResourceJob = useCallback(async (taskId) => {
+    for (let index = 0; index < 40; index += 1) {
+      const next = await getTaskStatus(taskId)
+      setResourceJob(next)
+      if (next.status === 'done' || next.status === 'failed') return next
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
+    return null
+  }, [])
+
+  const handleGenerate = useCallback(async (item, resourceType = 'exercise', variantType = null, selectedItems = null) => {
+    const targets = selectedItems || [item]
+    if (!targets.length) return
+    setGenerating(true)
+    try {
+      const job = await createWrongBookResource({
+        question_ids: targets.map((row) => row.id),
+        resource_type: resourceType,
+        variant_type: variantType,
+      })
+      setResourceJob(job)
+      pollResourceJob(job.task_id).catch(() => {})
+    } catch (error) {
+      message.error(error.message || '错题专项资源创建失败')
+    } finally {
+      setGenerating(false)
+    }
+  }, [pollResourceJob])
+
   const stats = useMemo(() => ({
     pending: items.filter((i) => i.status === 'pending' || i.status === 'unmastered').length,
     reviewing: items.filter((i) => i.status === 'reviewing').length,
@@ -159,6 +191,15 @@ export default function WrongBookPage() {
             </Text>
           </div>
           <Space>
+            {items.length > 0 && status !== 'mastered' && (
+              <Button
+                type="primary"
+                loading={generating}
+                onClick={() => handleGenerate(null, 'exercise', 'targeted_training', items)}
+              >
+                创建专项训练
+              </Button>
+            )}
             <Segmented value={status} onChange={setStatus} options={tabItems} />
             <Button icon={<ReloadOutlined />} onClick={load} style={{ borderRadius: 8 }}>刷新</Button>
           </Space>
@@ -191,6 +232,23 @@ export default function WrongBookPage() {
             </Card>
           </Col>
         </Row>
+
+        {resourceJob && (
+          <Card size="small" style={{ borderRadius: 12, marginBottom: 16, border: '1px solid #E5E7EB' }}>
+            <Alert
+              showIcon
+              type={resourceJob.status === 'failed' ? 'error' : resourceJob.status === 'done' ? 'success' : 'info'}
+              message={resourceJob.message || '正在准备错题专项内容'}
+              description={resourceJob.error?.message}
+            />
+            <Progress percent={resourceJob.progress || 0} strokeColor="#6C5CE7" style={{ marginTop: 12 }} />
+            {resourceJob.status === 'done' && resourceJob.result?.learning_route && (
+              <Button type="primary" onClick={() => navigate(resourceJob.result.learning_route)}>
+                进入专项学习任务
+              </Button>
+            )}
+          </Card>
+        )}
 
         {/* Filters */}
         <div style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -242,7 +300,9 @@ export default function WrongBookPage() {
                 onReview={handleReview}
                 onManualMaster={handleManualMaster}
                 onRemove={handleRemove}
+                onGenerate={handleGenerate}
                 reviewing={reviewing}
+                generating={generating}
               />
             ))}
           </div>

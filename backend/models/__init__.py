@@ -11,9 +11,10 @@ Base = declarative_base()
 # 延迟导入模型类，避免循环引用
 from .student import Student, StudentProfile, CourseProfileConversationMessage
 from .learning_path import AgentRun, LearningPath, LearningStage, LearningTask
-from .resource import Resource
+from .resource import Resource, ResourceUserState
 from .evaluation import EvaluationReport, LearningRecord, WrongQuestion
 from .auth import User, AuthToken, Course
+from .study_session import StudySession
 
 __all__ = [
     "Base",
@@ -25,10 +26,12 @@ __all__ = [
     "LearningTask",
     "AgentRun",
     "Resource",
+    "ResourceUserState",
     "EvaluationReport",
     "LearningRecord",
     "WrongQuestion",
     "User",
     "AuthToken",
     "Course",
+    "StudySession",
 ]

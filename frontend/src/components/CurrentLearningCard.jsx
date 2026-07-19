@@ -1,10 +1,9 @@
-import { Button, Card, Progress, Space, Tag, Typography } from 'antd'
+import { Button, Card, Progress, Space, Typography } from 'antd'
 import {
   BookOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
   PlayCircleFilled,
-  RightOutlined,
 } from '@ant-design/icons'
 import { safeProgress } from '../utils/safeClamp'
 
@@ -22,6 +21,7 @@ export default function CurrentLearningCard({
   totalTasks = 1,
   onContinue,
   onViewResources,
+  continueLabel = '继续学习',
   style,
 }) {
   const { completed, total, percent } = safeProgress(completedTasks, totalTasks)
@@ -101,7 +101,7 @@ export default function CurrentLearningCard({
             borderColor: '#6C5CE7',
           }}
         >
-          继续学习
+          {continueLabel}
         </Button>
         <Button
           block

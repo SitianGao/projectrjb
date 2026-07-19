@@ -97,7 +97,8 @@ async def bootstrap(user=Depends(require_user), db: Session = Depends(get_db)):
         )
 
     profile_completion = float(profile.get("completeness") or 0) if profile else 0.0
-    profile_ready = profile_completion >= 0.85
+    from config import PROFILE_READY_THRESHOLD
+    profile_ready = profile_completion >= PROFILE_READY_THRESHOLD
     has_path = bool(path)
     continue_target = _resolve_continue_target(course, path)
 

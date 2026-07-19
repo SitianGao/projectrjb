@@ -44,6 +44,35 @@ from .prompts.resource_prompts import RESOURCE_SYSTEM_PROMPT, TYPE_PROMPTS
 
 logger = logging.getLogger(__name__)
 
+# 星火 PPT API 大纲格式
+SPARK_PPT_OUTLINE_SCHEMA = """
+请按照以下 JSON 格式输出 PPT 大纲，用于调用星火 PPT API 生成专业课件：
+
+```json
+{
+  "outline": [
+    {
+      "title": "章节标题",
+      "subtitles": [
+        {
+          "title": "子标题",
+          "content": "内容要点（简短描述，用于 PPT 排版）"
+        }
+      ]
+    }
+  ]
+}
+```
+
+要求：
+1. outline 数组最多 20 个一级章节（实际建议 8-12 个）
+2. 每个章节最多 5 个子标题
+3. 每个子标题的 content 控制在 50 字以内，用于 PPT 排版参考
+4. 第一个章节通常是封面/标题页
+5. 最后一个章节通常是小结/课后任务
+6. 根据学生难度调整内容深度
+"""
+
 
 class ResourceAgent(BaseAgent):
     """根据学习路径生成个性化学习资源"""
@@ -70,21 +99,10 @@ class ResourceAgent(BaseAgent):
             "- 不使用序号，纯 Markdown 列表，缩进用 2 个空格"
         ),
         "exercise": (
-            "生成 Markdown 格式练习题，要求：\n"
-            "- 3-5 道题，覆盖概念理解、公式应用、场景判断\n"
-            "- 使用 Markdown 标题（### 题目 N）、列表、加粗等排版\n"
-            "- 每题包含：题目描述、选项（A/B/C/D）、正确答案、详细解析\n"
-            "- 初级难度以单选和判断为主，中高级加入简答和代码补全\n"
-            "- 正确答案需逻辑正确并用 **加粗** 标注，干扰项需有迷惑性\n"
-            "- 用 --- 分隔各题"
+            TYPE_PROMPTS["exercise"]
         ),
         "code": (
-            "生成完整可运行的 Python 代码示例，用 Markdown 代码块（```python...```）包裹，要求：\n"
-            "- 包含必要的 import 和 main 入口\n"
-            "- 关键步骤用中文注释解释 WHY 而不仅仅是 WHAT\n"
-            "- 如有多个实现方式，提供对比并标注适用场景\n"
-            "- 代码风格遵循 PEP 8\n"
-            "- 代码块前后可加简短说明文字"
+            TYPE_PROMPTS["code"]
         ),
         "reading": (
             "生成一份拓展阅读推荐材料，要求：\n"
@@ -169,7 +187,9 @@ class ResourceAgent(BaseAgent):
 
         lines.append("\n## 各类型生成要求")
         for rtype in resource_types:
-            detail = self.TYPE_PROMPTS.get(rtype, f"请生成 {rtype} 类型的资源。")
+            detail = TYPE_PROMPTS.get(rtype) or self.TYPE_PROMPTS.get(
+                rtype, f"请生成 {rtype} 类型的资源。"
+            )
             lines.append(f"\n### {rtype}\n{detail}")
 
         # 关卡对齐的强调
@@ -184,7 +204,11 @@ class ResourceAgent(BaseAgent):
             )
 
         lines.append(
-            "\n请严格输出 JSON: {\"resources\": [{type, title, topic, difficulty, content}, ...]}"
+            "\n请严格输出 JSON："
+            "{\"resources\":[{\"type\":\"exercise\",\"title\":\"...\","
+            "\"topic\":\"...\",\"difficulty\":\"初级\",\"content\":{...}}]}。"
+            "document、exercise、mindmap、ppt 的 content 必须是符合上方 Schema 的 JSON 对象，"
+            "禁止把 Markdown 字符串放进 content。"
         )
         return "\n".join(lines)
 
@@ -254,11 +278,22 @@ class ResourceAgent(BaseAgent):
                 raw = "".join(chunks)
                 result = self._parse_and_validate(raw, topic, resource_types, difficulty, profile)
                 if result is not None:
+                    result["generation_meta"] = {
+                        "generation_source": "llm",
+                        "fallback_used": False,
+                        "fallback_type": None,
+                    }
                     return result
             except Exception as exc:
                 logger.warning("ResourceAgent LLM 调用失败，回退规则化: %s", exc)
 
-        return self._rule_based_resources(topic, resource_types, difficulty, profile, stage_info)
+        result = self._rule_based_resources(topic, resource_types, difficulty, profile, stage_info, knowledge_context=knowledge_context)
+        result["generation_meta"] = {
+            "generation_source": "llm_failed_rag_enriched" if knowledge_context else "outline",
+            "fallback_used": True,
+            "fallback_type": "knowledge_base_basic" if knowledge_context else "outline",
+        }
+        return result
 
     # ------------------------------------------------------------------
     # LLM 输出校验
@@ -305,12 +340,40 @@ class ResourceAgent(BaseAgent):
         for i, item in enumerate(resources):
             if not isinstance(item, dict):
                 continue
+            resource_type = item.get("type") or item.get("resource_type") or (
+                resource_types[0] if resource_types else "document"
+            )
+            content = item.get("content", "")
+            if resource_type in {"document", "exercise", "mindmap", "ppt"}:
+                if not isinstance(content, dict):
+                    # LLM 常把 document 输出为 Markdown 字符串而非结构化对象
+                    # 对于 document 类型：接收并包装为 dict，避免不必要的降级
+                    if resource_type == "document" and isinstance(content, str) and len(content) > 100:
+                        content = {"markdown_sections": content}
+                    elif resource_type == "mindmap" and isinstance(content, str) and len(content) > 20:
+                        content = {"markdown_tree": content}
+                    elif resource_type == "ppt" and isinstance(content, str) and len(content) > 50:
+                        content = {"markdown_slides": content}
+                    else:
+                        logger.warning("ResourceAgent: %s content 不是结构化对象，回退规则化", resource_type)
+                        return None
+                try:
+                    validated = ResourceAgent._validate_by_type(resource_type, content)
+                    content = validated.model_dump() if hasattr(validated, "model_dump") else content
+                except ResourceSchemaInvalid as exc:
+                    # 如果包装后的 dict 仍然校验失败，对于 document 做最终兜底
+                    if resource_type == "document" and isinstance(content, dict) and "markdown_sections" in content:
+                        logger.warning("ResourceAgent: document markdown 校验失败，使用原始字符串: %s", exc)
+                        # 保持 markdown_sections，跳过 Pydantic 校验
+                    else:
+                        logger.warning("ResourceAgent: %s content 校验失败: %s", resource_type, exc)
+                        return None
             normalized.append({
-                "type": item.get("type", resource_types[0] if resource_types else "document"),
+                "type": resource_type,
                 "title": item.get("title", f"{topic} 学习资源"),
                 "topic": item.get("topic", topic),
                 "difficulty": item.get("difficulty", difficulty),
-                "content": item.get("content", ""),
+                "content": content,
             })
 
         if not normalized:
@@ -329,11 +392,13 @@ class ResourceAgent(BaseAgent):
         difficulty: str,
         profile: dict,
         stage_info: Optional[dict] = None,
+        knowledge_context: Optional[List[str]] = None,
     ) -> Dict:
-        """开发期无 API Key 时使用的规则化资源生成（v2: 关卡感知）"""
+        """开发期无 API Key 或 LLM 调用失败时使用的规则化资源生成（v2: 关卡感知）"""
         resources = []
         profile_inner = profile.get("profile", profile)
         cognitive = profile_inner.get("cognitive_style", "")
+        has_rag = bool(knowledge_context)
 
         # 关卡感知的标题前缀
         stage_prefix = ""
@@ -352,7 +417,7 @@ class ResourceAgent(BaseAgent):
                 "ppt": f"{stage_prefix}{topic} PPT 大纲",
             }
 
-            content = self._build_content(rtype, topic, difficulty, cognitive, stage_info)
+            content = self._build_content(rtype, topic, difficulty, cognitive, stage_info, has_rag=has_rag, has_llm=False)
             resources.append({
                 "type": rtype,
                 "title": title_map.get(rtype, f"{topic} 学习资源"),
@@ -407,111 +472,116 @@ class ResourceAgent(BaseAgent):
         difficulty: str,
         cognitive: str,
         stage_info: Optional[dict] = None,
+        has_rag: bool = False,
+        has_llm: bool = False,
     ) -> str:
-        """为每种资源类型生成骨架内容（v2: 关卡感知）"""
+        """为每种资源类型生成基础内容（第6轮改造：去掉模板痕迹）。"""
         diff_labels = {"初级": "入门", "中级": "进阶", "高级": "深入"}
         level = diff_labels.get(difficulty, "入门")
-
-        # 构建关卡背景块（统一注入到各资源类型开头）
         stage_context = self._build_stage_context_markdown(stage_info)
 
+        # 降级提示
+        if not has_llm and has_rag:
+            degrade_note = "> AI 生成暂时不可用，已根据课程知识库为你准备基础版本。\n\n"
+        elif not has_llm and not has_rag:
+            degrade_note = "> 暂时无法生成完整内容，已为你创建学习提纲。请稍后重试。\n\n"
+        else:
+            degrade_note = ""
+
         if rtype == "document":
-            cognitive_hint = (
-                "建议从生活场景或工程问题切入，用白话讲清楚「为什么需要这个概念」"
-                if "图解" in cognitive else
-                "建议从数学定义出发，先给出公式再逐项解释物理含义"
-            )
-            return (
-                f"# {topic} 讲解文档（{level}）\n\n"
-                f"{stage_context}"
-                f"## 1. 概念导入\n\n"
-                f"{topic} 是{level}阶段的核心知识点。{cognitive_hint}。\n\n"
-                f"## 2. 概念定义\n\n"
-                f"{topic} 指……（请结合教材中的标准定义理解）。\n"
-                f"其核心思想是建立一个从输入到输出的映射关系，通过数据驱动的方式学习规律。\n\n"
-                f"## 3. 核心原理\n\n"
-                f"### 3.1 基本思路\n"
-                f"从给定数据出发，通过优化目标函数来确定模型参数。\n\n"
-                f"### 3.2 关键步骤\n"
-                f"1. 数据准备：收集、清洗并划分训练集与测试集\n"
-                f"2. 模型选择：根据问题类型选择合适的模型结构\n"
-                f"3. 训练优化：使用优化算法最小化损失函数\n"
-                f"4. 评估验证：在测试集上评估模型性能\n\n"
-                f"## 4. 示例说明\n\n"
-                f"以实际场景为例：假设我们要预测房价，可以将面积、地段、房龄作为输入特征，\n"
-                f"房价作为输出。通过{topic}构建从特征到价格的映射，实现对新房源的价格预估。\n\n"
-                f"## 5. 关键要点\n\n"
-                f"- 核心理解：掌握算法的基本思想和适用场景\n"
-                f"- 常见误区：不要忽略数据预处理步骤，垃圾进则垃圾出\n"
-                f"- 实践建议：先跑通简单示例，再逐步增加数据量和特征维度\n\n"
-                f"## 6. 参考来源\n\n"
-                f"> **建议核实**: 本内容基于通用知识体系生成，具体公式推导、超参数选择请以课程指定教材为准。\n"
-                f"> 标注「建议核实」的内容建议对照教材确认后使用。\n"
-            )
+            # RAG 可用时：提供比纯提纲更丰富的内容骨架
+            if has_rag:
+                return (
+                    f"# {topic}\n\n"
+                    f"{degrade_note}"
+                    f"{stage_context}"
+                    f"## 情境导入\n\n"
+                    f"在正式学习 {topic} 之前，先思考一个实际问题来建立感性认识。"
+                    f"课程知识库已为你匹配了相关材料，建议先浏览下方「关键课程资料」中的章节。\n\n"
+                    f"## 核心知识结构\n\n"
+                    f"知识库中已检索到与 {topic} 相关的内容。请重点阅读：\n\n"
+                    f"1. **概念与定义** — {topic} 的基本原理和数学表达\n"
+                    f"2. **关键方法** — 解决相关问题的核心步骤\n"
+                    f"3. **应用案例** — {topic} 在实际工程中的典型应用\n"
+                    f"4. **定理前提与注意事项** — 如何识别 {topic} 的适用条件\n\n"
+                    f"## 理解检测\n\n"
+                    f"阅读完成后，尝试回答以下问题来检验理解：\n\n"
+                    f"1. 什么是 {topic}？用自己的话给一个简短定义\n"
+                    f"2. {topic} 需要哪些前置知识？\n"
+                    f"3. 在什么场景下 {topic} 是首选的解决方案？\n\n"
+                    f"## 关键课程资料\n\n"
+                    f"知识库已根据当前任务自动匹配相关章节，请在左侧目录或上方资源区查看。\n\n"
+                    f"## 简短总结\n\n"
+                    f"{topic} 是{level}阶段学习的重要内容。当前基于课程知识库的检索结果为"
+                    f"你准备了基础框架，配合阅读原始章节可以获得完整的理解。\n"
+                )
+            else:
+                return (
+                    f"# {topic}\n\n"
+                    f"{degrade_note}"
+                    f"{stage_context}"
+                    f"## 本任务要解决什么\n\n"
+                    f"掌握 {topic} 的核心概念和基本应用，为后续学习奠定基础。\n\n"
+                    f"## 核心知识点\n\n"
+                    f"- {topic} 的定义与基本原理\n"
+                    f"- {topic} 的典型应用场景\n"
+                    f"- {topic} 中的常见误区和注意事项\n\n"
+                    f"## 推荐学习顺序\n\n"
+                    f"1. 先阅读课程知识库中关于 {topic} 的章节\n"
+                    f"2. 理解核心定义后，完成配套练习题\n"
+                    f"3. 用自己的话复述关键概念，检查理解深度\n"
+                    f"4. 尝试在实际问题中应用所学知识\n\n"
+                    f"## 关键课程资料\n\n"
+                    f"- 知识库中「{topic}」相关章节\n"
+                    f"- 课程配套练习和示例代码\n\n"
+                    f"## 简短总结\n\n"
+                    f"{topic} 是{level}阶段的重要知识点。建议先掌握其核心定义和适用场景，"
+                    f"再通过练习巩固理解。遇到困难时可以随时向 AI 导师提问。\n"
+                )
         elif rtype == "mindmap":
-            # 关卡感知的思维导图：当有 stage_info 时，围绕关卡知识点展开
-            stage_topics_bullets = ""
-            if stage_info and isinstance(stage_info, dict):
-                stage_topics_list = stage_info.get("topics") or []
-                if stage_topics_list:
-                    stage_topics_bullets = "  - 关卡知识点\n" + "".join(
-                        f"    - {t}\n" for t in stage_topics_list
-                    )
             return (
-                f"{stage_context}"
                 f"- {topic}\n"
-                f"{stage_topics_bullets}"
                 f"  - 概念定义\n"
                 f"    - 核心术语\n"
-                f"    - 公式表达\n"
-                f"  - 工作原理\n"
-                f"    - 输入\n"
-                f"    - 处理过程\n"
-                f"    - 输出\n"
+                f"    - 基本原理\n"
                 f"  - 应用场景\n"
-                f"    - 场景A\n"
-                f"    - 场景B\n"
+                f"    - 典型用途\n"
+                f"    - 实践案例\n"
                 f"  - 常见问题\n"
-                f"    - 误区1\n"
-                f"    - 误区2\n"
+                f"    - 易错点\n"
+                f"    - 注意事项\n"
             )
         elif rtype == "exercise":
-            # 关卡感知的练习题：将关卡任务转化为具体题目
-            tasks_questions = ""
-            if stage_info and isinstance(stage_info, dict):
-                stage_tasks = stage_info.get("tasks") or []
-                if stage_tasks:
-                    tasks_questions = "### 关卡任务练习\n\n"
-                    for i, t in enumerate(stage_tasks, 1):
-                        task_desc = t.get("task", "") if isinstance(t, dict) else str(t)
-                        resource_hint = t.get("resource_type", "") if isinstance(t, dict) else ""
-                        hint_note = f"（推荐资源类型: {resource_hint}）" if resource_hint else ""
-                        tasks_questions += (
-                            f"**关卡任务 {i}**：{task_desc} {hint_note}\n\n"
-                            f"> **📝 练习要求**：请根据上述任务描述完成练习。\n\n"
-                        )
-                    tasks_questions += "---\n\n"
-            return (
-                f"# {topic} 练习题（{level}）\n\n"
-                f"{stage_context}"
-                f"{tasks_questions}"
-                f"### 题目 1（单选）\n\n"
-                f"关于 {topic}，以下说法正确的是？\n\n"
-                f"A. {topic} 是 AI 领域的基础概念之一\n\n"
-                f"B. {topic} 完全不实用\n\n"
-                f"C. 学习 {topic} 不需要任何前置知识\n\n"
-                f"D. 以上都不对\n\n"
-                f"> **✅ 正确答案：A**\n>\n"
-                f"> **📖 解析：** {topic} 是重要基础概念，学习前建议具备相关前置知识。B 过于绝对，C 不符合实际。\n\n"
-                f"---\n\n"
-                f"### 题目 2（简答）\n\n"
-                f"请简述 {topic} 的核心思想。\n\n"
-                f"> **📝 参考答案：** （围绕核心概念展开，重点考察对核心原理的理解深度）\n\n"
-                f"---\n\n"
-                f"### 题目 3（应用）\n\n"
-                f"{topic} 在实际项目中如何应用？请举例说明。\n\n"
-                f"> **📝 参考答案：** （结合实际场景作答，考察理论联系实际的能力）\n"
-            )
+            return {
+                "instructions": f"请完成以下关于「{topic}」的练习。",
+                "questions": [
+                    {
+                        "id": "q1",
+                        "type": "single_choice",
+                        "stem": f"关于 {topic}，以下说法正确的是？",
+                        "options": [
+                            {"key": "A", "text": f"{topic} 是当前阶段需要掌握的核心知识"},
+                            {"key": "B", "text": f"{topic} 与实际应用完全无关"},
+                            {"key": "C", "text": f"学习 {topic} 不需要理解任何前置概念"},
+                            {"key": "D", "text": "以上说法都正确"},
+                        ],
+                        "correct_answer": ["A"],
+                        "explanation": f"{topic} 是当前学习任务的核心内容，需要结合定义、原理和应用理解。",
+                        "difficulty": "easy" if difficulty == "初级" else "medium",
+                        "knowledge_point_ids": [topic],
+                    },
+                    {
+                        "id": "q2",
+                        "type": "short_answer",
+                        "stem": f"请用自己的话概括 {topic} 的核心思想，并给出一个应用场景。",
+                        "options": [],
+                        "correct_answer": [f"围绕 {topic} 的定义、核心机制和应用场景作答"],
+                        "explanation": "回答应同时包含概念说明和具体应用，避免只背诵定义。",
+                        "difficulty": "medium",
+                        "knowledge_point_ids": [topic],
+                    },
+                ],
+            }
         elif rtype == "code":
             func_name = topic.lower().replace(" ", "_").replace("-", "_")
             # 关卡感知：将关卡任务作为代码示例的场景说明
@@ -524,82 +594,112 @@ class ResourceAgent(BaseAgent):
                         td = t.get("task", "") if isinstance(t, dict) else str(t)
                         task_scenario += f"> 任务：{td}\n"
                     task_scenario += "\n"
-            return (
-                f"# {topic} — 代码示例（{level}）\n\n"
-                f"{stage_context}"
-                f"{task_scenario}"
-                f"本代码演示 {topic} 的典型实现方式，包含数据准备、模型构建、训练和评估四个阶段。\n\n"
-                f"```python\n"
+            # 生成结构化代码实验内容（而非纯 Markdown 代码块）
+            starter_code = (
                 f'"""\n'
-                f'{topic} — 代码示例（{level}）\n'
-                f'本代码演示 {topic} 的典型实现方式，包含数据准备、模型构建、训练和评估四个阶段。\n'
+                f'{topic} — 参数实验（{level}）\n'
+                f'通过调整参数观察 {topic} 的行为变化。\n'
                 f'"""\n\n'
                 f'import numpy as np\n\n'
-                f'\n'
-                f'# ============================================================================\n'
-                f'# 步骤 1：生成示例数据\n'
-                f'# ============================================================================\n'
+                f'# ── 可调参数 ──\n'
+                f'learning_rate = 0.01\n'
+                f'n_iters = 500\n\n'
+                f'# ── 步骤 1：生成数据 ──\n'
                 f'np.random.seed(42)\n'
                 f'n_samples = 100\n'
-                f'n_features = 5\n'
-                f'X = np.random.randn(n_samples, n_features)  # 特征矩阵\n'
-                f'y = X[:, 0] * 2.5 + X[:, 1] * (-1.3) + np.random.randn(n_samples) * 0.1  # 目标变量\n'
-                f'print(f"数据形状: X={{X.shape}}, y={{y.shape}}")\n'
-                f'\n'
-                f'\n'
-                f'# ============================================================================\n'
-                f'# 步骤 2：实现 {topic} 核心算法\n'
-                f'# ============================================================================\n'
-                f'def {func_name}(X, y, learning_rate=0.01, n_iters=1000):\n'
-                f'    """{topic} 的核心实现\n'
-                f'    \n'
-                f'    参数:\n'
-                f'        X: 特征矩阵 (n_samples, n_features)\n'
-                f'        y: 目标变量 (n_samples,)\n'
-                f'        learning_rate: 学习率，控制每步更新幅度\n'
-                f'        n_iters: 最大迭代次数\n'
-                f'    返回:\n'
-                f'        weights: 模型权重 (n_features,)\n'
-                f'    """\n'
-                f'    n_samples, n_features = X.shape\n'
-                f'    weights = np.zeros(n_features)  # 初始化权重为零\n'
-                f'    \n'
-                f'    for i in range(n_iters):\n'
-                f'        # 正向计算：预测值\n'
-                f'        y_pred = X @ weights  # 矩阵乘法 (n_samples, n_features) @ (n_features,) = (n_samples,)\n'
-                f'        \n'
-                f'        # 计算损失：均方误差 (MSE)\n'
-                f'        loss = np.mean((y_pred - y) ** 2)\n'
-                f'        \n'
-                f'        # 反向计算：梯度\n'
-                f'        gradient = (2 / n_samples) * X.T @ (y_pred - y)\n'
-                f'        \n'
-                f'        # 参数更新：沿负梯度方向\n'
-                f'        weights -= learning_rate * gradient\n'
-                f'        \n'
-                f'        # 每 200 轮打印一次训练进度\n'
-                f'        if i % 200 == 0:\n'
-                f'            print(f"迭代 {{i:4d}}: loss={{loss:.6f}}")\n'
-                f'    \n'
-                f'    return weights\n'
-                f'\n'
-                f'\n'
-                f'# ============================================================================\n'
-                f'# 步骤 3：训练与评估\n'
-                f'# ============================================================================\n'
-                f'if __name__ == "__main__":\n'
-                f'    print(f"开始演示: {topic}（{level}级别）")\n'
-                f'    \n'
-                f'    # 训练模型\n'
-                f'    learned_weights = {func_name}(X, y, learning_rate=0.01, n_iters=1000)\n'
-                f'    \n'
-                f'    # 评估模型\n'
-                f'    y_final_pred = X @ learned_weights\n'
-                f'    final_mse = np.mean((y_final_pred - y) ** 2)\n'
-                f'    print(f"\\n训练完成！最终 MSE: {{final_mse:.6f}}")\n'
-                f'    print(f"学习到的权重: {{np.round(learned_weights, 4)}}")\n'
-                f'```\n'
+                f'X = np.random.randn(n_samples, 3)\n'
+                f'y = X[:, 0] * 2.5 + X[:, 1] * (-1.3) + np.random.randn(n_samples) * 0.1\n\n'
+                f'# ── 步骤 2：训练模型 ──\n'
+                f'weights = np.zeros(3)\n'
+                f'for i in range(n_iters):\n'
+                f'    y_pred = X @ weights\n'
+                f'    loss = np.mean((y_pred - y) ** 2)\n'
+                f'    gradient = (2 / n_samples) * X.T @ (y_pred - y)\n'
+                f'    weights -= learning_rate * gradient\n'
+                f'    if i % 50 == 0:\n'
+                f'        print(f"epoch {i}, loss = {{loss:.6f}}")\n\n'
+                f'# ── 步骤 3：结果 ──\n'
+                f'final_pred = X @ weights\n'
+                f'final_loss = np.mean((final_pred - y) ** 2)\n'
+                f'print(f"\\n最终 loss = {{final_loss:.6f}}")\n'
+                f'print(f"学习到的权重: {{np.round(weights, 4)}}")\n'
             )
+
+            return {
+                "title": f"{topic} — 参数实验",
+                "scenario": f"本实验通过调整学习率等参数，观察 {topic} 的训练过程和收敛行为。学生将对比不同参数下的损失曲线，理解参数对模型训练的影响。",
+                "experiment_mode": "param_experiment",
+                "difficulty": level,
+                "estimated_minutes": 25,
+                "learning_objectives": [
+                    f"理解 {topic} 的核心原理",
+                    "掌握学习率对训练收敛的影响",
+                    "能够通过观察损失曲线判断训练状态",
+                ],
+                "knowledge_points": [topic],
+                "prerequisite_knowledge": ["Python 基础", "NumPy 基础"],
+                "steps": [
+                    {
+                        "step_id": "step-1",
+                        "title": "运行基准实验",
+                        "instruction": "使用默认参数运行代码，观察损失曲线的整体趋势。",
+                        "code_snippet": "# 直接点击「运行实验」按钮",
+                        "expected_result": "损失值随迭代次数增加而下降",
+                    },
+                    {
+                        "step_id": "step-2",
+                        "title": "调整学习率",
+                        "instruction": "将学习率从 0.01 改为 0.1 和 1.0，分别运行，观察损失曲线变化。",
+                        "code_snippet": "learning_rate = 0.1  # 试试 1.0",
+                        "expected_result": "较大学习率可能导致损失震荡或发散",
+                        "hint": "学习率过大会导致参数更新步长过大，可能跳过最优解",
+                    },
+                    {
+                        "step_id": "step-3",
+                        "title": "对比与总结",
+                        "instruction": "对比不同学习率下的损失曲线，总结规律。",
+                        "code_snippet": "",
+                        "expected_result": "较小学习率收敛稳定但慢，较大学习率可能震荡",
+                    },
+                ],
+                "starter_code": starter_code,
+                "editable_parameters": [
+                    {
+                        "name": "learning_rate",
+                        "label": "学习率",
+                        "default_value": 0.01,
+                        "allowed_values": [0.001, 0.01, 0.1, 0.5, 1.0],
+                        "explanation": "控制每次参数更新的步长",
+                    },
+                    {
+                        "name": "n_iters",
+                        "label": "迭代次数",
+                        "default_value": 500,
+                        "allowed_values": [100, 500, 1000],
+                        "explanation": "训练的总迭代轮数",
+                    },
+                ],
+                "observation_questions": [
+                    "学习率为 0.01 时，损失曲线的形状是什么样的？",
+                    "学习率调大后，损失曲线发生了什么变化？",
+                    "哪个学习率的收敛速度最快？哪个最稳定？",
+                ],
+                "common_errors": [
+                    "学习率设置过大导致损失值变为 NaN",
+                    "迭代次数不足导致模型未收敛",
+                    "忘记设置随机种子导致结果不可复现",
+                ],
+                "expected_phenomena": [
+                    "学习率 0.01：损失缓慢但稳定下降",
+                    "学习率 0.1：损失快速下降",
+                    "学习率 1.0：损失可能出现震荡或发散",
+                ],
+                "visualization_type": "loss_curve",
+                "personalization_reason": f"学生对 {topic} 的掌握度较低，通过参数实验加深理解",
+                "language": "python",
+                "code": starter_code,
+                "explanation": f"本实验演示 {topic} 的核心实现，通过调整学习率观察训练行为。",
+            }
         elif rtype == "reading":
             return (
                 f"# {topic} 拓展阅读\n\n"
@@ -726,6 +826,15 @@ class ResourceAgent(BaseAgent):
             raise ResourceSchemaInvalid("ppt", str(e))
 
     @staticmethod
+    def _validate_code(content: dict):
+        """校验 code 类型资源的 content 是否符合 CodeExperimentContent schema。"""
+        from .schemas import CodeExperimentContent
+        try:
+            return CodeExperimentContent.model_validate(content)
+        except Exception as e:
+            raise ResourceSchemaInvalid("code", str(e))
+
+    @staticmethod
     def _validate_by_type(resource_type: str, content: dict):
         """分发到对应类型的 Pydantic 校验器。
 
@@ -744,6 +853,7 @@ class ResourceAgent(BaseAgent):
             "exercise": ResourceAgent._validate_exercise,
             "mindmap": ResourceAgent._validate_mindmap,
             "ppt": ResourceAgent._validate_ppt,
+            "code": ResourceAgent._validate_code,
         }
         validator = validators.get(resource_type)
         if validator is None:
@@ -893,6 +1003,7 @@ class ResourceAgent(BaseAgent):
         difficulty: str = "中级",
         profile: dict | None = None,
         stage_info: dict | None = None,
+        knowledge_context: str | None = None,
     ) -> ResourceGenerationOutput:
         """生成学习资源（v2：Pydantic 结构化输出 + 类型校验）。
 
@@ -903,6 +1014,7 @@ class ResourceAgent(BaseAgent):
             difficulty: 难度等级（初级/中级/高级）
             profile: 学生画像
             stage_info: 当前关卡信息（可选）
+            knowledge_context: RAG 检索上下文（外部传入，避免重复检索）
 
         Returns:
             ResourceGenerationOutput: Pydantic 校验后的结构化资源列表
@@ -911,14 +1023,17 @@ class ResourceAgent(BaseAgent):
         profile = profile or {}
         profile_json = json.dumps(profile, ensure_ascii=False, indent=2)
 
-        # 1. 检索知识库上下文
-        try:
-            knowledge_context = knowledge_service.search_context(context.course_id, topic)
-        except Exception as exc:
-            logger.warning("ResourceAgent: 知识库检索失败，继续生成: %s", exc)
-            knowledge_context = "（资料库中未找到可靠依据）"
+        # 1. 检索知识库上下文（仅在外部未传入时）
+        if knowledge_context is None:
+            try:
+                knowledge_context = knowledge_service.search_context(context.course_id, topic)
+            except Exception as exc:
+                logger.warning("ResourceAgent: 知识库检索失败，继续生成: %s", exc)
+                knowledge_context = "（资料库中未找到可靠依据）"
 
         # 2. LLM 路径
+        fallback_reason_code = None
+        fallback_reason_detail = None
         if self.llm:
             try:
                 user_prompt = self._build_generate_prompt_v2(
@@ -936,6 +1051,8 @@ class ResourceAgent(BaseAgent):
                     response_model=ResourceGenerationOutput,
                 )
             except Exception as exc:
+                fallback_reason_code = _classify_error_code(exc)
+                fallback_reason_detail = str(exc)
                 if RESOURCE_STRICT_MODE:
                     raise RuntimeError(
                         f"严格模式：ResourceAgent 生成失败，拒绝规则模板降级：{exc}"
@@ -952,6 +1069,8 @@ class ResourceAgent(BaseAgent):
                 )
         else:
             # 3. 规则化兜底
+            fallback_reason_code = "LLM_NOT_CONFIGURED"
+            fallback_reason_detail = "LLM client is None"
             if RESOURCE_STRICT_MODE:
                 raise RuntimeError("严格模式：ResourceAgent 未配置 LLM，拒绝规则模板降级")
             logger.info("ResourceAgent v2: 无 LLM，使用规则化资源生成")
@@ -1007,6 +1126,201 @@ class ResourceAgent(BaseAgent):
 
         return result
 
+    async def generate_spark_ppt_outline(
+        self,
+        *,
+        context: AgentContext,
+        topic: str,
+        difficulty: str = "中级",
+        profile: dict | None = None,
+        stage_info: dict | None = None,
+        knowledge_context: str | None = None,
+    ) -> list[dict]:
+        """生成星火 PPT API 兼容的大纲格式。
+
+        Args:
+            context: 统一 Agent 上下文
+            topic: 知识点主题
+            difficulty: 难度等级
+            profile: 学生画像
+            stage_info: 关卡信息
+            knowledge_context: 知识库上下文
+
+        Returns:
+            星火 API 格式的大纲列表
+        """
+        profile = profile or {}
+        profile_json = json.dumps(profile, ensure_ascii=False, indent=2)
+
+        # 构建提示词
+        lines = [
+            f"知识点: {topic}",
+            f"难度: {difficulty}",
+            f"学生画像:\n{profile_json}",
+        ]
+
+        if stage_info and isinstance(stage_info, dict):
+            stage_title = stage_info.get("title", "")
+            if stage_title:
+                lines.append(f"当前关卡: {stage_title}")
+            objectives = stage_info.get("objectives", "")
+            if objectives:
+                lines.append(f"关卡目标: {objectives}")
+
+        if knowledge_context:
+            lines.append(f"\n知识库上下文:\n{knowledge_context}")
+
+        lines.append(SPARK_PPT_OUTLINE_SCHEMA)
+        lines.append(
+            "\n请严格输出 JSON 格式，不要包含任何其他文字。"
+        )
+
+        user_prompt = "\n".join(lines)
+
+        # 调用 LLM 生成大纲
+        if self.llm:
+            try:
+                chunks = []
+                async for chunk in self.call_llm(user_prompt):
+                    chunks.append(chunk)
+                raw = "".join(chunks)
+
+                # 解析 JSON
+                data = self._parse_outline_json(raw)
+                if data and "outline" in data:
+                    outline = data["outline"]
+                    if isinstance(outline, list) and len(outline) > 0:
+                        logger.info("LLM 生成 PPT 大纲成功: %d 个章节", len(outline))
+                        return outline
+
+                logger.warning("LLM 输出的大纲格式不正确，使用规则化大纲")
+            except Exception as exc:
+                logger.warning("LLM 生成 PPT 大纲失败: %s，使用规则化大纲", exc)
+
+        # 规则化兜底
+        return self._generate_rule_based_outline(topic, difficulty, stage_info)
+
+    @staticmethod
+    def _parse_outline_json(raw: str) -> dict | None:
+        """解析 LLM 输出的 JSON 大纲"""
+        text = raw.strip()
+
+        # 移除代码块标记
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+            if text.startswith("json"):
+                text = text[4:].strip()
+
+        # 提取 JSON 对象
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1 and end >= start:
+            text = text[start:end + 1]
+
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                return data
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        return None
+
+    def _generate_rule_based_outline(
+        self,
+        topic: str,
+        difficulty: str,
+        stage_info: dict | None = None,
+    ) -> list[dict]:
+        """规则化生成 PPT 大纲（LLM 不可用时的兜底方案）"""
+        diff_labels = {"初级": "入门", "中级": "进阶", "高级": "深入"}
+        level = diff_labels.get(difficulty, "入门")
+
+        # 关卡信息
+        stage_title = ""
+        if stage_info and isinstance(stage_info, dict):
+            stage_title = stage_info.get("title", "")
+
+        outline = [
+            {
+                "title": topic,
+                "subtitles": [
+                    {"title": "学习目标", "content": f"掌握{topic}的核心概念和基本应用"},
+                    {"title": "难度等级", "content": f"本课件面向{level}阶段学习者"},
+                ]
+            },
+            {
+                "title": f"为什么需要{topic}",
+                "subtitles": [
+                    {"title": "现实痛点", "content": f"描述没有{topic}时会遇到的困难"},
+                    {"title": "解决方案", "content": f"{topic}如何解决上述问题"},
+                ]
+            },
+            {
+                "title": f"{topic}的核心概念",
+                "subtitles": [
+                    {"title": "基本定义", "content": f"{topic}的标准定义和关键术语"},
+                    {"title": "数学表达", "content": f"{topic}的数学公式和符号说明"},
+                ]
+            },
+            {
+                "title": f"{topic}的工作原理",
+                "subtitles": [
+                    {"title": "算法流程", "content": f"{topic}的核心算法步骤"},
+                    {"title": "推导过程", "content": f"{topic}的关键推导"},
+                ]
+            },
+            {
+                "title": f"{topic}的代码实现",
+                "subtitles": [
+                    {"title": "Python 示例", "content": f"{topic}的完整代码实现"},
+                    {"title": "关键代码解读", "content": "逐行解释核心逻辑"},
+                ]
+            },
+            {
+                "title": f"{topic}实例演示",
+                "subtitles": [
+                    {"title": "案例分析", "content": f"{topic}的实际应用案例"},
+                    {"title": "效果对比", "content": "Before/After 效果对比"},
+                ]
+            },
+            {
+                "title": f"{topic}常见误区",
+                "subtitles": [
+                    {"title": "典型错误", "content": f"学习{topic}时的常见错误"},
+                    {"title": "正确理解", "content": f"正确理解{topic}的关键点"},
+                ]
+            },
+            {
+                "title": f"{topic}小结",
+                "subtitles": [
+                    {"title": "核心要点", "content": f"回顾{topic}的3个关键 takeaway"},
+                    {"title": "知识地图", "content": f"{topic}在整个知识体系中的位置"},
+                    {"title": "课后任务", "content": "完成配套练习题，巩固所学知识"},
+                ]
+            },
+        ]
+
+        # 根据难度调整章节数量
+        if difficulty == "初级":
+            outline = outline[:6]
+        elif difficulty == "高级":
+            # 高级增加前沿发展章节
+            outline.insert(-1, {
+                "title": f"{topic}前沿发展",
+                "subtitles": [
+                    {"title": "最新研究", "content": f"{topic}领域的最新研究进展"},
+                    {"title": "未来方向", "content": f"{topic}的未来发展趋势"},
+                ]
+            })
+
+        return outline
+
     async def prepare_stage_resources(
         self,
         *,
@@ -1046,3 +1360,66 @@ class ResourceAgent(BaseAgent):
             for index, item in enumerate(blueprint, 1)
             if isinstance(item, dict)
         ]
+
+
+# ── Helpers (module-level) ──────────────────────────────────
+
+def _classify_error_code(exc: Exception) -> str:
+    """Classify an exception into a fallback_reason_code."""
+    msg = str(exc).lower()
+    if isinstance(exc, RuntimeError):
+        if "未配置" in str(exc) or "缺少" in str(exc) or "api key" in msg or "api_key" in msg:
+            return "LLM_NOT_CONFIGURED"
+        if "认证" in str(exc) or "auth" in msg or "unauthorized" in msg or "401" in msg:
+            return "LLM_AUTH_FAILED"
+    if isinstance(exc, (TimeoutError,)) or "timeout" in msg or "timed out" in msg:
+        return "LLM_TIMEOUT"
+    exc_name = type(exc).__name__
+    if "HTTPError" in exc_name or "ConnectError" in exc_name or "provider" in msg:
+        return "LLM_PROVIDER_ERROR"
+    if "empty" in msg or "空" in str(exc):
+        return "LLM_OUTPUT_EMPTY"
+    if isinstance(exc, (json.JSONDecodeError,)) or "json" in msg or "parse" in msg:
+        return "LLM_OUTPUT_INVALID_JSON"
+    if "schema" in msg or "pydantic" in msg or "validation" in msg:
+        return "RESOURCE_SCHEMA_INVALID"
+    if "rag" in msg or "retrieval" in msg or "知识库" in str(exc):
+        return "RAG_RETRIEVAL_FAILED"
+    if "safety" in msg or "安全" in str(exc):
+        return "SAFETY_CHECK_FAILED"
+    return "UNKNOWN_GENERATION_ERROR"
+
+
+def resource_output_to_service_dict(output: ResourceGenerationOutput) -> dict:
+    """Convert v2 Pydantic output to the dict format ResourceService expects."""
+    resources = []
+    for r in output.resources:
+        content = r.content
+        if hasattr(content, "model_dump"):
+            content = content.model_dump()
+        resources.append({
+            "type": r.resource_type,
+            "title": r.title,
+            "topic": r.topic,
+            "difficulty": r.difficulty,
+            "content": content,
+            "summary": r.summary or "",
+            "estimated_minutes": r.estimated_minutes or 20,
+        })
+    meta = {}
+    if output.generation_meta:
+        gm = output.generation_meta
+        meta = {
+            "agent_name": gm.agent_name or "ResourceAgent",
+            "provider": gm.provider,
+            "model": gm.model,
+            "run_id": gm.run_id,
+            "request_id": gm.request_id,
+            "duration_ms": gm.duration_ms,
+            "fallback_used": gm.fallback_used,
+            "generated_at": gm.generated_at,
+        }
+    return {
+        "resources": resources,
+        "generation_meta": meta,
+    }

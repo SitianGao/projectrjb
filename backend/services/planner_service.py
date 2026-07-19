@@ -7,6 +7,7 @@
 - 将 Agent 输出持久化到数据库
 """
 import json
+import hashlib
 import logging
 import threading
 import time
@@ -20,6 +21,7 @@ from api.response import sse_done, sse_error
 from config import LLM_STRICT_MODE, PROFILE_READY_THRESHOLD, RAG_STRICT_MODE, SPARK_MODEL
 from core.agent_context import AgentContext
 from models.auth import Course
+from models.evaluation import PathAdjustmentLog
 from models.learning_path import AgentRun, LearningPath, LearningStage, LearningTask
 from models.student import StudentProfile
 
@@ -82,6 +84,223 @@ class PlannerService:
             return None
         self.ensure_normalized_entities(db, path)
         return self._path_to_dict(path)
+
+    def create_contextual_task(
+        self,
+        db: Session,
+        *,
+        user_id: str,
+        course_id: str,
+        source_key: str,
+        topic: str,
+        resource_type: str,
+        reason: str = "",
+        stage_id: Optional[str] = None,
+        difficulty: str = "初级",
+        trigger_source: str = "evaluation",
+    ) -> Dict:
+        """Create or reuse a path task for a downstream contextual resource."""
+        course = (
+            db.query(Course)
+            .filter(Course.id == course_id, Course.user_id == user_id)
+            .first()
+        )
+        if not course:
+            raise ValueError("课程不存在或不属于当前登录用户")
+        path = (
+            db.query(LearningPath)
+            .filter(
+                LearningPath.user_id == user_id,
+                LearningPath.course_id == course_id,
+                LearningPath.status == "active",
+            )
+            .order_by(LearningPath.version.desc())
+            .first()
+        )
+        if not path:
+            raise ValueError("当前课程还没有学习路径")
+        self.ensure_normalized_entities(db, path)
+
+        stage_query = db.query(LearningStage).filter(LearningStage.path_id == path.id)
+        stage = None
+        if stage_id:
+            stage = stage_query.filter(LearningStage.stage_id == str(stage_id)).first()
+        if not stage and path.current_stage_id:
+            stage = stage_query.filter(LearningStage.stage_id == path.current_stage_id).first()
+        if not stage:
+            stage = stage_query.order_by(LearningStage.order.asc()).first()
+        if not stage:
+            raise ValueError("学习路径中没有可用阶段")
+
+        canonical_type = "exercise" if resource_type in {"quiz", "practice"} else resource_type
+        digest = hashlib.sha256(
+            f"{user_id}|{course_id}|{source_key}|{topic}|{canonical_type}".encode("utf-8")
+        ).hexdigest()[:16]
+        task_id = f"context_{digest}"
+        existing = (
+            db.query(LearningTask)
+            .filter(LearningTask.path_id == path.id, LearningTask.task_id == task_id)
+            .first()
+        )
+        if existing:
+            try:
+                task_meta = json.loads(existing.content or "{}")
+            except (TypeError, json.JSONDecodeError):
+                task_meta = {}
+            task_meta.update({
+                "trigger_source": trigger_source,
+                "source_key": source_key,
+                "topic": topic,
+                "dynamic_source": (
+                    "ai_diagnosis"
+                    if trigger_source in {"evaluation", "path_adjustment"}
+                    else trigger_source
+                ),
+                "adjustment_reason": reason or existing.description or "",
+                "content_preparation_status": (
+                    "ready" if existing.resource_id else "pending"
+                ),
+            })
+            existing.content = json.dumps(task_meta, ensure_ascii=False)
+            db.commit()
+            return {
+                "reused": True,
+                "path_id": path.id,
+                "stage_id": existing.stage_id,
+                "task_id": existing.task_id,
+                "course_id": course.id,
+                "route": f"/course/{course.id}/learn/{existing.task_id}",
+            }
+
+        last_order = (
+            db.query(LearningTask)
+            .filter(LearningTask.stage_row_id == stage.id)
+            .order_by(LearningTask.order.desc())
+            .first()
+        )
+        task = LearningTask(
+            id=str(uuid.uuid4()),
+            path_id=path.id,
+            stage_row_id=stage.id,
+            stage_id=stage.stage_id,
+            task_id=task_id,
+            task_type=canonical_type or "document",
+            title=f"{topic}专项学习",
+            description=reason or f"根据{trigger_source}结果生成的个性化学习任务",
+            content=json.dumps(
+                {
+                    "trigger_source": trigger_source,
+                    "source_key": source_key,
+                    "topic": topic,
+                    "dynamic_source": (
+                        "ai_diagnosis"
+                        if trigger_source in {"evaluation", "path_adjustment"}
+                        else trigger_source
+                    ),
+                    "adjustment_reason": reason or "",
+                    "content_preparation_status": "pending",
+                },
+                ensure_ascii=False,
+            ),
+            order=(last_order.order + 1) if last_order else 1,
+            estimated_minutes=20,
+            difficulty=difficulty or "初级",
+            status="not_started",
+            prerequisite_task_ids="[]",
+        )
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        return {
+            "reused": False,
+            "path_id": path.id,
+            "stage_id": stage.stage_id,
+            "task_id": task.task_id,
+            "course_id": course.id,
+            "route": f"/course/{course.id}/learn/{task.task_id}",
+        }
+
+    def apply_evaluation_adjustments(
+        self,
+        db: Session,
+        *,
+        user_id: str,
+        course_id: str,
+        evaluation_id: str,
+        suggestions: list,
+    ) -> list:
+        """Persist evaluation suggestions as real path tasks, idempotently."""
+        applied = []
+        for suggestion in suggestions:
+            if not isinstance(suggestion, dict):
+                continue
+            topic = str(
+                suggestion.get("knowledge_point")
+                or suggestion.get("topic")
+                or suggestion.get("name")
+                or ""
+            ).strip()
+            if not topic:
+                continue
+            resource_type = str(
+                suggestion.get("suggested_resource_type")
+                or suggestion.get("resource_type")
+                or "exercise"
+            )
+            adjustment_key = hashlib.sha256(
+                f"{evaluation_id}|{topic}|{resource_type}".encode("utf-8")
+            ).hexdigest()[:24]
+            task = self.create_contextual_task(
+                db,
+                user_id=user_id,
+                course_id=course_id,
+                source_key=f"path_adjustment:{adjustment_key}",
+                topic=topic,
+                resource_type=resource_type,
+                reason=str(suggestion.get("reason") or "根据评估结果补充学习任务"),
+                stage_id=suggestion.get("target_stage_id"),
+                difficulty=str(suggestion.get("difficulty") or "初级"),
+                trigger_source="path_adjustment",
+            )
+            log = (
+                db.query(PathAdjustmentLog)
+                .filter(
+                    PathAdjustmentLog.user_id == user_id,
+                    PathAdjustmentLog.course_id == course_id,
+                    PathAdjustmentLog.source_evaluation_id == evaluation_id,
+                    PathAdjustmentLog.adjustment_key == adjustment_key,
+                )
+                .first()
+            )
+            if not log:
+                log = PathAdjustmentLog(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    course_id=course_id,
+                    learning_path_id=task["path_id"],
+                    source_evaluation_id=evaluation_id,
+                    adjustment_key=adjustment_key,
+                    action=str(suggestion.get("action") or "insert_remedial_task"),
+                    knowledge_point=topic,
+                    target_stage_id=task["stage_id"],
+                    target_task_id=task["task_id"],
+                    suggested_resource_type=resource_type,
+                    before_state="{}",
+                    after_state=json.dumps({"task_id": task["task_id"]}, ensure_ascii=False),
+                    reason=str(suggestion.get("reason") or ""),
+                    priority=str(suggestion.get("priority") or "medium"),
+                    status="applied",
+                    applied_at=datetime.utcnow(),
+                )
+                db.add(log)
+            else:
+                log.target_task_id = task["task_id"]
+                log.target_stage_id = task["stage_id"]
+                log.status = "applied"
+                log.applied_at = log.applied_at or datetime.utcnow()
+            applied.append({**suggestion, **task, "adjustment_key": adjustment_key, "status": "applied"})
+        db.commit()
+        return applied
 
     def get_path_history(self, db: Session, student_id: str) -> list:
         """获取学生学习路径历史版本列表。"""
@@ -744,7 +963,7 @@ class PlannerService:
     ) -> None:
         """为每个阶段单独检索 Markdown 依据，避免所有阶段复用同一组宽泛来源。"""
         if not self.retriever:
-            _attach_knowledge_sources(path_data, course_rows)
+            self._attach_knowledge_sources(path_data, course_rows)
             return
 
         for stage in path_data.get("stages", []):
@@ -774,6 +993,11 @@ class PlannerService:
                 {key: row.get(key) for key in ("title", "source", "similarity")}
                 for row in selected
             ]
+
+    def _attach_knowledge_sources(self, path_data: dict, course_rows: list) -> None:
+        """Attach course-level knowledge sources to each stage when retriever is unavailable."""
+        for stage in path_data.get("stages", []):
+            stage["knowledge_sources"] = course_rows[:4] if course_rows else []
 
     def _claim_generation(self, student_id: str) -> bool:
         with self._generation_lock:
@@ -1081,5 +1305,5 @@ def _task_content(task: Dict) -> str:
 
 
 def _sse_event(event_type: str, **payload) -> str:
-    data = {"type": event_type, **payload}
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+    from core.sse import sse_event
+    return sse_event(event_type, **payload)

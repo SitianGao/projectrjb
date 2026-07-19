@@ -18,7 +18,7 @@ export default function PathReasonDrawer({
   )
   const source = pathData?.generation_source || 'legacy'
   const sourceLabels = {
-    agent: 'PlannerAgent 个性化生成',
+    agent: 'AI 智能规划生成',
     seed: '演示预置数据',
     manual: '人工配置',
     rule_fallback: '规则降级生成',
@@ -40,12 +40,6 @@ export default function PathReasonDrawer({
         </Text>
         <Descriptions size="small" column={1} bordered>
           <Descriptions.Item label="路径来源">{sourceLabels[source] || source}</Descriptions.Item>
-          <Descriptions.Item label="生成 Agent">{pathData?.generated_by || '未记录'}</Descriptions.Item>
-          <Descriptions.Item label="模型">
-            {pathData?.provider || pathData?.model
-              ? `${pathData.provider || ''}${pathData.model ? ` / ${pathData.model}` : ''}`
-              : '未使用模型'}
-          </Descriptions.Item>
           <Descriptions.Item label="画像版本">
             {pathData?.profile_version ? `v${pathData.profile_version}` : '未记录'}
           </Descriptions.Item>

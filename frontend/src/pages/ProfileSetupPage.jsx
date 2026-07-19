@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Skeleton } from 'antd'
 import ConversationPanel from '../components/profileSetup/ConversationPanel'
 import LiveProfilePanel from '../components/profileSetup/LiveProfilePanel'
@@ -11,6 +11,7 @@ import './ProfileSetupPage.css'
 
 export default function ProfileSetupPage() {
   const { courseId } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { activeCourse, courses, updateCourse } = useAuth()
   const targetCourse = courses.find((course) => String(course.id) === String(courseId)) || activeCourse
@@ -26,7 +27,10 @@ export default function ProfileSetupPage() {
       window.setTimeout(() => setHighlightKeys([]), 2600)
     }
   }
-  const conversation = useProfileConversation(resolvedCourseId, { onProfileResult: applyProfileResult })
+  const conversation = useProfileConversation(resolvedCourseId, {
+    onProfileResult: applyProfileResult,
+    initialConversationId: searchParams.get('conversationId'),
+  })
   const initializer = useInitializeCourseLearning({
     courseId: resolvedCourseId,
     goal: profileState?.profile?.learning_goal || targetCourse?.goal,
@@ -43,7 +47,7 @@ export default function ProfileSetupPage() {
   const handleGenerate = async () => {
     const goal = profileState?.profile?.learning_goal || targetCourse?.goal || targetCourse?.title
     if (resolvedCourseId && goal) {
-      updateCourse(resolvedCourseId, { title: goal.slice(0, 24), goal }).catch(() => {})
+      updateCourse(resolvedCourseId, { goal }).catch(() => {})
     }
     const path = await initializer.start()
     if (path) {

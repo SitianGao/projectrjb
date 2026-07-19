@@ -9,8 +9,67 @@ import {
   HighlightOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
+import MarkdownRenderer from './MarkdownRenderer'
 
 const { Text } = Typography
+
+/**
+ * Last-resort JSON stripping: if the content looks like JSON,
+ * try to extract the readable answer text from it.
+ */
+function stripJsonWrapper(text) {
+  if (!text || typeof text !== 'string') return text
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('```')) return text
+
+  // Try 1: JSON.parse
+  try {
+    let jsonStr = trimmed
+    const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlockMatch) {
+      jsonStr = codeBlockMatch[1].trim()
+    }
+    const start = jsonStr.indexOf('{')
+    const end = jsonStr.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      jsonStr = jsonStr.slice(start, end + 1)
+    }
+    const parsed = JSON.parse(jsonStr)
+    if (typeof parsed === 'object' && parsed !== null) {
+      const keys = ['answer', 'content', 'text', 'response', 'message', 'explanation']
+      for (const key of keys) {
+        if (typeof parsed[key] === 'string' && parsed[key].length > 5) {
+          return parsed[key]
+        }
+      }
+    }
+  } catch {
+    // Not valid JSON, try regex fallback
+  }
+
+  // Try 2: regex extraction for common answer keys
+  const answerMatch = trimmed.match(/"(?:answer|content|text|response|message|explanation)"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (answerMatch && answerMatch[1] && answerMatch[1].length > 5) {
+    return answerMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  }
+
+  // Try 3: find the longest string value in the JSON
+  const allStrings = trimmed.match(/"((?:[^"\\]|\\.)*)"/g)
+  if (allStrings) {
+    let best = ''
+    for (const s of allStrings) {
+      const unquoted = s.slice(1, -1)
+      if (unquoted.length > best.length && !unquoted.startsWith('{') && !unquoted.startsWith('[')) {
+        best = unquoted
+      }
+    }
+    if (best.length > 10) {
+      return best.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+    }
+  }
+
+  return text
+}
 
 const QUICK_ACTIONS = [
   { key: 'explain', icon: <HighlightOutlined />, label: '解释选中内容' },
@@ -87,26 +146,55 @@ export default function AITutorPanel({
 
       let fullContent = ''
       const decoder = new TextDecoder()
+      let buffer = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        const text = decoder.decode(value, { stream: true })
-        const lines = text.split('\n')
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6)
-            if (data === '[DONE]' || data === '{"type":"done"}') continue
-            try {
-              const json = JSON.parse(data)
-              if (json.type === 'chat' && json.content) {
-                fullContent += json.content
-              } else if (json.type === 'data' && json.content) {
-                fullContent += json.content
-              } else if (!json.type && typeof json === 'string') {
-                fullContent += json
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''  // Keep incomplete line in buffer
+
+        for (const raw of lines) {
+          const line = raw.trim()
+          if (!line) continue
+          if (!line.startsWith('data: ')) continue
+
+          const data = line.slice(6).trim()
+          if (data === '[DONE]' || data === '[STOP]') continue
+
+          try {
+            const json = JSON.parse(data)
+            const type = json.type || json.event || ''
+
+            // Handle delta/token events (main streaming content)
+            if (type === 'delta' || type === 'token' || type === 'text') {
+              const chunk = json.text || json.delta || json.content || ''
+              if (chunk) fullContent += chunk
+            }
+            // Handle data/result events (structured response)
+            else if ((type === 'data' || type === 'result') && json.content) {
+              // Only use if we haven't accumulated delta content
+              if (!fullContent) {
+                fullContent = json.content
               }
-            } catch {
-              if (data && data !== '[DONE]') fullContent += data
+            }
+            // Handle chat events (legacy)
+            else if (type === 'chat' && json.content) {
+              fullContent += json.content
+            }
+            // Skip done/start/progress events
+            else if (type === 'done' || type === 'close' || type === 'complete' ||
+                     type === 'start' || type === 'progress') {
+              // ignore
+            }
+            // Unknown type with content
+            else if (json.content && typeof json.content === 'string') {
+              fullContent += json.content
+            }
+          } catch {
+            // Plain text fallback
+            if (data && data !== '[DONE]' && data !== '[STOP]') {
+              fullContent += data
             }
           }
         }
@@ -250,7 +338,7 @@ export default function AITutorPanel({
               wordBreak: 'break-word',
             }}
           >
-            {msg.content}
+            {msg.role === 'assistant' ? <MarkdownRenderer content={stripJsonWrapper(msg.content)} compact /> : msg.content}
           </div>
         ))}
         {sending && (

@@ -15,7 +15,11 @@ class TaskService:
         self._tasks: Dict[str, Dict] = {}
         self._lock = threading.Lock()
 
-    def create(self, message: str = "任务已创建") -> Dict:
+    def create(
+        self,
+        message: str = "任务已创建",
+        owner_user_id: Optional[str] = None,
+    ) -> Dict:
         task_id = f"task_{uuid.uuid4().hex[:8]}"
         now = _now_iso()
         task = {
@@ -31,6 +35,7 @@ class TaskService:
             "started_at": None,
             "finished_at": None,
             "duration_ms": None,
+            "owner_user_id": owner_user_id,
             "progress_history": [
                 {"progress": 0, "message": message, "phase": "queued", "at": now}
             ],
@@ -78,9 +83,15 @@ class TaskService:
             })
             return dict(task)
 
-    def get(self, task_id: str) -> Optional[Dict]:
+    def get(
+        self,
+        task_id: str,
+        owner_user_id: Optional[str] = None,
+    ) -> Optional[Dict]:
         with self._lock:
             task = self._tasks.get(task_id)
+            if task and owner_user_id and task.get("owner_user_id") != owner_user_id:
+                return None
             return dict(task) if task else None
 
 

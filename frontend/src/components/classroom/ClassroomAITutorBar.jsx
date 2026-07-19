@@ -11,9 +11,51 @@ import {
   UpOutlined,
   DownOutlined,
 } from '@ant-design/icons'
+import MarkdownRenderer from '../MarkdownRenderer'
 
 const { Text } = Typography
 const { TextArea } = Input
+
+/**
+ * Last-resort JSON stripping: if the content looks like JSON,
+ * try to extract the readable answer text from it.
+ */
+function stripJsonWrapper(text) {
+  if (!text || typeof text !== 'string') return text
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('```')) return text
+
+  // Try 1: JSON.parse
+  try {
+    let jsonStr = trimmed
+    const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlockMatch) jsonStr = codeBlockMatch[1].trim()
+    const start = jsonStr.indexOf('{')
+    const end = jsonStr.lastIndexOf('}')
+    if (start >= 0 && end > start) jsonStr = jsonStr.slice(start, end + 1)
+    const parsed = JSON.parse(jsonStr)
+    if (typeof parsed === 'object' && parsed !== null) {
+      const keys = ['answer', 'content', 'text', 'response', 'message', 'explanation']
+      for (const key of keys) {
+        if (typeof parsed[key] === 'string' && parsed[key].length > 5) return parsed[key]
+      }
+    }
+  } catch {}
+
+  // Try 2: regex for common answer keys
+  const m = trimmed.match(/"(?:answer|content|text|response|message|explanation)"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (m && m[1] && m[1].length > 5) return m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+
+  // Try 3: longest string value
+  const all = trimmed.match(/"((?:[^"\\]|\\.)*)"/g)
+  if (all) {
+    let best = ''
+    for (const s of all) { const u = s.slice(1, -1); if (u.length > best.length && !u.startsWith('{') && !u.startsWith('[')) best = u }
+    if (best.length > 10) return best.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  }
+
+  return text
+}
 
 const QUICK_ACTIONS = [
   { key: 'explain', icon: <BulbOutlined />, label: '解释这一页' },
@@ -218,7 +260,7 @@ export default function ClassroomAITutorBar({
                   lineHeight: 1.6,
                 }}
               >
-                {msg.content || msg.text}
+                {msg.role === 'assistant' ? <MarkdownRenderer content={stripJsonWrapper(msg.content || msg.text)} compact /> : (msg.content || msg.text)}
               </div>
             ))}
             {loading && (

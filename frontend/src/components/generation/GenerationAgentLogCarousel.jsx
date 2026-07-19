@@ -18,7 +18,7 @@ export default function GenerationAgentLogCarousel({ activeStepIndex }) {
             >
               {agent.icon}
             </div>
-            <span style={{ fontWeight: 600, color: '#374151' }}>{agent.name}</span>
+            <span style={{ fontWeight: 600, color: '#374151' }}>{agent.displayName || agent.name}</span>
             <span style={{ color: '#9CA3AF' }}>·</span>
             <span>{agent.logMessage}</span>
           </div>

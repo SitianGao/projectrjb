@@ -1,4 +1,4 @@
-# Encoder
+# 编码器
 
 > 来源模块: module2_training
 > 原始文件: q29_ae_vae.py

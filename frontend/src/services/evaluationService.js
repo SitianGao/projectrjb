@@ -23,22 +23,28 @@ export function normalizeReport(raw) {
   const overall = raw.overall || structured.overall || {}
   const dataSummary = raw.data_summary || raw.dataSummary || structured.data_summary || {}
   const scope = raw.scope || structured.scope || {}
+  const evidenceSummary = raw.evidence_summary || raw.evidenceSummary || {}
+
+  // 处理 overall_score 可能为 null（数据不足）
+  const rawScore = overall.score ?? raw.overall_score ?? raw.overallScore
+  const hasScore = rawScore !== null && rawScore !== undefined
+
   return {
     ...raw,
     evaluationId: raw.evaluation_id || raw.report_id,
-    courseId: raw.course_id || structured.course_id,
+    courseId: raw.course_id || raw.courseId || structured.course_id,
     courseName: raw.course_name || structured.course_name || '当前课程',
     stageId: raw.stage_id || structured.stage_id,
     stageTitle: raw.stage_title || structured.stage_title || '',
     scope,
     dataSummary,
     overall: {
-      score: clampScore(overall.score ?? raw.overall_score ?? raw.overallScore),
-      previous_score: overall.previous_score,
+      score: hasScore ? clampScore(rawScore) : null,
+      previous_score: overall.previous_score ?? null,
       score_delta: Number(overall.score_delta || 0),
       period_average: clampScore(overall.period_average),
       confidence: Number(overall.confidence ?? 0),
-      level: overall.level || '基础掌握',
+      level: overall.level || (hasScore ? '基础掌握' : ''),
       short_term_trend: overall.short_term_trend || raw.recent_trend || 'insufficient_data',
       long_term_trend: overall.long_term_trend || 'insufficient_data',
     },
@@ -51,7 +57,24 @@ export function normalizeReport(raw) {
     history: raw.history || [],
     generatedAt: structured.generated_at || raw.created_at,
     canGenerate: raw.can_generate !== false,
+    hasNewData: raw.has_new_data !== false,
+    trigger: raw.trigger || 'auto',
     reason: raw.reason,
+    // 第1轮改造
+    hasSufficientData: raw.has_sufficient_data ?? raw.hasSufficientData ?? true,
+    insufficientReason: raw.insufficient_reason || raw.insufficientReason || '',
+    generationSource: raw.generation_source || raw.generationSource || 'rule',
+    provider: raw.provider || null,
+    model: raw.model || null,
+    fallbackUsed: raw.fallback_used ?? raw.fallbackUsed ?? false,
+    fallbackReason: raw.fallback_reason || raw.fallbackReason || null,
+    // 第2轮改造
+    evidenceHash: raw.evidence_hash || raw.evidenceHash || null,
+    evidenceCount: raw.evidence_count ?? raw.evidenceCount ?? 0,
+    evidenceSummary,
+    supersedesReportId: raw.supersedes_report_id || raw.supersedesReportId || null,
+    scopeType: raw.scope_type || raw.scopeType || 'last_30_days',
+    statisticsJson: raw.statistics_json || raw.statisticsJson || {},
   }
 }
 

@@ -1,30 +1,30 @@
-# Pandas Basics
+# Pandas基础
 
-Pandas provides two primary data structures:
-- **Series**: labeled 1D array (like a column in a spreadsheet).
-- **DataFrame**: labeled 2D table (like a spreadsheet with named columns).
+Pandas提供两种主要的数据结构：
+- **Series**：带标签的一维数组（类似于电子表格中的一列）。
+- **DataFrame**：带标签的二维表格（类似于带有命名列的电子表格）。
 
-Import convention: `import pandas as pd`
+导入约定：`import pandas as pd`
 
-## Creating DataFrames
+## 创建DataFrame
 
 ```python
 import pandas as pd
 
-# From a dict of lists (keys = column names)
+# 从字典的列表创建（键 = 列名）
 df = pd.DataFrame({
     'name': ['Alice', 'Bob', 'Charlie'],
     'age': [25, 30, 35],
     'score': [85.5, 92.3, 78.0]
 })
 
-# From a list of dicts (each dict = one row)
+# 从列表的字典创建（每个字典 = 一行）
 df = pd.DataFrame([
     {'name': 'Alice', 'age': 25},
     {'name': 'Bob', 'age': 30}
 ])
 
-# From CSV / Excel / JSON
+# 从CSV / Excel / JSON读取
 df = pd.read_csv('data.csv')
 df = pd.read_csv('data.csv', sep=';', encoding='utf-8', skiprows=2, nrows=1000)
 df = pd.read_csv('data.csv', usecols=['name', 'age'], dtype={'age': 'int32'})
@@ -32,21 +32,21 @@ df = pd.read_excel('data.xlsx', sheet_name='Sheet1')
 df = pd.read_json('data.json', orient='records')
 ```
 
-## Basic Exploration
+## 基本探索
 
 ```python
-df.head(10)         # First 10 rows (default 5)
-df.tail(3)          # Last 3 rows
-df.info()           # Column names, dtypes, non-null counts, memory usage
-df.describe()       # count, mean, std, min, 25%, 50%, 75%, max (numeric cols)
-df.describe(include='object')  # For string columns: count, unique, top, freq
-df.shape            # (rows, cols) tuple
-df.columns          # Index of column names
-df.dtypes           # Data type of each column
-df.nunique()        # Number of unique values per column
+df.head(10)         # 前10行（默认5行）
+df.tail(3)          # 最后3行
+df.info()           # 列名、数据类型、非空计数、内存使用
+df.describe()       # 计数、均值、标准差、最小值、25%、50%、75%、最大值（数值列）
+df.describe(include='object')  # 字符串列：计数、唯一值、最频繁值、频率
+df.shape            # (行数, 列数) 元组
+df.columns          # 列名索引
+df.dtypes           # 每列的数据类型
+df.nunique()        # 每列唯一值的数量
 ```
 
-## Selecting Data
+## 数据选择
 
 ```python
 df = pd.DataFrame({
@@ -56,29 +56,29 @@ df = pd.DataFrame({
     'city': ['NY', 'LA', 'NY', 'SF']
 })
 
-# By column name
-df['name']              # Returns a Series
-df[['name', 'score']]   # Returns a DataFrame with two columns
+# 按列名选择
+df['name']              # 返回 Series
+df[['name', 'score']]   # 返回包含两列的 DataFrame
 
-# By position: .iloc (integer-location based)
-df.iloc[0]              # First row as Series
-df.iloc[1:3]            # Rows 1-2
-df.iloc[:, 1:3]         # All rows, columns 1-2
+# 按位置选择：.iloc（基于整数位置）
+df.iloc[0]              # 第一行，返回 Series
+df.iloc[1:3]            # 第1-2行
+df.iloc[:, 1:3]         # 所有行，第1-2列
 
-# By label: .loc
-df = df.set_index('name')   # Now index is the 'name' column
-df.loc['Alice']             # Row where index = 'Alice'
-df.loc['Alice', 'score']    # Single cell
-df.loc['Alice':'Charlie']   # Slice by label (inclusive!)
+# 按标签选择：.loc
+df = df.set_index('name')   # 现在索引是 'name' 列
+df.loc['Alice']             # 索引为 'Alice' 的行
+df.loc['Alice', 'score']    # 单个单元格
+df.loc['Alice':'Charlie']   # 按标签切片（包含右边界！）
 
-# Conditional filtering
-df[df['age'] > 28]                              # Filter rows
-df[(df['age'] > 25) & (df['city'] == 'NY')]     # Combine with &, |, ~
-df[df['name'].str.contains('A', case=False)]     # String matching
-df.query('age > 25 and city == "NY"')            # SQL-like syntax
+# 条件筛选
+df[df['age'] > 28]                              # 筛选行
+df[(df['age'] > 25) & (df['city'] == 'NY')]     # 使用 &、|、~ 组合条件
+df[df['name'].str.contains('A', case=False)]     # 字符串匹配
+df.query('age > 25 and city == "NY"')            # 类似SQL的语法
 ```
 
-## Handling Missing Values
+## 处理缺失值
 
 ```python
 df = pd.DataFrame({
@@ -87,33 +87,33 @@ df = pd.DataFrame({
     'C': ['x', 'y', None, 'z']
 })
 
-df.isnull()          # Boolean mask of missing values
-df.isnull().sum()    # Count of missing values per column
+df.isnull()          # 缺失值的布尔掩码
+df.isnull().sum()    # 每列缺失值计数
 
-df.dropna()                    # Drop rows with ANY NaN
-df.dropna(axis=1)              # Drop columns with ANY NaN
-df.dropna(thresh=2)            # Keep rows with at least 2 non-NaN values
-df.dropna(subset=['B'])        # Drop rows where B is NaN
+df.dropna()                    # 删除包含任何NaN的行
+df.dropna(axis=1)              # 删除包含任何NaN的列
+df.dropna(thresh=2)            # 保留至少有2个非NaN值的行
+df.dropna(subset=['B'])        # 删除B列为NaN的行
 
-df.fillna(0)                   # Fill all NaN with 0
-df.fillna({'A': 0, 'B': 99})   # Fill each column with a different value
-df.fillna(method='ffill')      # Forward fill (use last valid value)
-df.fillna(df.mean())           # Fill numeric NaN with column mean
+df.fillna(0)                   # 将所有NaN填充为0
+df.fillna({'A': 0, 'B': 99})   # 每列用不同的值填充
+df.fillna(method='ffill')      # 前向填充（使用上一个有效值）
+df.fillna(df.mean())           # 用每列的均值填充数值型NaN
 ```
 
-## Sorting
+## 排序
 
 ```python
 df = pd.DataFrame({'name': ['C', 'A', 'B'], 'score': [85, 92, 78]})
 
-df.sort_values('score')                  # Ascending by score
-df.sort_values('score', ascending=False) # Descending
-df.sort_values(['name', 'score'], ascending=[True, False])  # Multi-column
-df.sort_index()                          # Sort by row index
-df.reset_index(drop=True)                # Reset index to 0,1,2,... (drop old index)
+df.sort_values('score')                  # 按score升序排列
+df.sort_values('score', ascending=False) # 降序排列
+df.sort_values(['name', 'score'], ascending=[True, False])  # 多列排序
+df.sort_index()                          # 按行索引排序
+df.reset_index(drop=True)                # 重置索引为0,1,2,...（丢弃旧索引）
 ```
 
-## Group Operations
+## 分组操作
 
 ```python
 df = pd.DataFrame({
@@ -122,56 +122,56 @@ df = pd.DataFrame({
     'salary': [50000, 60000, 80000, 75000]
 })
 
-# Aggregation
-df.groupby('department')['salary'].mean()     # Average salary per dept
+# 聚合
+df.groupby('department')['salary'].mean()     # 每个部门的平均工资
 df.groupby('department').agg({
     'salary': ['mean', 'min', 'max', 'count'],
     'employee': 'count'
 })
 
-# Transform (returns same shape as input -- great for normalization)
+# 变换（返回与输入相同的形状 -- 非常适合归一化）
 df['salary_norm'] = df.groupby('department')['salary'].transform(
     lambda x: (x - x.mean()) / x.std()
 )
 
-# Filter groups
+# 筛选分组
 df.groupby('department').filter(lambda g: g['salary'].mean() > 60000)
 ```
 
-## Merging DataFrames
+## 合并DataFrame
 
 ```python
 left = pd.DataFrame({'id': [1, 2, 3], 'name': ['A', 'B', 'C']})
 right = pd.DataFrame({'id': [1, 2, 4], 'score': [85, 90, 78]})
 
-# SQL-style joins
-pd.merge(left, right, on='id', how='inner')   # Only matching keys
-pd.merge(left, right, on='id', how='left')    # All left keys
-pd.merge(left, right, on='id', how='right')   # All right keys
-pd.merge(left, right, on='id', how='outer')   # All keys from both
+# SQL风格的连接
+pd.merge(left, right, on='id', how='inner')   # 仅匹配的键
+pd.merge(left, right, on='id', how='left')    # 保留左侧所有键
+pd.merge(left, right, on='id', how='right')   # 保留右侧所有键
+pd.merge(left, right, on='id', how='outer')   # 保留两表所有键
 
-# Concatenation (stack rows or columns)
-pd.concat([left, left], axis=0, ignore_index=True)  # Stack rows
-pd.concat([left, right], axis=1)                    # Stack columns side by side
+# 拼接（堆叠行或列）
+pd.concat([left, left], axis=0, ignore_index=True)  # 堆叠行
+pd.concat([left, right], axis=1)                    # 并排堆叠列
 ```
 
-## Apply and Map
+## Apply与Map
 
 ```python
 df = pd.DataFrame({'a': [1, 2, 3], 'b': [10, 20, 30]})
 
-# apply on DataFrame: runs function on each column (axis=0) or row (axis=1)
-df.apply(np.sum, axis=0)           # Sum of each column
-df.apply(lambda row: row['a'] + row['b'], axis=1)  # Row-wise
+# DataFrame的apply：对每列（axis=0）或每行（axis=1）执行函数
+df.apply(np.sum, axis=0)           # 每列的和
+df.apply(lambda row: row['a'] + row['b'], axis=1)  # 逐行计算
 
-# map on Series: element-wise mapping
+# Series的map：逐元素映射
 df['a'].map({1: 'one', 2: 'two', 3: 'three'})
 
-# applymap on DataFrame: element-wise on every cell
+# DataFrame的applymap：对每个单元格逐元素操作
 df.applymap(lambda x: x * 2)
 ```
 
-## DateTime Handling
+## 日期时间处理
 
 ```python
 df = pd.DataFrame({'date_str': ['2024-01-15', '2024-02-20', '2024-03-10']})
@@ -182,11 +182,11 @@ df['month']  = df['date'].dt.month
 df['weekday'] = df['date'].dt.day_name()   # 'Monday', 'Tuesday', ...
 df['quarter'] = df['date'].dt.quarter
 
-# Date ranges and resampling (for time series)
-dates = pd.date_range('2024-01-01', periods=12, freq='ME')  # Month-end
+# 日期范围与重采样（用于时间序列）
+dates = pd.date_range('2024-01-01', periods=12, freq='ME')  # 月末
 ```
 
-## Pivot Tables
+## 数据透视表
 
 ```python
 df = pd.DataFrame({
@@ -204,16 +204,16 @@ pivot = pd.pivot_table(df, values='sales', index='date',
 # Wed      130   160
 ```
 
-## Exporting
+## 导出
 
 ```python
 df.to_csv('output.csv', index=False, encoding='utf-8-sig')
 df.to_excel('output.xlsx', sheet_name='Results', index=False)
 df.to_json('output.json', orient='records', force_ascii=False)
-df.to_sql('table_name', engine, if_exists='replace')  # Requires SQLAlchemy
+df.to_sql('table_name', engine, if_exists='replace')  # 需要SQLAlchemy
 ```
 
-## Real Mini-Example: Student Grade Analysis
+## 实际小型示例：学生成绩分析
 
 ```python
 grades = pd.DataFrame({
@@ -222,13 +222,13 @@ grades = pd.DataFrame({
     'score': [85, 92, 78, 88, 90, 85]
 })
 
-# Average score per student
+# 每个学生的平均分
 avg_per_student = grades.groupby('student')['score'].mean()   # 赵六=88, 张三=87.5, ...
 
-# Top student in each subject
+# 每门科目的最高分学生
 top = grades.loc[grades.groupby('subject')['score'].idxmax()]
 
-# Pivot: students vs subjects
+# 透视表：学生 vs 科目
 pivot = grades.pivot_table(values='score', index='student',
                            columns='subject', fill_value=0)
 ```

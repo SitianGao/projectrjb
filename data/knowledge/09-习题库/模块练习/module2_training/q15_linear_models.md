@@ -104,60 +104,60 @@ def solve():
     X_plot = np.linspace(-3, 3, 300).reshape(-1, 1)
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-    fig.suptitle("Linear Models Comparison", fontsize=16)
+    fig.suptitle("线性模型对比", fontsize=16)
 
     # 子图1: OLS vs 真实曲线
     ax = axes[0, 0]
-    ax.scatter(X_test, y_test, c="blue", s=20, label="Test data", alpha=0.7)
+    ax.scatter(X_test, y_test, c="blue", s=20, label="测试数据", alpha=0.7)
     ax.plot(X_plot, 2 + 3 * X_plot.ravel() - 0.5 * X_plot.ravel() ** 2,
-            "g--", label="True curve", linewidth=2)
+            "g--", label="真实曲线", linewidth=2)
     ols = results["OLS"]["model"]
     ax.plot(X_plot, ols.predict(X_plot), "r-", label="OLS", linewidth=2)
-    ax.set_title("OLS Linear Regression")
+    ax.set_title("OLS线性回归")
     ax.legend(fontsize=8)
     ax.set_xlabel("X")
     ax.set_ylabel("y")
 
     # 子图2: Ridge回归对比
     ax = axes[0, 1]
-    ax.scatter(X_test, y_test, c="blue", s=20, alpha=0.7, label="Test data")
+    ax.scatter(X_test, y_test, c="blue", s=20, alpha=0.7, label="测试数据")
     ax.plot(X_plot, 2 + 3 * X_plot.ravel() - 0.5 * X_plot.ravel() ** 2,
-            "g--", label="True curve", linewidth=2)
+            "g--", label="真实曲线", linewidth=2)
     colors_ridge = ["red", "orange", "brown"]
     for idx, alpha in enumerate([0.1, 1.0, 10.0]):
         name = f"Ridge(alpha={alpha})"
         m = results[name]["model"]
         ax.plot(X_plot, m.predict(X_plot), c=colors_ridge[idx],
                 label=f"Ridge a={alpha}", linewidth=1.5)
-    ax.set_title("Ridge Regression")
+    ax.set_title("Ridge回归")
     ax.legend(fontsize=7)
     ax.set_xlabel("X")
     ax.set_ylabel("y")
 
     # 子图3: Lasso回归对比
     ax = axes[1, 0]
-    ax.scatter(X_test, y_test, c="blue", s=20, alpha=0.7, label="Test data")
+    ax.scatter(X_test, y_test, c="blue", s=20, alpha=0.7, label="测试数据")
     ax.plot(X_plot, 2 + 3 * X_plot.ravel() - 0.5 * X_plot.ravel() ** 2,
-            "g--", label="True curve", linewidth=2)
+            "g--", label="真实曲线", linewidth=2)
     colors_lasso = ["red", "purple", "brown"]
     for idx, alpha in enumerate([0.1, 1.0, 10.0]):
         name = f"Lasso(alpha={alpha})"
         m = results[name]["model"]
         ax.plot(X_plot, m.predict(X_plot), c=colors_lasso[idx],
                 label=f"Lasso a={alpha}", linewidth=1.5)
-    ax.set_title("Lasso Regression")
+    ax.set_title("Lasso回归")
     ax.legend(fontsize=7)
     ax.set_xlabel("X")
     ax.set_ylabel("y")
 
     # 子图4: 多项式回归
     ax = axes[1, 1]
-    ax.scatter(X_test, y_test, c="blue", s=20, alpha=0.7, label="Test data")
+    ax.scatter(X_test, y_test, c="blue", s=20, alpha=0.7, label="测试数据")
     ax.plot(X_plot, 2 + 3 * X_plot.ravel() - 0.5 * X_plot.ravel() ** 2,
-            "g--", label="True curve", linewidth=2)
+            "g--", label="真实曲线", linewidth=2)
     poly = results["PolyRegression(d=2)"]["model"]
-    ax.plot(X_plot, poly.predict(X_plot), "r-", label="Poly(d=2)", linewidth=2)
-    ax.set_title("Polynomial Regression (degree=2)")
+    ax.plot(X_plot, poly.predict(X_plot), "r-", label="多项式(d=2)", linewidth=2)
+    ax.set_title("多项式回归 (degree=2)")
     ax.legend(fontsize=8)
     ax.set_xlabel("X")
     ax.set_ylabel("y")

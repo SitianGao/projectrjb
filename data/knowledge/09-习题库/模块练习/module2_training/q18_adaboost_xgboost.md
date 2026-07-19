@@ -64,8 +64,8 @@ def plot_decision_boundary(ax, model, X, y, title):
     ax.contourf(xx, yy, Z, alpha=0.3, cmap=plt.cm.RdBu)
     ax.scatter(X[:, 0], X[:, 1], c=y, cmap=plt.cm.RdBu, edgecolors="k", s=15, alpha=0.6)
     ax.set_title(title)
-    ax.set_xlabel("Feature 1")
-    ax.set_ylabel("Feature 2")
+    ax.set_xlabel("特征1")
+    ax.set_ylabel("特征2")
 
 
 def solve():
@@ -82,8 +82,8 @@ def solve():
     xgb_results = {"accs": [], "times": []}
 
     print("\n" + "=" * 60)
-    print(f"{'n_estimators':<15} {'AdaBoost Acc':>14} {'AdaBoost Time':>14} "
-          f"{'XGBoost Acc':>14} {'XGBoost Time':>14}")
+    print(f"{'n_estimators':<15} {'AdaBoost精度':>14} {'AdaBoost耗时':>14} "
+          f"{'XGBoost精度':>14} {'XGBoost耗时':>14}")
     print("=" * 60)
 
     for n_est in n_estimators_list:
@@ -144,8 +144,8 @@ def solve():
     axes[0].plot(n_estimators_list, ada_results["accs"], "bo-", label="AdaBoost", linewidth=2)
     axes[0].plot(n_estimators_list, xgb_results["accs"], "rs-", label="XGBoost", linewidth=2)
     axes[0].set_xlabel("n_estimators")
-    axes[0].set_ylabel("Test Accuracy")
-    axes[0].set_title("Accuracy vs n_estimators")
+    axes[0].set_ylabel("测试精度")
+    axes[0].set_title("精度 vs n_estimators")
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
 
@@ -153,15 +153,15 @@ def solve():
     axes[1].plot(n_estimators_list, ada_results["times"], "bo-", label="AdaBoost", linewidth=2)
     axes[1].plot(n_estimators_list, xgb_results["times"], "rs-", label="XGBoost", linewidth=2)
     axes[1].set_xlabel("n_estimators")
-    axes[1].set_ylabel("Training Time (s)")
-    axes[1].set_title("Training Time vs n_estimators")
+    axes[1].set_ylabel("训练时间 (秒)")
+    axes[1].set_title("训练时间 vs n_estimators")
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
 
-    # 子图3 & 4: 决策边界 (用两个子区域)
+    # 子图3: AdaBoost决策边界
     plot_decision_boundary(axes[2], best_ada, X_test, y_test,
                            "AdaBoost (n=100)")
-    axes[2].text(0.02, 0.02, f"Acc={accuracy_score(y_test, best_ada.predict(X_test)):.4f}",
+    axes[2].text(0.02, 0.02, f"精度={accuracy_score(y_test, best_ada.predict(X_test)):.4f}",
                  transform=axes[2].transAxes, fontsize=9,
                  bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
 
@@ -172,7 +172,7 @@ def solve():
     # 额外绘制XGBoost决策边界
     fig2, ax2 = plt.subplots(1, 1, figsize=(6, 5))
     plot_decision_boundary(ax2, best_xgb, X_test, y_test, "XGBoost (n=100)")
-    ax2.text(0.02, 0.02, f"Acc={accuracy_score(y_test, best_xgb.predict(X_test)):.4f}",
+    ax2.text(0.02, 0.02, f"精度={accuracy_score(y_test, best_xgb.predict(X_test)):.4f}",
              transform=ax2.transAxes, fontsize=9,
              bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
     plt.tight_layout()

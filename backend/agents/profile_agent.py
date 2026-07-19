@@ -699,7 +699,7 @@ class ProfileAgent(BaseAgent):
 
         missing_required = ProfileAgent._missing_required_dimensions(result.profile)
         result.missing_dimensions = missing_required
-        result.can_start_journey = result.completeness >= PROFILE_READY_THRESHOLD and not missing_required
+        result.can_start_journey = result.completeness >= PROFILE_READY_THRESHOLD and len(missing_required) <= 1
         if result.can_start_journey:
             result.next_questions = []
         return result
@@ -718,12 +718,10 @@ class ProfileAgent(BaseAgent):
             missing.append("认知或理解偏好")
         if not profile.preferred_resources:
             missing.append("资源偏好")
-        if not profile.assessment_preference:
-            missing.append("测评偏好")
-        if profile.weekly_available_hours is None:
-            missing.append("每周可投入时间")
         if profile.target_duration_weeks is None:
             missing.append("目标学习周期")
+        # assessment_preference 和 weekly_available_hours 已降级为可选维度，
+        # 不再阻塞学习之旅启动，但仍会被 PlannerAgent 用来优化路径。
         return missing
 
     @staticmethod
@@ -757,7 +755,7 @@ class ProfileAgent(BaseAgent):
         - weakness: 有内容 = +0.10
         - interest: 有内容 = +0.10
         - pace_preference: 非默认（非"中速均衡型"）= +0.08
-        上限 0.90；六个维度通过多轮对话补齐后，降级路径也能达到 0.85 解锁线。
+        上限 0.90；六个维度通过多轮对话补齐后，降级路径也能达到 0.75 解锁线。
         """
         score = 0.15  # base: 至少有一定信息
 

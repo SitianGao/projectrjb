@@ -2,24 +2,21 @@ import { useState } from 'react'
 import { Button, Card, Dropdown, Modal, Radio, Space, Tag, Typography, message } from 'antd'
 import {
   CheckCircleOutlined, CloseCircleOutlined, DownOutlined, MoreOutlined,
-  ExclamationCircleOutlined, RightOutlined, ClockCircleOutlined,
+  RightOutlined, ClockCircleOutlined,
+  FileTextOutlined, FormOutlined,
 } from '@ant-design/icons'
 import MarkdownRenderer from './MarkdownRenderer'
 
 const { Text, Paragraph } = Typography
-
-const PRIORITY_CONFIG = {
-  high: { color: '#EF4444', label: '高优先级' },
-  medium: { color: '#F59E0B', label: '中优先级' },
-  low: { color: '#22C55E', label: '低优先级' },
-}
 
 export default function WrongQuestionCard({
   item,
   onReview,
   onManualMaster,
   onRemove,
+  onGenerate,
   reviewing,
+  generating,
 }) {
   const [expanded, setExpanded] = useState(false)
   const [showReviewModal, setShowReviewModal] = useState(false)
@@ -27,7 +24,6 @@ export default function WrongQuestionCard({
   const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [submitted, setSubmitted] = useState(false)
 
-  const priority = PRIORITY_CONFIG[item.priority] || PRIORITY_CONFIG.medium
   const masteryProgress = Math.min(item.correct_streak || 0, 2)
   const statusColor = item.status === 'mastered' ? '#22C55E' : item.status === 'reviewing' ? '#F59E0B' : '#EF4444'
 
@@ -117,6 +113,30 @@ export default function WrongQuestionCard({
         >
           查看解析
         </Button>
+        <Dropdown menu={{ items: [
+          {
+            key: 'variant',
+            label: '生成变式练习',
+            icon: <FormOutlined />,
+            onClick: () => onGenerate?.(item, 'exercise', 'variant_exercise'),
+          },
+          {
+            key: 'explanation',
+            label: '生成错因讲解',
+            icon: <FileTextOutlined />,
+            onClick: () => onGenerate?.(item, 'document', 'error_explanation'),
+          },
+          {
+            key: 'knowledge',
+            label: '生成相关知识讲义',
+            icon: <FileTextOutlined />,
+            onClick: () => onGenerate?.(item, 'document', 'related_knowledge'),
+          },
+        ]}} trigger={['click']}>
+          <Button size="small" loading={generating} icon={<FormOutlined />} style={{ borderRadius: 8 }}>
+            错题专项
+          </Button>
+        </Dropdown>
         <Dropdown menu={{ items: [
           { key: 'master', label: '手动标记为掌握', icon: <CheckCircleOutlined />, onClick: () => setShowMasterConfirm(true) },
           { key: 'remove', label: '移出错题本', icon: <CloseCircleOutlined />, danger: true, onClick: () => onRemove?.(item) },

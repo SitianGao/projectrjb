@@ -144,8 +144,8 @@ def solve():
             if (batch_idx + 1) % 200 == 0:
                 print(f"  Epoch {epoch+1}/{n_epochs} "
                       f"[{batch_idx+1}/{len(train_loader)}] "
-                      f"Loss: {loss.item():.4f} "
-                      f"Train Acc: {100.*correct/total:.2f}%")
+                      f"损失: {loss.item():.4f} "
+                      f"训练精度: {100.*correct/total:.2f}%")
 
         # ---- 4. 测试 ----
         model.eval()
@@ -165,7 +165,7 @@ def solve():
         test_loss /= len(test_loader)
         acc = 100. * correct / total
         print(f"  >> Epoch {epoch+1} 测试结果: "
-              f"Loss={test_loss:.4f}, Accuracy={acc:.2f}% "
+              f"损失={test_loss:.4f}, 精度={acc:.2f}% "
               f"({correct}/{total})")
 
     # ---- 5. 最终评估与混淆矩阵 ----

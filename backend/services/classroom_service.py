@@ -344,12 +344,21 @@ class ClassroomService:
         resource = Resource(
             id=f"resource_{uuid.uuid4().hex[:12]}",
             student_id=course.student_id,
+            course_id=course.id,
+            stage_id=str(brief.get("stage_id") or ""),
+            task_id=brief.get("task_id"),
             type=CLASSROOM_TYPE,
             title=data.get("title") or "互动课堂",
             content=json.dumps({"classroom_id": classroom_id, "summary": data.get("summary", "")}, ensure_ascii=False),
             topic=data.get("topic") or brief.get("topic"),
             difficulty=brief.get("difficulty", "medium"),
             source_refs=json.dumps(data.get("source_ids", []), ensure_ascii=False),
+            trigger_source="learning_task",
+            trigger_context=json.dumps(
+                {"classroom_id": classroom_id, "course_id": course.id},
+                ensure_ascii=False,
+            ),
+            generation_source="classroom_agent",
         )
         db.add(resource)
         classroom = InteractiveClassroom(

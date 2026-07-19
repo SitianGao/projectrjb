@@ -884,3 +884,45 @@ docker-compose up -d
 | markmap | MIT |
 
 > 所有依赖均为 MIT 或 Apache 2.0 协议，可自由使用。详见 README.md 开源致谢部分。
+
+## 13. 最终学习资源闭环
+
+### 13.1 信息架构
+
+学习路径负责组织学习，`StageResourcePage` 负责执行任务，`ResourceAgent` 负责按需准备内容，“我的学习资料”负责搜索、筛选、收藏、回看和继续学习。自由主题学习统一由“AI 学习工作台”承接。
+
+主学习链路：
+
+`学习首页 → 学习路径 → 当前任务 → 任务资源 → 下一任务`
+
+资源不是独立入口。任务页先查询 `task_id` 已绑定的资源；不存在时，通过统一服务读取课程、阶段、任务、画像和知识库，再生成或降级。
+
+### 13.2 统一 ResourceService
+
+所有场景复用同一个 `ResourceService`。有正式学习任务的场景进入 `generate_contextual_resource()`；路径外的 AI 学习工作台没有 `task_id`，进入同一服务的 `generate_resources()`：
+
+| 场景 | trigger_source | 主要关联 |
+|---|---|---|
+| 学习任务 | `learning_task` | course、stage、task |
+| 学习诊断 | `evaluation` | evaluation、专项 task |
+| 错题学习 | `wrong_book` | wrong question、专项 task |
+| AI 助手整理 | `tutor` | tutor session、task |
+| 路径调整 | `path_adjustment` | adjustment、stage、task |
+| 自由生成 | `manual_workspace` | course，可选 task |
+| 课程预置 | `curated_course` | course、stage、task |
+
+旧生成 API 仅作为兼容包装，不维护第二套 Agent 或 Service。后台场景由 `contextual_resource_jobs.py` 排队，任务存在不依赖生成成功。
+
+### 13.3 来源、降级与幂等
+
+`generation_source` 只保存 `curated_seed`、`llm_generated`、`template_generated`、`legacy_unknown`。`rag_used` 保存在生成上下文中，前端据此显示“课程精选”“AI 个性化生成”“知识库基础版”“基础提纲”或“历史资源”。
+
+幂等键由 `user_id + task_id + resource_type + difficulty + generation_version` 计算。同键优先返回已有资源并标记 `reused=true`；明确重新生成时添加随机后缀，并用 `parent_resource_id`、`variant_type` 保留资源谱系。
+
+LLM 失败但 RAG 成功时生成“知识库基础版”；RAG 与 LLM 均失败时生成“基础提纲”。降级状态和原因必须真实返回，不能伪装成 AI 生成成功。
+
+### 13.4 数据与权限
+
+`resources` 保存可回看的正式内容及 course、path、stage、task、parent、trigger、version、idempotency 等关系。`resource_user_states` 保存用户私有的收藏、学习状态、最近打开、打开次数和完成时间。
+
+资源读取先按当前登录用户拥有的课程集合过滤，再校验任务和课程归属。客户端提交的 `student_id` 不能越过当前课程范围；其他用户的资源、收藏和学习状态不可见。课程预置资源在用户拥有的课程范围内读取，不开放匿名跨用户访问。

@@ -47,17 +47,52 @@ CREATE TABLE IF NOT EXISTS learning_paths (
 CREATE TABLE IF NOT EXISTS resources (
     id TEXT PRIMARY KEY,
     student_id TEXT NOT NULL,
+    course_id TEXT,
     path_id TEXT,
-    stage_id INTEGER,
+    stage_id TEXT,
+    task_id TEXT,
+    parent_resource_id TEXT,
     type TEXT NOT NULL,
     title TEXT NOT NULL,
     content TEXT,
     topic TEXT,
     difficulty TEXT,
     is_review BOOLEAN DEFAULT 0,
+    source_refs TEXT DEFAULT '[]',
+    artifact_url TEXT,
+    mime_type TEXT,
+    trigger_source TEXT DEFAULT 'manual',
+    trigger_context TEXT DEFAULT '{}',
+    variant_type TEXT,
+    generation_version TEXT DEFAULT '1',
+    generation_status TEXT DEFAULT 'ready',
+    generation_source TEXT DEFAULT 'agent',
+    fallback_type TEXT,
+    idempotency_key TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id),
-    FOREIGN KEY (path_id) REFERENCES learning_paths(id)
+    FOREIGN KEY (course_id) REFERENCES courses(id),
+    FOREIGN KEY (path_id) REFERENCES learning_paths(id),
+    FOREIGN KEY (parent_resource_id) REFERENCES resources(id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_resources_context_lookup
+ON resources(student_id, task_id, type, difficulty, generation_version);
+
+CREATE TABLE IF NOT EXISTS resource_user_states (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    is_favorite BOOLEAN DEFAULT 0 NOT NULL,
+    learning_status TEXT DEFAULT 'not_started' NOT NULL,
+    opened_count INTEGER DEFAULT 0 NOT NULL,
+    last_opened_at DATETIME,
+    completed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, resource_id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (resource_id) REFERENCES resources(id)
 );
 
 CREATE TABLE IF NOT EXISTS learning_records (
@@ -76,12 +111,33 @@ CREATE TABLE IF NOT EXISTS learning_records (
 CREATE TABLE IF NOT EXISTS evaluation_reports (
     id TEXT PRIMARY KEY,
     student_id TEXT NOT NULL,
-    overall_score REAL NOT NULL DEFAULT 0.0,
+    course_id TEXT,
+    overall_score REAL,                      -- NULL when insufficient data
     dimensions TEXT NOT NULL DEFAULT '[]',
     weak_topics TEXT NOT NULL DEFAULT '[]',
     suggestions TEXT NOT NULL DEFAULT '[]',
     review_plan TEXT NOT NULL DEFAULT '[]',
     source_snapshot TEXT NOT NULL DEFAULT '{}',
+    -- v1: data sufficiency
+    has_sufficient_data BOOLEAN DEFAULT 0 NOT NULL,
+    insufficient_reason TEXT DEFAULT '',
+    -- v1: provenance
+    generation_source TEXT DEFAULT 'rule',
+    provider TEXT,
+    model TEXT,
+    fallback_used BOOLEAN DEFAULT 0 NOT NULL,
+    fallback_reason TEXT,
+    -- v2: evidence & versioning
+    evidence_hash TEXT,
+    evidence_count INTEGER DEFAULT 0,
+    evidence_summary TEXT DEFAULT '{}',
+    trigger TEXT DEFAULT 'auto',
+    scope_type TEXT DEFAULT 'last_30_days',
+    scope_start_at DATETIME,
+    scope_end_at DATETIME,
+    supersedes_report_id TEXT,
+    statistics_json TEXT DEFAULT '{}',
+    agent_result_json TEXT DEFAULT '{}',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (student_id) REFERENCES students(id)

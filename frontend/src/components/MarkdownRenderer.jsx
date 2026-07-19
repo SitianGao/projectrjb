@@ -1,10 +1,89 @@
 import { useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneLight, oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import MermaidChart from './MermaidChart'
 import { useTheme } from '../contexts/ThemeContext'
+import 'katex/dist/katex.min.css'
+
+/**
+ * 预处理：将 Unicode 数学符号和常见数学文本模式转换为 LaTeX
+ * 作为 LLM 未使用 LaTeX 时的兜底方案
+ */
+function preprocessMathNotation(text) {
+  if (!text) return text
+
+  // 保护已有的 LaTeX 公式（$...$ 和 $$...$$），避免重复处理
+  const protectedBlocks = []
+  let processed = text
+
+  // 保护 $$...$$ 块
+  processed = processed.replace(/\$\$[\s\S]+?\$\$/g, (match) => {
+    const idx = protectedBlocks.length
+    protectedBlocks.push(match)
+    return `__PROTECTED_BLOCK_${idx}__`
+  })
+
+  // 保护 $...$ 行内
+  processed = processed.replace(/\$[^$\n]+?\$/g, (match) => {
+    const idx = protectedBlocks.length
+    protectedBlocks.push(match)
+    return `__PROTECTED_INLINE_${idx}__`
+  })
+
+  // Unicode 符号 → LaTeX
+  const symbolMap = [
+    ['∑', '\\sum'], ['∏', '\\prod'],
+    ['Δ', '\\Delta'], ['δ', '\\delta'],
+    ['α', '\\alpha'], ['β', '\\beta'], ['γ', '\\gamma'],
+    ['ε', '\\epsilon'], ['η', '\\eta'], ['θ', '\\theta'],
+    ['λ', '\\lambda'], ['μ', '\\mu'], ['π', '\\pi'],
+    ['ρ', '\\rho'], ['σ', '\\sigma'], ['τ', '\\tau'],
+    ['φ', '\\phi'], ['ω', '\\omega'],
+    ['Γ', '\\Gamma'], ['Ω', '\\Omega'],
+    ['∂', '\\partial'], ['∇', '\\nabla'],
+    ['∞', '\\infty'], ['±', '\\pm'], ['×', '\\times'], ['÷', '\\div'],
+    ['≠', '\\neq'], ['≈', '\\approx'], ['≤', '\\leq'], ['≥', '\\geq'],
+    ['∈', '\\in'], ['∉', '\\notin'], ['⊂', '\\subset'],
+    ['∪', '\\cup'], ['∩', '\\cap'], ['∅', '\\emptyset'],
+    ['∀', '\\forall'], ['∃', '\\exists'],
+    ['→', '\\rightarrow'], ['←', '\\leftarrow'],
+    ['⇒', '\\Rightarrow'], ['⇐', '\\Leftarrow'],
+    ['√', '\\sqrt'],
+  ]
+
+  for (const [sym, latex] of symbolMap) {
+    const escaped = sym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    processed = processed.replace(new RegExp(`(?<![\\w$])${escaped}(?![\\w$])`, 'g'), `$${latex}$`)
+  }
+
+  // 模式：下标 x_i, x_1, x_{ij} → $x_i$, $x_1$, $x_{ij}$
+  processed = processed.replace(/\b([a-zA-Z])_([a-zA-Z0-9]+(?:\{[^}]+\})?)\b/g, (match, var_, sub) => {
+    if (match.startsWith('$')) return match
+    return `$${var_}_${sub}$`
+  })
+
+  // 模式：上标 x^2, x^n, x^{T} → $x^2$, $x^n$, $x^{T}$
+  processed = processed.replace(/\b([a-zA-Z0-9]+)\^([a-zA-Z0-9]+(?:\{[^}]+\})?)\b/g, (match, base, exp) => {
+    if (match.startsWith('$')) return match
+    return `$${base}^${exp}$`
+  })
+
+  // 模式：\frac{a}{b}（已经是 LaTeX，但可能缺少 $ 包裹）
+  processed = processed.replace(/(?<!\$)(\\frac\s*\{[^}]+\}\s*\{[^}]+\})(?!\$)/g, '$$$1$$')
+
+  // 模式：\sum_{i=1}^{n} 等（已经是 LaTeX，但可能缺少 $ 包裹）
+  processed = processed.replace(/(?<!\$)(\\(?:sum|prod|int|lim)\s*(?:_\{[^}]+\})?\s*(?:\^\{[^}]+\})?)(?!\$)/g, '$$$1$$')
+
+  // 恢复受保护的块
+  processed = processed.replace(/__PROTECTED_BLOCK_(\d+)__/g, (_, idx) => protectedBlocks[parseInt(idx)])
+  processed = processed.replace(/__PROTECTED_INLINE_(\d+)__/g, (_, idx) => protectedBlocks[parseInt(idx)])
+
+  return processed
+}
 
 /**
  * Markdown 渲染器（基于 react-markdown + remark-gfm）
@@ -13,6 +92,9 @@ import { useTheme } from '../contexts/ThemeContext'
 export default function MarkdownRenderer({ content = '', compact = false }) {
   const { resolved } = useTheme()
   const isDark = resolved === 'dark'
+
+  // 预处理：将 Unicode 数学符号转换为 LaTeX
+  const processedContent = useMemo(() => preprocessMathNotation(content), [content])
 
   const styles = useMemo(() => {
     const baseFontSize = compact ? 14 : 15
@@ -94,7 +176,8 @@ export default function MarkdownRenderer({ content = '', compact = false }) {
   return (
     <div style={styles.base}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           h1: ({ children, ...props }) => <h1 style={styles.heading(1)} {...props}>{children}</h1>,
           h2: ({ children, ...props }) => <h2 style={styles.heading(2)} {...props}>{children}</h2>,
@@ -177,7 +260,7 @@ export default function MarkdownRenderer({ content = '', compact = false }) {
           strong: ({ children, ...props }) => <strong style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 700 }} {...props}>{children}</strong>,
         }}
       >
-        {content}
+        {processedContent}
       </ReactMarkdown>
     </div>
   )

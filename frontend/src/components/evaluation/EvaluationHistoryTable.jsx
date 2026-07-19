@@ -1,31 +1,28 @@
-import { Button, Table, Tag, Typography } from 'antd'
+import { Empty, Table, Tag } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import { confidenceLabel } from '../../services/evaluationService'
+import { scopeLabel, diagnosticLabel, diagnosticIcon, isAiEnhanced, confidenceText } from '../../utils/evaluationLabels'
 
-const { Text } = Typography
-
-export default function EvaluationHistoryTable({ history = [], loading }) {
+export default function EvaluationHistoryTable({ history = [], loading = false }) {
   const navigate = useNavigate()
-  return (
-    <Table
-      className="evaluation-history-table"
-      loading={loading}
-      dataSource={history}
-      rowKey={(row) => row.evaluationId}
-      columns={[
-        { title: '日期', dataIndex: 'created_at', render: (v) => String(v || '').slice(0, 10) },
-        { title: '课程', dataIndex: 'courseName' },
-        { title: '评估范围', dataIndex: ['scope', 'type'], render: (v) => <Tag>{v || 'last_30_days'}</Tag> },
-        { title: '综合评分', dataIndex: ['overall', 'score'], render: (v) => <Text strong>{v} 分</Text> },
-        { title: '较上次变化', dataIndex: ['overall', 'score_delta'], render: (v) => Number(v) > 0 ? `+${v}` : v },
-        {
-          title: '有效数据量',
-          render: (_, row) => `${row.dataSummary?.unique_tasks_completed || 0} 个任务 / ${row.dataSummary?.questions_answered || 0} 道题`,
-        },
-        { title: '评估置信度', dataIndex: ['overall', 'confidence'], render: confidenceLabel },
-        { title: '操作', render: (_, row) => <Button type="link" onClick={() => navigate(`/assessment/report/${row.evaluationId}`)}>查看报告</Button> },
-      ]}
-      pagination={{ pageSize: 6 }}
-    />
-  )
+  if (!loading && (!history || history.length === 0)) {
+    return <Empty description="暂无评估历史" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+  }
+
+  const columns = [
+    { title: '日期', dataIndex: 'created_at', width: 100, render: (v) => v ? new Date(v).toLocaleDateString('zh-CN') : '—' },
+    { title: '课程', dataIndex: 'courseName', width: 120, render: (v, r) => v || r.course_name || '—' },
+    { title: '范围', width: 90, render: (_, r) => scopeLabel(r.scopeType || r.scope_type || r.scope?.type) },
+    { title: '评分', dataIndex: 'overall_score', width: 55, align: 'center',
+      render: (v, r) => { const s = v ?? r.overallScore ?? r.overall?.score; return s != null ? <strong>{s}</strong> : <Tag>不足</Tag> } },
+    { title: '变化', width: 50, align: 'center',
+      render: (_, r) => { const d = Number(r.overall?.score_delta || 0); if (!d) return '—'; return <span style={{color:d>0?'#52c41a':'#ff4d4f'}}>{d>0?`+${d}`:d}</span> } },
+    { title: '证据', dataIndex: 'evidence_count', width: 50, align: 'center', render: (v, r) => v ?? r.evidenceCount ?? '—' },
+    { title: '置信度', width: 80, align: 'center', render: (_, r) => confidenceText(r.overall?.confidence || 0) },
+    { title: '来源', width: 100, render: (_, r) => <Tag color={isAiEnhanced(r)?'purple':'default'}>{diagnosticIcon(r)} {diagnosticLabel(r)}</Tag> },
+    { title: '操作', width: 60, align: 'center',
+      render: (_, r) => <a onClick={() => navigate(`/assessment/report/${r.evaluationId || r.report_id}`)}>查看</a> },
+  ]
+
+  return <Table dataSource={history} columns={columns} rowKey={(r) => r.evaluationId || r.report_id || r.id}
+    loading={loading} size="small" pagination={history.length > 20 ? { pageSize: 20 } : false} scroll={{ x: 800 }} />
 }

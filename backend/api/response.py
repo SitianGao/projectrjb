@@ -54,16 +54,15 @@ def fail(
 
 
 def sse_error(code: str, message: str) -> str:
-    payload = {
-        "type": "error",
-        "code": code,
-        "message": message,
-    }
-    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+    """Format an SSE error event (delegates to core.sse)."""
+    from core.sse import sse_error as _sse_error
+    return _sse_error(code, message)
 
 
 def sse_done() -> str:
-    return 'data: {"type":"done"}\n\n'
+    """Format the SSE done event (delegates to core.sse)."""
+    from core.sse import sse_done as _sse_done
+    return _sse_done()
 
 
 class ApiError(Exception):

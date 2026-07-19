@@ -606,3 +606,30 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* ===== 数学公式 (KaTeX) 样式 ===== */
+.katex-display {
+  margin: 16px 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 0;
+}
+
+.katex {
+  font-size: 1.1em;
+}
+
+.katex-display > .katex {
+  font-size: 1.2em;
+}
+
+/* 深色模式下的数学公式 */
+[data-theme='dark'] .katex {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* 行内公式样式 */
+.katex-inline {
+  display: inline;
+  margin: 0 2px;
+}

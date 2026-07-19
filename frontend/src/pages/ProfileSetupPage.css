@@ -106,12 +106,9 @@
   border-color: #BFDBFE;
 }
 
-.profile-agent-run {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-  font-size: 12px;
+/* ── Debug overlay (dev only, hidden in production) ── */
+.profile-agent-debug {
+  font-family: 'SF Mono', 'Fira Code', monospace;
 }
 
 .profile-message-loading {

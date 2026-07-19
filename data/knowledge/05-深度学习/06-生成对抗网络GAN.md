@@ -1,147 +1,147 @@
-# Generative Adversarial Networks (GANs)
+# 生成对抗网络（GAN）
 
-## The Core Idea
+## 核心思想
 
-A GAN consists of two neural networks locked in a game-theoretic contest:
+GAN 由两个在博弈论式对抗中较量的神经网络组成：
 
-- **Generator $G$:** Takes random noise $z \sim p_z$ (e.g., Gaussian) and produces synthetic data $G(z)$ that aims to look real.
-- **Discriminator $D$:** Takes a sample (real or generated) and outputs the probability that it came from the real data distribution.
+- **生成器 $G$：** 接收随机噪声 $z \sim p_z$（如高斯噪声），生成力求以假乱真的合成数据 $G(z)$。
+- **判别器 $D$：** 接收一个样本（真实或生成），输出其来自真实数据分布的概率。
 
-$G$ tries to minimize and $D$ tries to maximize the probability that the discriminator correctly labels real vs. fake. This adversarial process drives the generator to produce increasingly realistic outputs.
+$G$ 试图最小化、$D$ 试图最大化判别器正确区分真假样本的概率。这一对抗过程驱使生成器产生越来越逼真的输出。
 
 ---
 
-## Minimax Objective
+## 极小极大目标
 
-The training objective (Goodfellow et al., 2014):
+训练目标函数（Goodfellow 等，2014）：
 
 $$\min_G \max_D V(D, G) = \mathbb{E}_{x \sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))]$$
 
-- $D(x)$ should be close to 1 for real data (maximize $\log D(x)$).
-- $D(G(z))$ should be close to 0 for generated data (maximize $\log(1 - D(G(z)))$).
-- $G$ minimizes $\log(1 - D(G(z)))$, which is equivalent to maximizing $\log D(G(z))$ — this "non-saturating" loss provides stronger gradients early in training.
+- 对于真实数据，$D(x)$ 应接近 1（最大化 $\log D(x)$）。
+- 对于生成数据，$D(G(z))$ 应接近 0（最大化 $\log(1 - D(G(z)))$）。
+- $G$ 最小化 $\log(1 - D(G(z)))$，这等价于最大化 $\log D(G(z))$——这种"非饱和"损失在训练早期提供更强的梯度信号。
 
-At the theoretical Nash equilibrium, $G$ perfectly replicates $p_{\text{data}}$ and $D(x) = 0.5$ everywhere (the discriminator cannot distinguish real from fake).
-
----
-
-## Training Procedure
-
-GANs are trained by alternating between:
-1. **Train $D$:** On a batch of real data (label=1) and a batch of generated data (label=0). Update $D$ to maximize classification accuracy.
-2. **Train $G$:** Generate a batch of fake data, ask $D$ to evaluate it, and update $G$ to maximize $D$'s mistake (i.e., make $D(G(z)) \to 1$).
-
-A common heuristic: train $D$ for $k$ steps per $G$ step (e.g., $k = 1$ or $k = 5$) to keep the discriminator ahead.
+在理论上的纳什均衡点，$G$ 完美复现 $p_{\text{data}}$，且 $D(x) = 0.5$ 处处成立（判别器无法区分真实与生成样本）。
 
 ---
 
-## Training Instability and Mode Collapse
+## 训练流程
 
-GAN training is notoriously unstable. Two major failure modes:
+GAN 通过交替以下两步进行训练：
+1. **训练 $D$：** 在一个批次的真实数据（标签=1）和一个批次的生成数据（标签=0）上，更新 $D$ 以最大化分类准确率。
+2. **训练 $G$：** 生成一批假数据，让 $D$ 评估，然后更新 $G$ 以最大化 $D$ 的错误率（即，使 $D(G(z)) \to 1$）。
 
-**Mode collapse:** The generator finds a few samples that fool the discriminator and produces only those. The distribution $p_g$ covers only a tiny subset of $p_{\text{data}}$. Visible as lack of diversity in generated outputs.
-
-**Non-convergence:** The two networks oscillate instead of converging to equilibrium. Loss curves are often uninformative — the GAN loss does not reliably indicate sample quality.
-
-**Mitigations:** Feature matching, minibatch discrimination, historical averaging, gradient penalty, and architectural improvements (see DCGAN, WGAN below).
+常用启发式策略：每个 $G$ 步训练 $D$ $k$ 步（如 $k = 1$ 或 $k = 5$），以保持判别器领先于生成器。
 
 ---
 
-## DCGAN: Deep Convolutional GAN
+## 训练不稳定与模式崩塌
 
-Radford et al. (2016) established a stable convolutional architecture:
+GAN 训练出了名地不稳定。两种主要失效模式：
 
-**Generator architecture:**
-- Start with a dense layer, reshape to 4x4 feature maps.
-- Series of transposed convolutions (fractionally-strided) doubling spatial resolution each step.
-- Batch normalization in all layers except the output.
-- ReLU activations in intermediate layers; Tanh in the output layer.
+**模式崩塌（Mode collapse）：** 生成器找到少数能骗过判别器的样本后就只生成这些样本。分布 $p_g$ 只覆盖了 $p_{\text{data}}$ 的极小部分。表现为生成结果缺乏多样性。
 
-**Discriminator architecture:**
-- Standard convolutions with stride 2 (replacing pooling).
-- Batch normalization.
-- LeakyReLU with slope 0.2.
-- No fully-connected layers at the end (fully convolutional).
+**不收敛：** 两个网络振荡而非收敛到均衡点。损失曲线通常缺乏指导意义——GAN 的损失值并不能可靠地反映样本质量。
 
-**Key DCGAN guidelines:**
-- Replace any pooling layers with strided convolutions.
-- Use batch normalization in both $G$ and $D$.
-- Remove fully-connected hidden layers.
-- Use ReLU in $G$ except the output layer; use LeakyReLU in $D$.
+**缓解措施：** 特征匹配、小批量判别、历史平均、梯度惩罚，以及架构改进（参见下文的 DCGAN、WGAN）。
 
 ---
 
-## WGAN and WGAN-GP
+## DCGAN：深度卷积生成对抗网络
 
-Wasserstein GAN (Arjovsky et al., 2017) replaces the Jensen-Shannon divergence with the **Wasserstein distance** (Earth Mover's Distance):
+Radford 等人（2016）提出了稳定的卷积架构：
+
+**生成器架构：**
+- 以全连接层开始，重塑为 4x4 的特征图。
+- 一系列转置卷积（分数步长卷积），每步将空间分辨率翻倍。
+- 除输出层外，所有层均使用批归一化。
+- 中间层使用 ReLU 激活；输出层使用 Tanh。
+
+**判别器架构：**
+- 标准卷积，步长为 2（替代池化层）。
+- 批归一化。
+- 斜率为 0.2 的 LeakyReLU。
+- 末端不使用全连接层（全卷积网络）。
+
+**DCGAN 关键指导原则：**
+- 用步长卷积替代所有池化层。
+- 在 $G$ 和 $D$ 中均使用批归一化。
+- 移除全连接隐藏层。
+- $G$ 中除输出层外使用 ReLU；$D$ 中使用 LeakyReLU。
+
+---
+
+## WGAN 与 WGAN-GP
+
+Wasserstein GAN（Arjovsky 等，2017）用 **Wasserstein 距离**（地球移动者距离，Earth Mover's Distance）替代 Jensen-Shannon 散度：
 
 $$W(p_r, p_g) = \inf_{\gamma \in \Pi(p_r, p_g)} \mathbb{E}_{(x, y) \sim \gamma}[\|x - y\|]$$
 
-This provides meaningful gradients even when the real and generated distributions are disjoint.
+即便真实分布和生成分布不相交，该距离也能提供有意义的梯度。
 
-**WGAN changes:**
-- Remove the sigmoid from $D$'s output (it's now a "critic," not a classifier).
-- Use weight clipping to enforce 1-Lipschitz constraint.
-- Train the critic many more steps than the generator.
-- Use RMSProp or Adam with lower $\beta_1$.
+**WGAN 的改动：**
+- 移除 $D$ 输出的 sigmoid（现在它是"评判器"critic，而非分类器）。
+- 使用权值裁剪来强制执行 1-Lipschitz 约束。
+- 评判器的训练步数远多于生成器。
+- 使用 RMSProp 或较小 $\beta_1$ 的 Adam。
 
-**WGAN-GP (Gradient Penalty):** Replaces the hacky weight clipping with a gradient penalty term added to the critic loss:
+**WGAN-GP（梯度惩罚）：** 用添加到评判器损失中的梯度惩罚项替代并不优雅的权值裁剪：
 
 $$\lambda \cdot \mathbb{E}_{\hat{x}}[(\|\nabla_{\hat{x}} D(\hat{x})\|_2 - 1)^2]$$
 
-where $\hat{x}$ is sampled uniformly along straight lines between real and generated samples. This yields more stable training and better sample quality.
+其中 $\hat{x}$ 是在真实样本和生成样本之间的直线上均匀采样的点。这能带来更稳定的训练和更好的样本质量。
 
 ---
 
-## Conditional GAN (cGAN)
+## 条件 GAN（cGAN）
 
-Conditioning both $G$ and $D$ on auxiliary information $y$ (e.g., class labels) allows controlled generation:
+用辅助信息 $y$（如类别标签）同时调节 $G$ 和 $D$，可以实现可控生成：
 
 $$\min_G \max_D \mathbb{E}_{x,y}[\log D(x, y)] + \mathbb{E}_{z,y}[\log (1 - D(G(z, y), y))]$$
 
-The generator takes both noise $z$ and label $y$ as input; the discriminator evaluates both the image and whether it matches the condition.
+生成器同时接收噪声 $z$ 和标签 $y$ 作为输入；判别器同时评估图像及其是否与条件匹配。
 
 ---
 
-## StyleGAN and CycleGAN
+## StyleGAN 与 CycleGAN
 
-### StyleGAN (Karras et al., 2019)
+### StyleGAN（Karras 等，2019）
 
-Key innovations:
-- **Progressive growing:** Start training with 4x4 resolution, gradually add layers for higher resolution.
-- **Mapping network:** Maps $z$ to an intermediate latent space $w$ before feeding into synthesis network.
-- **Adaptive Instance Normalization (AdaIN):** Controls style at each resolution independently.
-- **Style mixing:** Regularization technique where two different $w$ vectors control different layers.
-- Achieves state-of-the-art high-resolution face generation.
+关键创新：
+- **渐进生长：** 从 4x4 分辨率开始训练，逐步添加层以获得更高分辨率。
+- **映射网络：** 在输入合成网络之前，将 $z$ 映射到中间潜在空间 $w$。
+- **自适应实例归一化（AdaIN）：** 在每个分辨率层级独立控制风格。
+- **风格混合：** 正则化技术，使用两个不同的 $w$ 向量控制不同层。
+- 实现了当时领先水平的高分辨率人脸生成。
 
-### CycleGAN (Zhu et al., 2017)
+### CycleGAN（Zhu 等，2017）
 
-Enables **unpaired** image-to-image translation (e.g., horses to zebras without paired examples).
+实现**不成对**的图像到图像翻译（如，将马转换为斑马，无需成对样本）。
 
-**Cycle consistency loss:** If you translate $A \to B \to A$, the result should match the original:
+**循环一致性损失：** 若将 $A \to B \to A$ 翻译回来，结果应与原始图像一致：
 
 $$\mathcal{L}_{\text{cycle}}(G, F) = \mathbb{E}_{x \sim p_A}[\|F(G(x)) - x\|_1] + \mathbb{E}_{y \sim p_B}[\|G(F(y)) - y\|_1]$$
 
-Two generators $(G: A \to B, F: B \to A)$ and two discriminators $(D_A, D_B)$ are trained jointly.
+两个生成器 $(G: A \to B, F: B \to A)$ 和两个判别器 $(D_A, D_B)$ 联合训练。
 
 ---
 
-## Evaluation Metrics
+## 评估指标
 
-**FID (Frechet Inception Distance):** Measures the distance between real and generated distributions in the Inception v3 feature space. Lower is better. FID correlates well with human judgment and detects mode collapse.
+**FID（Frechet Inception Distance）：** 衡量真实分布与生成分布在 Inception v3 特征空间中的距离。值越低越好。FID 与人类判断有良好的相关性，并能检测模式崩塌。
 
 $$\text{FID} = \|\mu_r - \mu_g\|^2 + \operatorname{Tr}(\Sigma_r + \Sigma_g - 2(\Sigma_r \Sigma_g)^{1/2})$$
 
-**IS (Inception Score):** Measures both quality (high confidence predictions) and diversity (uniform marginal label distribution). Higher is better. Less reliable than FID for many settings.
+**IS（Inception Score）：** 同时衡量质量（高置信度预测）和多样性（均匀的边缘标签分布）。值越高越好。在许多场景下其可靠性不如 FID。
 
 ---
 
-## Applications
+## 应用
 
-- **Image generation:** Photorealistic faces, objects, scenes (StyleGAN).
-- **Super-resolution:** SRGAN, ESRGAN — upscale low-res images while adding plausible detail.
-- **Image-to-image translation:** Style transfer, semantic segmentation to photo, day-to-night.
-- **Data augmentation:** Generate additional training samples for downstream tasks.
-- **Text-to-image:** DALL-E, Stable Diffusion (building on GAN concepts but using diffusion models).
-- **Video generation and prediction.**
-- **Drug discovery:** Generate molecular structures with desired properties.
+- **图像生成：** 照片般逼真的人脸、物体、场景（StyleGAN）。
+- **超分辨率：** SRGAN、ESRGAN——放大低分辨率图像并添加合理细节。
+- **图像到图像翻译：** 风格迁移、语义分割转照片、白天转黑夜。
+- **数据增强：** 为下游任务生成额外训练样本。
+- **文本到图像：** DALL-E、Stable Diffusion（基于 GAN 概念但使用扩散模型）。
+- **视频生成与预测。**
+- **药物发现：** 生成具有目标特性的分子结构。

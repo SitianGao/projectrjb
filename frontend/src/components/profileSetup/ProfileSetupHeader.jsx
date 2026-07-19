@@ -4,7 +4,7 @@ import { ArrowLeftOutlined, BranchesOutlined, HomeOutlined } from '@ant-design/i
 const { Title, Text } = Typography
 
 export default function ProfileSetupHeader({ course, mode, completion = 0, onBack, onPath }) {
-  const step = completion >= 0.85 ? 1 : 0
+  const step = completion >= 0.75 ? 1 : 0
   return (
     <Card className="profile-setup-header">
       <div className="profile-header-top">

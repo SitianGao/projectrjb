@@ -71,13 +71,16 @@ async def test_generate_exercise(agent, sample_profile):
     )
     r = data["resources"][0]
     assert r["type"] == "exercise"
-    # exercise 的 content 是 JSON 字符串，包含题目列表
-    questions = json.loads(r["content"])
-    assert isinstance(questions, list)
+    # exercise 使用统一的结构化内容，便于前端直接渲染和后端校验。
+    content = r["content"]
+    if isinstance(content, str):
+        content = json.loads(content)
+    assert isinstance(content, dict)
+    questions = content["questions"]
     assert len(questions) >= 1
     q = questions[0]
-    assert "question" in q
-    assert "answer" in q
+    assert "stem" in q
+    assert "correct_answer" in q
     assert "explanation" in q
 
 

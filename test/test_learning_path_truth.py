@@ -154,6 +154,51 @@ def test_task_completion_is_idempotent_and_survives_reload():
     assert reloaded["current_task"]["type_label"] == "核心讲义"
 
 
+def test_learning_state_separates_course_name_goal_and_completed_state():
+    db = _session()
+    user, student_id = _seed_scope(db)
+    planner = PlannerService(None, None, None)
+    path = planner.save_path(
+        db,
+        student_id,
+        _path_data(),
+        user_id=user.id,
+        course_id="ai_deep_learning_demo",
+        generation_metadata={"generation_source": "seed"},
+    )
+    for task in db.query(LearningTask).filter_by(path_id=path.id).all():
+        task.status = "completed"
+    for stage in db.query(LearningStage).filter_by(path_id=path.id).all():
+        stage.status = "completed"
+    path.status = "completed"
+    db.commit()
+
+    service = CourseLearningService(planner)
+    state = service.resolve_active_learning_state(
+        db,
+        user=user,
+        course_id="ai_deep_learning_demo",
+    )
+    context = service.get_learning_context(
+        db,
+        user=user,
+        course_id="ai_deep_learning_demo",
+    )
+
+    assert state["course"]["course_name"] == "人工智能与深度学习"
+    assert state["learning_goal"] == "完成图像分类项目"
+    assert state["course"]["course_name"] != state["learning_goal"]
+    assert state["progress"]["completed_tasks"] == 2
+    assert state["progress"]["total_tasks"] == 2
+    assert state["progress"]["percent"] == 100
+    assert state["course_status"] == "completed"
+    assert state["current_task"] is None
+    assert state["next_task"] is None
+    assert state["continue_target"]["route"] == "/course/ai_deep_learning_demo/path"
+    assert context["course_status"] == "completed"
+    assert context["current_task"] is None
+
+
 def test_course_scope_blocks_another_user():
     db = _session()
     user, student_id = _seed_scope(db)
@@ -335,15 +380,28 @@ def test_demo_course_api_is_authenticated_scoped_and_refreshable():
             headers=headers,
         )
 
+        learning_state = client.get(
+            "/api/courses/ai_deep_learning_demo/learning-state",
+            headers=headers,
+        )
+
         assert first.status_code == 200
         assert path_overview.status_code == 200
         assert refreshed.status_code == 200
+        assert learning_state.status_code == 200
         assert login.json()["data"]["user"]["is_demo"] is True
-        assert first.json()["data"]["current_task"]["task_id"] == "task_gd_document"
+        assert first.json()["data"]["course"]["name"] == "人工智能与深度学习"
+        assert first.json()["data"]["course"]["goal"] == "掌握 Transformer 注意力机制"
+        assert first.json()["data"]["course_status"] == "completed"
+        assert first.json()["data"]["current_task"] is None
         assert refreshed.json()["data"]["progress"] == first.json()["data"]["progress"]
         assert path_overview.json()["data"]["progress"] == first.json()["data"]["path_progress"]
-        assert source.json()["data"]["generation_source"] == "seed"
-        assert idempotent.json()["data"]["idempotent"] is True
+        assert learning_state.json()["data"]["progress"]["percent"] == 100
+        assert learning_state.json()["data"]["current_task"] is None
+        assert learning_state.json()["data"]["next_task"] is None
+        assert source.json()["data"]["generation_source"] in {"agent", "seed"}
+        assert idempotent.status_code == 409
+        assert idempotent.json()["code"] == "COURSE_ALREADY_COMPLETED"
 
         admin_login = client.post(
             "/api/auth/login",

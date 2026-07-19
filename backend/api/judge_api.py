@@ -24,6 +24,7 @@ from services.judge_service import (
     JudgeConfig,
     LANG_CONFIG,
     default_sandbox,
+    default_experiment_runner,
 )
 from services.evaluate_service import EvaluateService
 from models.evaluation import LearningRecord
@@ -290,4 +291,69 @@ async def supported_languages():
             {"key": k, "label": {"c": "C", "cpp": "C++", "java": "Java", "python": "Python"}[k]}
             for k in LANG_CONFIG.keys()
         ]
+    })
+
+
+# ══════════════════════════════════════════════════════════
+# 交互式代码实验
+# ══════════════════════════════════════════════════════════
+
+class ExperimentRunRequest(BaseModel):
+    """实验运行请求"""
+    code: str = Field(..., examples=["import numpy as np\nprint('hello')"])
+    student_id: Optional[str] = Field(default=None, examples=["demo-student-01"])
+    experiment_id: Optional[str] = None
+    parameters: Optional[dict] = Field(default=None, description="参数覆盖，如 {learning_rate: 0.1}")
+    time_limit_sec: int = Field(default=30, ge=5, le=120)
+
+
+@router.post("/experiment", responses=json_responses("EXPERIMENT_FAILED"))
+async def run_experiment(request: ExperimentRunRequest):
+    """运行交互式代码实验（非判题，返回结构化结果）"""
+    if not request.code.strip():
+        raise ApiError("BAD_REQUEST", "代码不能为空")
+
+    # 如果有参数覆盖，将代码中的默认值替换
+    code = request.code
+    if request.parameters:
+        for param_name, param_value in request.parameters.items():
+            # 简单替换：将 parameter_name = old_value 替换为 parameter_name = new_value
+            # 支持 "learning_rate = 0.01" 和 "learning_rate=0.01" 两种格式
+            import re as _re
+            pattern = rf'({_re.escape(param_name)}\s*=\s*)([^\s\n#]+)'
+            replacement = rf'\g<1>{param_value}'
+            code = _re.sub(pattern, replacement, code, count=1)
+
+    result = await default_experiment_runner.run(
+        code=code,
+        time_limit_sec=request.time_limit_sec,
+    )
+
+    # 保存学习记录（如有 student_id）
+    if request.student_id:
+        db = SessionLocal()
+        try:
+            record_id = str(uuid.uuid4())
+            db.add(LearningRecord(
+                id=record_id,
+                student_id=request.student_id,
+                resource_id=request.experiment_id,
+                action="code_experiment_run",
+                topic=f"experiment:{request.experiment_id or 'free'}",
+                score=1.0 if result.status == "success" else 0.0,
+            ))
+            db.commit()
+        except Exception as exc:
+            logger.warning(f"保存实验记录失败: {exc}")
+        finally:
+            db.close()
+
+    return ok({
+        "status": result.status,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "metrics": result.metrics,
+        "chart_data": result.chart_data,
+        "observations": result.observations,
+        "execution_time_ms": result.execution_time_ms,
     })

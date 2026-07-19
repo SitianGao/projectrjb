@@ -1,8 +1,17 @@
 import { useCallback, useState } from 'react'
 import { streamTutorChat } from '../services/aiWorkspaceService'
 
-export function useChatStreaming({ studentId, messages, setMessages }) {
+export function useChatStreaming({
+  studentId,
+  courseId,
+  stageId,
+  taskId,
+  learningGoal,
+  messages,
+  setMessages,
+}) {
   const [loading, setLoading] = useState(false)
+  const [sessionId, setSessionId] = useState(null)
 
   const send = useCallback(async (content) => {
     const text = String(content || '').trim()
@@ -16,17 +25,36 @@ export function useChatStreaming({ studentId, messages, setMessages }) {
       let acc = ''
       await streamTutorChat({
         studentId,
+        courseId,
+        stageId,
+        taskId,
+        learningGoal,
         message: text,
         history: messages.map((item) => item.content),
+        conversationId: sessionId,
         onToken: (token) => {
           acc += token
           setMessages([...messages, userMessage, { ...assistantMessage, content: acc || '正在整理回答...' }])
+        },
+        onEvent: (event) => {
+          const nextSessionId = event?.session_id || event?.data?.session_id
+          if (nextSessionId) setSessionId(nextSessionId)
         },
       })
     } finally {
       setLoading(false)
     }
-  }, [loading, messages, setMessages, studentId])
+  }, [
+    courseId,
+    learningGoal,
+    loading,
+    messages,
+    setMessages,
+    sessionId,
+    stageId,
+    studentId,
+    taskId,
+  ])
 
-  return { send, loading }
+  return { send, loading, sessionId }
 }

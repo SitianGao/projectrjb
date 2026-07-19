@@ -59,6 +59,7 @@ from api.session_api import router as session_router
 from api.course_profile_api import router as course_profile_router
 from api.classroom_api import router as classroom_router
 from api.course_learning_api import router as course_learning_router
+from api.ppt_api import router as ppt_router
 
 app.include_router(profile_router, prefix="/api/profile", tags=["画像"])
 app.include_router(planner_router, prefix="/api/planner", tags=["规划"])
@@ -74,6 +75,7 @@ app.include_router(session_router, prefix="/api/session", tags=["会话启动"])
 app.include_router(course_profile_router, prefix="/api", tags=["课程画像"])
 app.include_router(classroom_router, prefix="/api/classrooms", tags=["互动课堂"])
 app.include_router(course_learning_router, prefix="/api/courses", tags=["课程学习"])
+app.include_router(ppt_router, prefix="/api/ppt", tags=["PPT 生成"])
 
 
 @app.on_event("startup")

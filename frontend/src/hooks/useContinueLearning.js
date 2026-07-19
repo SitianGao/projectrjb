@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { message } from 'antd'
 import { useAuth } from '../contexts/AuthContext'
-import { getCourseLearningPath } from '../api/courseLearning'
+import { getCourseLearningState } from '../api/courseLearning'
 
 /**
  * Unified "Continue Learning" logic.
@@ -10,11 +10,7 @@ import { getCourseLearningPath } from '../api/courseLearning'
  *
  * Resolution order:
  * 1. No course → /courses
- * 2. No learning path → /course/:id/path (prompt to generate)
- * 3. Current stage has in-progress task → /course/:id/learn/:taskId
- * 4. First pending task in current stage → /course/:id/learn/:taskId
- * 5. Stage complete, next stage unlocked → next stage first task
- * 6. All done → /course/:id/path
+ * The backend owns target resolution through continue_target.route.
  */
 export function useContinueLearning() {
   const navigate = useNavigate()
@@ -33,16 +29,9 @@ export function useContinueLearning() {
     const cid = course.id
     let learningData
     try {
-      learningData = await getCourseLearningPath(cid)
-    } catch {
-      message.info('请先生成学习路径')
-      navigate(`/course/${cid}/path`)
-      return
-    }
-
-    if (!learningData?.path?.stages?.length) {
-      message.info('请先生成学习路径')
-      navigate(`/course/${cid}/path`)
+      learningData = await getCourseLearningState(cid)
+    } catch (error) {
+      message.error(error.message || '学习状态加载失败')
       return
     }
 
@@ -52,7 +41,7 @@ export function useContinueLearning() {
       return
     }
 
-    navigate(`/course/${cid}/path`)
+    message.error('暂时没有可进入的学习内容')
   }, [activeCourse, courses, navigate])
 
   return { continueLearning: go }
