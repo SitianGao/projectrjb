@@ -24,8 +24,18 @@ _load_env_files()
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./eduagent.db")
 
 # ── LLM 主模型配置 ───────────────────────────────────
-LLM_PRIMARY = os.getenv("LLM_PRIMARY", "deepseek")       # deepseek / spark
+LLM_PRIMARY = os.getenv("LLM_PRIMARY", "spark")          # spark / deepseek
+SPARK_PROTOCOL = os.getenv("SPARK_PROTOCOL", "http")     # http（X2 OpenAI 兼容）
+SPARK_ENABLED = os.getenv("SPARK_ENABLED", "true").lower() in {
+    "1", "true", "yes", "on",
+}
 SPARK_API_PASSWORD = os.getenv("SPARK_API_PASSWORD", "")  # API 密码（Bearer token）
+# 兼容旧变量名 SPARK_API_BASE，新变量 SPARK_BASE_URL 优先
+# 默认 v1 接口（X2 需要新 APIPassword，配置后切换）
+SPARK_BASE_URL = os.getenv(
+    "SPARK_BASE_URL",
+    os.getenv("SPARK_API_BASE", "https://spark-api-open.xf-yun.com/v1/"),
+)
 SPARK_API_URL = os.getenv(
     "SPARK_API_URL",
     "https://spark-api-open.xf-yun.com/v1/chat/completions",

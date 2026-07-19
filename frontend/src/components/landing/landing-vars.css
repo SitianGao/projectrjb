@@ -1,0 +1,25 @@
+/* ===== Landing Page Scoped Variables ===== */
+.landing-page {
+  --lp-primary: #6256e8;
+  --lp-primary-dark: #4938d1;
+  --lp-primary-soft: rgba(98, 86, 232, 0.10);
+  --lp-blue: #258cf4;
+  --lp-cyan: #20b8e6;
+  --lp-green: #2ac99a;
+  --lp-orange: #fa8c16;
+  --lp-pink: #eb2f96;
+  --lp-text-primary: #111827;
+  --lp-text-secondary: #667085;
+  --lp-text-muted: #98a2b3;
+  --lp-border: rgba(95, 103, 160, 0.14);
+  --lp-bg: #f8faff;
+  --lp-surface: #ffffff;
+  --lp-shadow: 0 24px 70px rgba(63, 71, 120, 0.12);
+  --lp-shadow-sm: 0 4px 24px rgba(63, 71, 120, 0.08);
+  --lp-shadow-hover: 0 12px 40px rgba(63, 71, 120, 0.15);
+  --lp-radius: 18px;
+  --lp-radius-sm: 12px;
+  --lp-radius-lg: 24px;
+  --lp-max-width: 1200px;
+  --lp-nav-height: 68px;
+}

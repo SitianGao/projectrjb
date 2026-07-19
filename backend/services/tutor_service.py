@@ -324,7 +324,7 @@ class TutorService:
                 "agent_run": {
                     "agent_name": "TutorAgent",
                     "provider": getattr(self.llm_client, "primary", "deepseek"),
-                    "model": "deepseek-chat" if getattr(self.llm_client, "primary", "") == "deepseek" else "4.0Ultra",
+                    "model": "deepseek-chat" if getattr(self.llm_client, "primary", "") == "deepseek" else __import__("config").SPARK_MODEL,
                     "status": "completed",
                     "fallback_used": not bool(self.tutor_agent),
                 },

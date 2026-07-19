@@ -788,7 +788,7 @@ class EvaluateAgent(BaseAgent):
 
         return result
 
-阶段stage_gradient_descent：
+# 阶段 stage_gradient_descent
 # ------------------------------------------------------------------
 # 模块级辅助函数
 # ------------------------------------------------------------------

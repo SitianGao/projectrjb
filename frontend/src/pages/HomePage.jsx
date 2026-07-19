@@ -341,7 +341,7 @@ export default function HomePage() {
               <CourseShortcut icon={<AppstoreOutlined />} title="AI 学习工作台" desc="课程答疑、资源生成和路径调整" color="#6C5CE7"
                 onClick={() => navigate(currentCourse ? `/course/${currentCourse.id}/ai-workspace` : '/courses')} />
               <CourseShortcut icon={<CheckCircleOutlined />} title="在线测评" desc="按当前课程生成评估报告" color="#4F8CFF"
-                onClick={() => navigate(currentCourse ? `/course/${currentCourse.id}/assessment/report` : '/assessment/tests')} />
+                onClick={() => navigate('/assessment/dashboard')} />
               <CourseShortcut icon={<FileTextOutlined />} title="学习资源" desc="讲义、导图、PPT 和练习题" color="#20C7B7"
                 onClick={() => navigate(currentCourse ? `/resources?courseId=${currentCourse.id}` : '/resources')} />
               <CourseShortcut icon={<ExperimentOutlined />} title="代码实验" desc="交互式实验，调参观察结果" color="#89b4fa"
