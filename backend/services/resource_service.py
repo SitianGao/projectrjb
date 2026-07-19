@@ -951,6 +951,31 @@ class ResourceService:
                 else idempotency_key
             ),
         )
+        if not saved:
+            logger.warning("persist_generated_resources 返回空列表，使用模板降级")
+            fallback_result = _template_resources(resolved_topic, [resolved_type], resolved_difficulty, 1)
+            fallback_result["generation_meta"] = {
+                "generation_source": "template_after_empty",
+                "fallback_used": True,
+                "fallback_type": "empty_persist",
+            }
+            fallback_result["knowledge_sources"] = knowledge_sources
+            saved = self.persist_generated_resources(
+                db=db,
+                student_id=course.student_id,
+                generated=fallback_result,
+                path_id=path.id,
+                stage_id=stage.stage_id,
+                default_topic=resolved_topic,
+                default_difficulty=resolved_difficulty,
+                course_id=course.id,
+                task_id=task.task_id,
+                trigger_source=trigger_source or "learning_task",
+                trigger_context=trigger_context or {},
+                generation_version=generation_version,
+                generation_source="template",
+                generation_status="degraded",
+            )
         resource_id = saved[0]["id"]
         if not parent and not task.resource_id:
             task.resource_id = resource_id

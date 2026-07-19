@@ -59,6 +59,8 @@ def setup_logging(level: int = logging.DEBUG) -> None:
     logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
     logging.getLogger("chromadb").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("watchfiles").setLevel(logging.WARNING)
+    logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 
     root.info("EduAgent 日志系统初始化完成")
 

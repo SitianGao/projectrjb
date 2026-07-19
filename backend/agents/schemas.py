@@ -308,6 +308,7 @@ class ResourceGenerationOutput(BaseModel):
     difficulty: str = "中级"
     total: int = 0
     knowledge_sources: list[dict] = Field(default_factory=list)
+    generation_meta: GenerationMeta = Field(default_factory=GenerationMeta)
 
 
 # ═══════════════════════════════════════════════════════════════════════

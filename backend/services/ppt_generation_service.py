@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from sqlalchemy.orm.Session import Session
+from sqlalchemy.orm import Session
 
 try:
     from config import SPARK_PPT_ENABLED

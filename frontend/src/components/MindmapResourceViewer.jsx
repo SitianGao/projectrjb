@@ -1,70 +1,48 @@
-import { useEffect, useRef } from 'react'
-import { Empty, Typography } from 'antd'
+import { useMemo } from 'react'
+import { Empty } from 'antd'
 import { normalizeLegacyContent } from '../utils/resourceNormalizer'
-
-const { Text } = Typography
+import MindMapViewer from './MindMapViewer'
 
 /**
- * Render mindmap using nested list rendering (compatible with markmap-style).
+ * 将 JSON 树结构 { label, description, children } 递归转为 Markdown 大纲字符串，
+ * 供 MindMapViewer (markmap) 渲染为交互式思维导图。
+ */
+function treeToMarkdown(node, depth = 0) {
+  const label = typeof node === 'string' ? node : (node.label || node.title || node.name || '')
+  const desc = node.description || ''
+  const kids = node.children || []
+
+  // depth 0 是根节点，用 #；子节点用 ## / ### / #### ...
+  const prefix = depth === 0 ? '# ' : `${'#'.repeat(depth + 1)} `
+  const descLine = desc ? `\n> ${desc}\n` : ''
+  let md = `${prefix}${label}${descLine}\n`
+
+  for (const child of kids) {
+    md += treeToMarkdown(child, depth + 1)
+  }
+  return md
+}
+
+/**
+ * 思维导图资源查看器 — 将 resource.content（JSON 树）转为 Markdown，用 markmap 渲染。
  */
 export default function MindmapResourceViewer({ resource }) {
   const content = normalizeLegacyContent(resource) || resource?.content
-  const containerRef = useRef(null)
-
   const root = content?.root || content
   const children = root?.children || (Array.isArray(content) ? content : [])
 
-  const renderNodes = (nodes, depth = 0) => {
-    if (!nodes?.length) return null
-    return (
-      <ul style={{ paddingLeft: depth === 0 ? 0 : 20, listStyle: 'none', margin: 0 }}>
-        {nodes.map((node, i) => {
-          const label = typeof node === 'string' ? node : (node.label || node.title || node.name || '')
-          const kids = node.children || []
-          const desc = node.description || ''
-          return (
-            <li key={i} style={{ marginBottom: depth === 0 ? 12 : 4 }}>
-              <div style={{
-                padding: depth === 0 ? '10px 16px' : '6px 12px',
-                borderRadius: depth === 0 ? 12 : 8,
-                background: depth === 0 ? '#F3F0FF' : depth === 1 ? '#FAFAFC' : 'transparent',
-                border: depth === 0 ? '1.5px solid #6C5CE7' : depth === 1 ? '1px solid #E5E7EB' : 'none',
-                fontWeight: depth === 0 ? 600 : 400,
-                fontSize: depth === 0 ? 15 : depth === 1 ? 13 : 12,
-                color: '#111827',
-                cursor: 'default',
-              }}>
-                {label}
-                {desc && <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 400, marginTop: 2 }}>{desc}</div>}
-              </div>
-              {kids.length > 0 && renderNodes(kids, depth + 1)}
-            </li>
-          )
-        })}
-      </ul>
-    )
-  }
+  const markdown = useMemo(() => {
+    if (!root?.label && !children.length) return ''
+    // 如果有 root.label，以 root 为根；否则以 topic 或 "知识点" 为根
+    const tree = root?.label
+      ? root
+      : { label: resource?.topic || '知识点', children }
+    return treeToMarkdown(tree)
+  }, [root, children, resource?.topic])
 
-  if (!children.length && !root?.label) {
+  if (!markdown) {
     return <Empty description="思维导图数据加载中..." image={Empty.PRESENTED_IMAGE_SIMPLE} />
   }
 
-  return (
-    <div ref={containerRef} style={{ maxWidth: 780, margin: '0 auto', padding: '8px 0' }}>
-      {root?.label && (
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{
-            display: 'inline-block', padding: '14px 24px', borderRadius: 16,
-            background: 'linear-gradient(135deg, #6C5CE7, #A78BFA)', color: '#fff',
-            fontSize: 16, fontWeight: 700,
-          }}>
-            {root.label}
-          </div>
-        </div>
-      )}
-      {renderNodes([
-        ...(root?.label ? children : [{ label: resource?.topic || '知识点', children }]),
-      ])}
-    </div>
-  )
+  return <MindMapViewer content={markdown} />
 }

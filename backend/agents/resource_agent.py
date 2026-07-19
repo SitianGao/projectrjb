@@ -28,6 +28,7 @@ from .base_agent import BaseAgent
 from .schemas import (
     ResourceMeta,
     ResourceGenerationOutput,
+    GenerationMeta,
     DocumentContent,
     SectionData,
     ExerciseContent,
@@ -1086,7 +1087,8 @@ class ResourceAgent(BaseAgent):
 
         # 4. 后处理：校验 + 规范化 + 上下文注入
         valid_resources = []
-        for resource in result.resources:
+        logger.info("ResourceAgent v2: LLM 输出 %d 个资源，开始校验", len(result.resources))
+        for i, resource in enumerate(result.resources):
             try:
                 # 类型化 Schema 校验
                 validated_content = self._validate_by_type(resource.resource_type, resource.content)
@@ -1112,17 +1114,55 @@ class ResourceAgent(BaseAgent):
                 )
 
                 valid_resources.append(resource)
+                logger.info("ResourceAgent v2: 资源[%d] 校验通过 type=%s title=%s", i, resource.resource_type, resource.title)
             except ResourceSchemaInvalid as e:
                 logger.warning(
-                    "ResourceAgent v2: 资源校验失败 type=%s title=%s: %s",
-                    resource.resource_type, resource.title, e,
+                    "ResourceAgent v2: 资源[%d] 校验失败 type=%s title=%s: %s",
+                    i, resource.resource_type, resource.title, e,
                 )
                 continue
+            except Exception as e:
+                logger.warning(
+                    "ResourceAgent v2: 资源[%d] 处理异常 type=%s: %s",
+                    i, resource.resource_type, e,
+                )
+                continue
+
+        if not valid_resources and result.resources:
+            logger.error(
+                "ResourceAgent v2: 所有 %d 个资源均校验失败，LLM 输出内容可能不符合 Schema",
+                len(result.resources),
+            )
+            # 降级：使用规则化资源
+            logger.info("ResourceAgent v2: 降级使用规则化资源")
+            result = self._rule_based_resources_v2(
+                topic=topic,
+                resource_types=resource_types,
+                difficulty=difficulty,
+                profile=profile,
+                context=context,
+                stage_info=stage_info,
+                knowledge_context=knowledge_context or "",
+            )
 
         result.resources = valid_resources
         result.total = len(valid_resources)
         result.topic = topic
         result.difficulty = difficulty
+
+        # 设置 generation_meta
+        from datetime import datetime
+        usage = self.llm.last_usage if self.llm else None
+        result.generation_meta = GenerationMeta(
+            agent_name=self.agent_name,
+            provider=usage.provider if usage else ("spark" if fallback_reason_code is None else "fallback"),
+            model=usage.model if usage else "unknown",
+            run_id="",
+            request_id="",
+            duration_ms=usage.duration_ms if usage else 0,
+            fallback_used=fallback_reason_code is not None,
+            generated_at=datetime.utcnow().isoformat() + "Z",
+        )
 
         return result
 

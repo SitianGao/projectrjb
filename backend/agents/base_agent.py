@@ -164,11 +164,21 @@ class BaseAgent(ABC):
 
             # 自动修复一次
             try:
+                # 提取错误位置附近的上下文
+                error_context = raw[:2000]
+                error_str = str(first_error)
+                char_match = re.search(r"char (\d+)", error_str)
+                if char_match:
+                    pos = int(char_match.group(1))
+                    start = max(0, pos - 200)
+                    end = min(len(raw), pos + 200)
+                    error_context = f"...\n{raw[start:end]}\n...(错误在 char {pos} 附近)"
+
                 repair_prompt = (
-                    f"你上一次的输出无法通过 Schema 校验。\n\n"
-                    f"错误信息: {str(first_error)}\n\n"
-                    f"你的原始输出:\n```\n{raw[:2000]}\n```\n\n"
-                    f"请修正以上 JSON，确保符合 Schema。只输出修正后的 JSON 对象。"
+                    f"你上一次的输出无法通过 JSON 解析。\n\n"
+                    f"错误信息: {error_str}\n\n"
+                    f"错误位置附近的内容:\n```\n{error_context}\n```\n\n"
+                    f"请修正 JSON 格式错误（如缺少逗号、引号不匹配等），确保输出合法 JSON。只输出修正后的完整 JSON 对象。"
                 )
                 raw2 = await self.llm.chat(
                     system=system,
@@ -195,7 +205,7 @@ class BaseAgent(ABC):
     def _extract_json(text: str) -> Any:
         """从 LLM 输出中提取 JSON 对象。
 
-        处理: Markdown 代码块、前后文字、尾部逗号。
+        处理: Markdown 代码块、前后文字、尾部逗号、缺少逗号。
         """
         if not text or not text.strip():
             raise ValueError("LLM 输出为空")
@@ -221,7 +231,14 @@ class BaseAgent(ABC):
         except json.JSONDecodeError:
             # 修复尾部逗号
             cleaned = re.sub(r",\s*([}\]])", r"\1", text)
-            return json.loads(cleaned)
+            try:
+                return json.loads(cleaned)
+            except json.JSONDecodeError:
+                # 修复缺少逗号: }" 或 ]" 或 }{ 或 ]{ 前缺少逗号
+                cleaned = re.sub(r'(["\d\w\]}])\s*(["{\[])', r'\1,\2', cleaned)
+                # 修复行尾缺少逗号: 值后面直接换行
+                cleaned = re.sub(r'(["\d\w\]}\)])\s*\n\s*(["{\[])', r'\1,\n\2', cleaned)
+                return json.loads(cleaned)
 
     # ── 日志 ─────────────────────────────────────────────────
 
