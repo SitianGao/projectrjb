@@ -35,7 +35,7 @@ export default function AssessmentRadarChart({ knowledgeMastery, loading }) {
   return (
     <Card
       className="assessment-card"
-      title={<span className="assessment-card-title">知识点掌握雷达图</span>}
+      title={<span className="assessment-card-title">六维能力图</span>}
     >
       {hasData ? (
         <>
@@ -43,7 +43,7 @@ export default function AssessmentRadarChart({ knowledgeMastery, loading }) {
             dimensions={values}
             dimensionDefs={dimensions}
             animated
-            size={320}
+            size={400}
           />
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px 16px', marginTop: 12 }}>
             {knowledgeMastery.map((item) => (

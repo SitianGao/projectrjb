@@ -155,8 +155,9 @@ class EvaluateAgent(BaseAgent):
         功能：
         - 按 course_id 过滤学习记录
         - 按 task_id 去重
-        - 计算综合评分公式：knowledge_mastery × 0.4 + test_accuracy × 0.25
-          + task_completion × 0.2 + learning_consistency × 0.15
+        - 计算综合评分公式：knowledge_mastery × 0.30 + test_accuracy × 0.20
+          + task_completion × 0.15 + learning_consistency × 0.10
+          + error_correction × 0.15 + practice_ability × 0.10
         - 优先使用 call_llm_json；LLM 不可用时降级到规则评估
 
         Args:
@@ -285,7 +286,7 @@ class EvaluateAgent(BaseAgent):
             for r in score_records
             if r.get("score", 0) < 0.6
         ]
-        weak_topics = list(set(weak)) if weak else []
+        weak_topics = list(set(weak)) if weak else ["暂未检测到明显薄弱点"]
 
         # 学习效率: 知识点/小时
         time_values = [(r.get("time_spent") or 0) for r in records]
@@ -303,12 +304,39 @@ class EvaluateAgent(BaseAgent):
         })
         learning_consistency = round(max(0, min((active_days / 7) * 100, 100)))
 
-        # 综合评分公式
+        # 纠错能力: 错题订正率（已掌握/复习中的错题占比）
+        review_records = [r for r in records if r.get("action") == "review"]
+        wrong_total = len(review_records)
+        wrong_mastered = len([r for r in review_records if r.get("status") == "mastered"])
+        wrong_reviewing = len([r for r in review_records if r.get("status") == "reviewing"])
+        error_correction = round(
+            (wrong_mastered + wrong_reviewing * 0.5) / wrong_total * 100
+        ) if wrong_total else 0
+        error_correction = max(0, min(error_correction, 100))
+
+        # 实践能力: 实践类活动完成数 + 答题得分综合
+        practice_records = [
+            r for r in records
+            if r.get("action") in ("complete", "experiment")
+        ]
+        practice_score_records = [r for r in practice_records if r.get("score") is not None]
+        practice_raw = (
+            sum(r.get("score", 0) for r in practice_score_records) / len(practice_score_records) * 100
+            if practice_score_records else 0
+        )
+        practice_count = len(practice_records)
+        practice_bonus = min(practice_count * 5, 30)
+        practice_ability = round(practice_raw * 0.7 + practice_bonus)
+        practice_ability = max(0, min(practice_ability, 100))
+
+        # 综合评分公式（六维）
         overall_score = round(
-            knowledge_mastery * 0.4
-            + test_accuracy * 0.25
-            + task_completion * 0.2
-            + learning_consistency * 0.15
+            knowledge_mastery * 0.30
+            + test_accuracy * 0.20
+            + task_completion * 0.15
+            + learning_consistency * 0.10
+            + error_correction * 0.15
+            + practice_ability * 0.10
         )
 
         dimensions = EvalDimensions(
@@ -316,6 +344,8 @@ class EvaluateAgent(BaseAgent):
             test_accuracy=test_accuracy,
             task_completion=task_completion,
             learning_consistency=learning_consistency,
+            error_correction=error_correction,
+            practice_ability=practice_ability,
         )
 
         # --- 按 topic 聚合得分（用于 strengths / weaknesses） ---
@@ -334,7 +364,7 @@ class EvaluateAgent(BaseAgent):
         if efficiency < 1.5:
             suggestions.append("尝试用思维导图整理知识点，提升理解和记忆效率")
         if len(weak_topics) > 2:
-            real_weak_list = [t for t in weak_topics if t != "未知"]
+            real_weak_list = [t for t in weak_topics if t not in ("暂未检测到明显薄弱点", "未知")]
             if real_weak_list:
                 suggestions.append(f"薄弱知识点较多 ({', '.join(real_weak_list[:3])})，建议逐个攻克而非跳跃学习")
         if not suggestions:
@@ -467,7 +497,7 @@ class EvaluateAgent(BaseAgent):
             for r in score_records
             if r.get("score", 0) < 0.6
         ]
-        weak_topics = list(set(weak)) if weak else []
+        weak_topics = list(set(weak)) if weak else ["暂未检测到明显薄弱点"]
 
         # 学习效率: 知识点/小时
         time_values = [(r.get("time_spent") or 0) for r in records]
@@ -478,17 +508,48 @@ class EvaluateAgent(BaseAgent):
         test_accuracy = knowledge_mastery
         task_completion = round(max(0, min(progress * 100, 100)))
         learning_consistency = round(max(0, min((len({r.get("created_at", "")[:10] for r in records if r.get("created_at")}) / 7) * 100, 100)))
+
+        # 纠错能力: 错题订正率
+        review_records = [r for r in records if r.get("action") == "review"]
+        wrong_total = len(review_records)
+        wrong_mastered = len([r for r in review_records if r.get("status") == "mastered"])
+        wrong_reviewing = len([r for r in review_records if r.get("status") == "reviewing"])
+        error_correction = round(
+            (wrong_mastered + wrong_reviewing * 0.5) / wrong_total * 100
+        ) if wrong_total else 0
+        error_correction = max(0, min(error_correction, 100))
+
+        # 实践能力: 实践类活动 + 答题得分
+        practice_records = [
+            r for r in records
+            if r.get("action") in ("complete", "experiment")
+        ]
+        practice_score_records = [r for r in practice_records if r.get("score") is not None]
+        practice_raw = (
+            sum(r.get("score", 0) for r in practice_score_records) / len(practice_score_records) * 100
+            if practice_score_records else 0
+        )
+        practice_count = len(practice_records)
+        practice_bonus = min(practice_count * 5, 30)
+        practice_ability = round(practice_raw * 0.7 + practice_bonus)
+        practice_ability = max(0, min(practice_ability, 100))
+
+        # 综合评分公式（六维）
         overall_score = round(
-            knowledge_mastery * 0.4
-            + test_accuracy * 0.25
-            + task_completion * 0.2
-            + learning_consistency * 0.15
+            knowledge_mastery * 0.30
+            + test_accuracy * 0.20
+            + task_completion * 0.15
+            + learning_consistency * 0.10
+            + error_correction * 0.15
+            + practice_ability * 0.10
         )
         dimensions = {
             "knowledge_mastery": knowledge_mastery,
             "test_accuracy": test_accuracy,
             "task_completion": task_completion,
             "learning_consistency": learning_consistency,
+            "error_correction": error_correction,
+            "practice_ability": practice_ability,
         }
 
         # --- 改进建议 ---
@@ -510,7 +571,7 @@ class EvaluateAgent(BaseAgent):
         )
 
         now = datetime.now(timezone.utc)
-        real_weak_topics = [t for t in weak_topics if t != "未知"]
+        real_weak_topics = [topic for topic in weak_topics if topic not in ("暂未检测到明显薄弱点", "未知")]
         result = {
             "evaluation_id": f"eval_{student_id}_{int(now.timestamp())}",
             "user_id": profile_inner.get("user_id"),
@@ -541,7 +602,16 @@ class EvaluateAgent(BaseAgent):
                 "long_term_trend": "insufficient_data",
             },
             "dimensions": dimensions,
-            "strengths": [],
+            "strengths": [
+                {
+                    "knowledge_point_id": f"kp_{index}",
+                    "name": topic,
+                    "score": round(sum(scores) / len(scores) * 100 if scores and max(scores) <= 1 else sum(scores) / len(scores)),
+                    "reason": "相关练习正确率较高",
+                }
+                for index, (topic, scores) in enumerate(topic_scores.items())
+                if scores and (sum(scores) / len(scores)) >= 0.8
+            ][:3],
             "weaknesses": [
                 {
                     "knowledge_point_id": f"kp_weak_{index}",
@@ -718,7 +788,7 @@ class EvaluateAgent(BaseAgent):
 
         return result
 
-
+阶段stage_gradient_descent：
 # ------------------------------------------------------------------
 # 模块级辅助函数
 # ------------------------------------------------------------------

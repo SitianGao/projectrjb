@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Layout, Button, Space, Typography, message, Spin, Empty, List, Tag,
+  Layout, Button, Space, Typography, message, Spin, Empty, List, Tag, Card, Input,
 } from 'antd'
 import {
   PlayCircleOutlined, ReloadOutlined, UndoOutlined,
   ExperimentOutlined, LeftOutlined, RightOutlined,
+  SearchOutlined, RocketOutlined,
 } from '@ant-design/icons'
 import MonacoCodeEditor from '../components/MonacoCodeEditor'
 import ExperimentGuide from '../components/experiment/ExperimentGuide'
@@ -13,6 +14,7 @@ import ParameterPanel from '../components/experiment/ParameterPanel'
 import ExperimentResult from '../components/experiment/ExperimentResult'
 import { CodeBlanks, ErrorDiagnosis } from '../components/experiment/CodeBlanks'
 import { runExperiment } from '../api/experiment'
+import { getResources } from '../api/resource'
 import { useAuth } from '../contexts/AuthContext'
 
 const { Sider, Content } = Layout
@@ -34,11 +36,16 @@ const MODE_LABELS = {
 export default function CodeExperimentPage() {
   const { experimentId } = useParams()
   const navigate = useNavigate()
-  const { studentId } = useAuth()
+  const { studentId, activeCourse } = useAuth()
 
   // 实验数据（来自资源或直接传入）
   const [experiment, setExperiment] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  // 实验列表（无 experimentId 时显示）
+  const [experiments, setExperiments] = useState([])
+  const [experimentsLoading, setExperimentsLoading] = useState(false)
+  const [searchText, setSearchText] = useState('')
 
   // 编辑器状态
   const [code, setCode] = useState('')
@@ -57,6 +64,28 @@ export default function CodeExperimentPage() {
   // 侧边栏
   const [sidebarOpen, setSidebarOpen] = useState(true)
 
+  // 加载实验列表
+  const loadExperiments = useCallback(async () => {
+    setExperimentsLoading(true)
+    try {
+      const params = { resource_type: 'code', page_size: 50 }
+      if (activeCourse?.id) params.course_id = activeCourse.id
+      const res = await getResources(params)
+      const list = res?.items || res?.resources || res || []
+      const experimentList = (Array.isArray(list) ? list : []).filter((r) => {
+        const content = typeof r.content === 'string'
+          ? (() => { try { return JSON.parse(r.content) } catch { return {} } })()
+          : (r.content || {})
+        return content.experiment_mode
+      })
+      setExperiments(experimentList)
+    } catch (e) {
+      console.error('加载实验列表失败', e)
+    } finally {
+      setExperimentsLoading(false)
+    }
+  }, [activeCourse])
+
   // 从 URL 参数或 localStorage 加载实验数据
   useEffect(() => {
     if (experimentId) {
@@ -71,9 +100,12 @@ export default function CodeExperimentPage() {
         } catch (e) {
           console.error('加载实验数据失败', e)
         }
+      } else {
+        // 没有实验数据，加载实验列表
+        loadExperiments()
       }
     }
-  }, [experimentId])
+  }, [experimentId, loadExperiments])
 
   const loadExperiment = useCallback(async (id) => {
     setLoading(true)
@@ -207,6 +239,29 @@ export default function CodeExperimentPage() {
     }
   }, [result, experiment, studentId])
 
+  // 选择实验
+  const handleSelectExperiment = useCallback((item) => {
+    const content = typeof item.content === 'string'
+      ? (() => { try { return JSON.parse(item.content) } catch { return {} } })()
+      : (item.content || {})
+    initExperiment({ ...content, title: item.title || content.title })
+  }, [initExperiment])
+
+  // 过滤实验列表
+  const filteredExperiments = useMemo(() => {
+    if (!searchText) return experiments
+    const kw = searchText.toLowerCase()
+    return experiments.filter((r) => {
+      const title = (r.title || '').toLowerCase()
+      const content = typeof r.content === 'string'
+        ? (() => { try { return JSON.parse(r.content) } catch { return {} } })()
+        : (r.content || {})
+      const desc = (content.description || content.desc || '').toLowerCase()
+      const mode = (content.experiment_mode || '').toLowerCase()
+      return title.includes(kw) || desc.includes(kw) || mode.includes(kw)
+    })
+  }, [experiments, searchText])
+
   // 根据实验模式决定右侧渲染内容
   const editorContent = useMemo(() => {
     if (!experiment) return null
@@ -265,12 +320,74 @@ export default function CodeExperimentPage() {
     )
   }
 
+  // 无实验时显示实验列表
   if (!experiment) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <Empty description="未找到实验数据">
-          <Button onClick={() => navigate('/resources')}>返回资源列表</Button>
-        </Empty>
+      <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+        <div style={{ marginBottom: 24, textAlign: 'center' }}>
+          <Title level={3} style={{ marginBottom: 8 }}>
+            <ExperimentOutlined style={{ marginRight: 8 }} />
+            代码实验
+          </Title>
+          <Text type="secondary">选择一个实验开始交互式学习</Text>
+        </div>
+
+        <div style={{ marginBottom: 16, maxWidth: 400, margin: '0 auto 16px' }}>
+          <Input
+            placeholder="搜索实验..."
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            allowClear
+          />
+        </div>
+
+        {experimentsLoading ? (
+          <div style={{ textAlign: 'center', padding: 60 }}>
+            <Spin tip="加载实验列表..." />
+          </div>
+        ) : filteredExperiments.length === 0 ? (
+          <Empty description="暂无可用实验" />
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: 16,
+          }}>
+            {filteredExperiments.map((item) => {
+              const content = typeof item.content === 'string'
+                ? (() => { try { return JSON.parse(item.content) } catch { return {} } })()
+                : (item.content || {})
+              const mode = content.experiment_mode
+              const desc = content.description || content.desc || ''
+              return (
+                <Card
+                  key={item.id}
+                  hoverable
+                  onClick={() => handleSelectExperiment(item)}
+                  style={{ borderRadius: 12 }}
+                >
+                  <div style={{ marginBottom: 8 }}>
+                    {mode && (
+                      <Tag color="blue">{MODE_LABELS[mode] || mode}</Tag>
+                    )}
+                  </div>
+                  <Title level={5} style={{ marginBottom: 8 }}>
+                    {item.title || content.title || '未命名实验'}
+                  </Title>
+                  {desc && (
+                    <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>
+                      {desc.length > 80 ? desc.slice(0, 80) + '...' : desc}
+                    </Text>
+                  )}
+                  <Button type="primary" icon={<RocketOutlined />} size="small">
+                    开始实验
+                  </Button>
+                </Card>
+              )
+            })}
+          </div>
+        )}
       </div>
     )
   }

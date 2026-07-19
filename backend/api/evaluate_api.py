@@ -280,6 +280,30 @@ async def get_dashboard_summary(
     ))
 
 
+@router.get("/assessment-dashboard", responses=json_responses())
+async def get_assessment_dashboard(
+    student_id: Optional[str] = None,
+    course_id: Optional[str] = None,
+    scope: str = "last_30_days",
+    stage_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """学习评估仪表盘 —— 供 LearningAssessmentPage 使用。
+
+    至少需要传 student_id 或 course_id 其一；course_id 优先用于解析学生。
+    """
+    from api.response import fail
+    if not student_id and not course_id:
+        return fail("VALIDATION_ERROR", "student_id 或 course_id 至少需要提供一个")
+    return ok(evaluate_service.build_assessment_dashboard(
+        db,
+        student_id=student_id or "",
+        course_id=course_id,
+        scope_type=scope,
+        stage_id=stage_id,
+    ))
+
+
 @router.get("/reports/{report_id}/adjustments", responses=json_responses())
 async def get_adjustment_status(report_id: str, db: Session = Depends(get_db)):
     """获取某次评估的画像/路径调整状态"""

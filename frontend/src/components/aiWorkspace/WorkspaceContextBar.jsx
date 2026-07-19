@@ -1,4 +1,4 @@
-import { Tag, Typography } from 'antd'
+import { Typography } from 'antd'
 import { LinkOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
@@ -21,11 +21,6 @@ export default function WorkspaceContextBar({ course, currentStage, currentTask,
             当前任务：{currentTask.title}
           </Text>
         )}
-        <div className="context-bar-tags">
-          <Tag color="green">课程知识库已连接</Tag>
-          <Tag color="blue">当前任务已加载</Tag>
-          <Tag color="purple">画像已同步</Tag>
-        </div>
       </div>
       {onViewTask && currentTask?.task_id && (
         <a className="context-bar-link" onClick={onViewTask}>
