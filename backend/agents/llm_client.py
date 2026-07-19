@@ -135,7 +135,7 @@ class LLMClient:
                             response_schema=response_schema,
                         ):
                             yield chunk
-                        self._record_usage(start, model or os.getenv("SPARK_MODEL", "4.0Ultra"), "spark")
+                        self._record_usage(start, model or config.SPARK_MODEL, "spark")
                         return
                     except (httpx.HTTPError, httpx.TimeoutException, OSError, RuntimeError) as e:
                         spark_failed = True
@@ -178,12 +178,12 @@ class LLMClient:
         response_format: Optional[dict[str, str]] = None,
         response_schema: Optional[dict[str, Any]] = None,
     ) -> AsyncIterator[str]:
-        api_password = os.getenv("SPARK_API_PASSWORD", "")
+        api_password = config.SPARK_API_PASSWORD
         if not api_password:
             raise RuntimeError("讯飞星火 API 未配置，请检查 SPARK_API_PASSWORD")
 
-        api_url = os.getenv("SPARK_API_URL", "https://spark-api-open.xf-yun.com/v1/chat/completions")
-        model_name = model or os.getenv("SPARK_MODEL", "4.0Ultra")
+        api_url = config.SPARK_API_URL
+        model_name = model or config.SPARK_MODEL
 
         payload: dict[str, Any] = {
             "model": model_name,

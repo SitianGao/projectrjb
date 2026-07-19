@@ -153,7 +153,7 @@ class CourseProfileConversationService:
         run_meta.model = (
             __import__("os").getenv("DEEPSEEK_MODEL", "deepseek-chat")
             if primary == "deepseek"
-            else __import__("os").getenv("SPARK_MODEL", "4.0Ultra")
+            else __import__("os").getenv("SPARK_MODEL", "spark-x")
         )
 
         # 2. 构建 AgentContext

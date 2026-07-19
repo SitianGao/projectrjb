@@ -213,23 +213,25 @@ class DeepSeekProvider(BaseProvider):
 # ═══════════════════════════════════════════════════════════════
 
 class XfyunSparkProvider(BaseProvider):
-    """讯飞星火 Spark API Provider。
+    """讯飞星火 Spark X2 HTTP API Provider（OpenAI 兼容）。
 
     环境变量：
         SPARK_API_PASSWORD  — API 密钥（Bearer token）
-        SPARK_API_URL       — API 地址
-        SPARK_MODEL         — 模型名称（默认 4.0Ultra）
-        SPARK_ENABLED       — 是否启用（默认 false）
+        SPARK_BASE_URL      — API base URL（默认 X2）
+        SPARK_API_URL       — 完整 chat/completions 地址（优先于 base_url 拼接）
+        SPARK_MODEL         — 模型名称（默认 spark-x）
+        SPARK_ENABLED       — 是否启用（默认 true）
     """
 
     def __init__(self, timeout_seconds: int = 60):
         self._api_password = os.getenv("SPARK_API_PASSWORD", "")
-        self._api_url = os.getenv(
-            "SPARK_API_URL",
-            "https://spark-api-open.xf-yun.com/v1/chat/completions",
+        # 优先 SPARK_API_URL（完整地址），否则从 SPARK_BASE_URL 拼接
+        self._api_url = os.getenv("SPARK_API_URL") or (
+            os.getenv("SPARK_BASE_URL", "https://spark-api-open.xf-yun.com/v1/").rstrip("/")
+            + "/chat/completions"
         )
         self._model = os.getenv("SPARK_MODEL", "4.0Ultra")
-        self._enabled = os.getenv("SPARK_ENABLED", "false").lower() in {
+        self._enabled = os.getenv("SPARK_ENABLED", "true").lower() in {
             "1", "true", "yes", "on",
         }
         self._timeout = httpx.Timeout(
