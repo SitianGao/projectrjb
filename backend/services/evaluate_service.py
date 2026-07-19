@@ -1206,6 +1206,287 @@ class EvaluateService:
             "latest_report": report_summary,
         }
 
+    # ─────────────────────────────────────────────────────────────
+    # 学习评估仪表盘 —— 供 LearningAssessmentPage 使用
+    # 数据结构对齐 frontend/src/services/assessmentMockData.js
+    # ─────────────────────────────────────────────────────────────
+
+    def build_assessment_dashboard(
+        self,
+        db: Session,
+        student_id: str,
+        course_id: Optional[str] = None,
+        scope_type: str = "last_30_days",
+        stage_id: Optional[str] = None,
+    ) -> Dict:
+        """构建学习评估仪表盘数据。
+
+        实时调用 _compute_report 计算最新报告，再转换为前端期望的结构。
+        不写入数据库；不依赖历史 EvaluationReport。
+        """
+        # 1. 解析上下文（兼容只传 course_id 的场景）
+        context = self._resolve_evaluation_context(
+            db,
+            student_id,
+            course_id=course_id,
+            scope_type=scope_type,
+            stage_id=stage_id,
+        )
+        resolved_student_id = context["student_id"]
+        resolved_course_id = context.get("course_id")
+
+        # 2. 实时计算最新报告（不落库）
+        report = self._compute_report(db, context)
+        structured = report.get("structured") or {}
+        overall_block = structured.get("overall") or {}
+        dimensions_block = structured.get("dimensions") or {}
+        strengths = structured.get("strengths") or []
+        weaknesses = structured.get("weaknesses") or []
+        topic_scores = report.get("topic_scores") or []
+        history = report.get("history") or []
+        review_plan = report.get("review_plan") or []
+
+        overall_score = report.get("overall_score") or 0
+        knowledge_mastery_score = dimensions_block.get("knowledge_mastery", overall_score)
+        task_completion = dimensions_block.get("task_completion", 0)
+        score_delta = overall_block.get("score_delta") or 0
+
+        # 3. 错题分布（按 topic 聚合）
+        wrong_questions = (
+            db.query(WrongQuestion)
+            .filter(WrongQuestion.student_id == resolved_student_id)
+            .all()
+        )
+        error_distribution = self._aggregate_error_distribution(wrong_questions)
+
+        # 4. 趋势数据
+        trend = self._build_assessment_trend(
+            history,
+            current_score=overall_score,
+            current_mastery=knowledge_mastery_score,
+            current_completion=task_completion,
+        )
+
+        # 5. 知识点掌握度列表（雷达图）
+        knowledge_mastery_list = [
+            {
+                "name": item.get("topic") or "综合",
+                "mastery": _clamp(item.get("score", 0)),
+            }
+            for item in topic_scores
+        ]
+
+        # 6. 诊断信息（优势 / 薄弱）
+        diagnosis = {
+            "strengths": [
+                {
+                    "name": s.get("name", ""),
+                    "mastery": _clamp(s.get("score", 0)),
+                }
+                for s in strengths
+            ],
+            "weaknesses": [
+                {
+                    "name": w.get("name", ""),
+                    "mastery": _clamp(w.get("score", 0)),
+                    "reason": w.get("reason", ""),
+                }
+                for w in weaknesses
+            ],
+        }
+
+        # 7. 薄弱知识点详细卡片
+        weak_points = self._build_weak_points(
+            db, resolved_student_id, weaknesses
+        )
+
+        # 8. 个性化强化计划（由 review_plan 转换）
+        improvement_plan = self._build_improvement_plan(review_plan)
+
+        # 9. 概览数据
+        overview = {
+            "overall_mastery": _clamp(knowledge_mastery_score),
+            "mastery_change": _clamp(score_delta),
+            "stage_completion": _clamp(task_completion),
+            "completion_change": 0,
+            "latest_score": _clamp(overall_score),
+            "score_change": _clamp(score_delta),
+            "weak_knowledge_count": len(weaknesses),
+            "weak_change": 0,
+        }
+
+        return {
+            "overview": overview,
+            "knowledge_mastery": knowledge_mastery_list,
+            "diagnosis": diagnosis,
+            "trend": trend,
+            "error_distribution": error_distribution,
+            "weak_points": weak_points,
+            "improvement_plan": improvement_plan,
+            # 额外元信息（前端不消费，但便于调试）
+            "meta": {
+                "student_id": resolved_student_id,
+                "course_id": resolved_course_id,
+                "scope_type": scope_type,
+                "stage_id": context.get("stage_id"),
+                "has_sufficient_data": bool(report.get("has_sufficient_data", True)),
+            },
+        }
+
+    @staticmethod
+    def _aggregate_error_distribution(wrong_questions: List[WrongQuestion]) -> List[Dict]:
+        """按 topic 聚合错题分布。"""
+        by_topic: Dict[str, int] = defaultdict(int)
+        for wq in wrong_questions:
+            topic = wq.topic or "综合"
+            by_topic[topic] += max(1, wq.wrong_count or 1)
+        if not by_topic:
+            return []
+        return [
+            {"name": topic, "value": count}
+            for topic, count in sorted(
+                by_topic.items(), key=lambda kv: kv[1], reverse=True
+            )
+        ]
+
+    @staticmethod
+    def _build_assessment_trend(
+        history: List[Dict],
+        current_score: int,
+        current_mastery: int,
+        current_completion: int,
+    ) -> Dict:
+        """构建趋势数据：基于每日 history，再追加本次最新评估结果。"""
+        points: List[Dict] = []
+        for item in history:
+            points.append({
+                "score": _clamp(item.get("score", 0)),
+                "mastery": _clamp(item.get("score", 0)),  # 每日 score 近似 mastery
+                "completion": _clamp(item.get("unique_tasks_completed", 0) * 10),
+            })
+        # 追加当前最新评估点
+        points.append({
+            "score": _clamp(current_score),
+            "mastery": _clamp(current_mastery),
+            "completion": _clamp(current_completion),
+        })
+        # 控制最多 8 个点
+        if len(points) > 8:
+            points = points[-8:]
+        labels = [f"第{i + 1}次" for i in range(len(points))]
+        return {
+            "labels": labels,
+            "score_series": [p["score"] for p in points],
+            "mastery_series": [p["mastery"] for p in points],
+            "completion_series": [p["completion"] for p in points],
+        }
+
+    @staticmethod
+    def _build_weak_points(
+        db: Session,
+        student_id: str,
+        weaknesses: List[Dict],
+    ) -> List[Dict]:
+        """构建薄弱知识点详细卡片，附带可点击的资源/任务 ID。"""
+        if not weaknesses:
+            return []
+
+        # 一次性查出该学生所有资源，按 topic 索引
+        resources = (
+            db.query(Resource)
+            .filter(Resource.student_id == student_id)
+            .all()
+        )
+        resource_by_topic: Dict[str, List[Resource]] = defaultdict(list)
+        for r in resources:
+            if r.topic:
+                resource_by_topic[r.topic].append(r)
+
+        review_types = {"document", "reading", "ppt", "mindmap", "interactive_classroom"}
+        exercise_types = {"exercise", "code"}
+
+        result: List[Dict] = []
+        for w in weaknesses:
+            topic = w.get("name") or ""
+            actions_list = w.get("actions") or []
+            suggestions = [
+                a.get("title", "") for a in actions_list if a.get("title")
+            ]
+            if not suggestions:
+                suggestions = [
+                    f"重新学习「{topic}」核心讲义",
+                    f"完成「{topic}」专项练习",
+                    "向 AI 导师请教不懂的部分",
+                ]
+
+            # 查找与该 topic 匹配的资源
+            matched = resource_by_topic.get(topic, [])
+            review_resource_id = None
+            exercise_task_id = None
+            for r in matched:
+                if review_resource_id is None and r.type in review_types:
+                    review_resource_id = r.id
+                if exercise_task_id is None and r.type in exercise_types:
+                    exercise_task_id = r.task_id
+                if review_resource_id and exercise_task_id:
+                    break
+
+            result.append({
+                "knowledge_point_id": w.get("knowledge_point_id"),
+                "name": topic,
+                "mastery": _clamp(w.get("score", 0)),
+                "evidence": w.get("evidence") or [],
+                "reason": w.get("reason", ""),
+                "suggestions": suggestions,
+                "actions": {
+                    "review_resource_id": review_resource_id,
+                    "exercise_task_id": exercise_task_id,
+                },
+            })
+        return result
+
+    @staticmethod
+    def _build_improvement_plan(review_plan: List[Dict]) -> List[Dict]:
+        """把评估 review_plan 转换为前端期望的强化计划结构。"""
+        if not review_plan:
+            return []
+        now = datetime.datetime.utcnow().date()
+        day_labels = ["今天", "明天", "后天", "大后天"]
+        result: List[Dict] = []
+        for item in review_plan:
+            topic = item.get("topic", "")
+            urgency = item.get("urgency", "medium")
+            # 解析 due_date → day_offset
+            due_str = item.get("due_date")
+            day_offset = 0
+            if due_str:
+                try:
+                    due_date = datetime.datetime.fromisoformat(due_str).date()
+                    day_offset = max(0, (due_date - now).days)
+                except (ValueError, TypeError):
+                    day_offset = 0
+            day = day_labels[min(day_offset, len(day_labels) - 1)]
+
+            # type 决定：high → learn（先补基础），low → test（验证），medium → practice
+            if urgency == "high":
+                ptype = "learn"
+                title = f"重新学习「{topic}」核心内容"
+            elif urgency == "low":
+                ptype = "test"
+                title = f"进行一次「{topic}」小测"
+            else:
+                ptype = "practice"
+                title = f"完成「{topic}」专项练习"
+
+            minutes = item.get("estimated_minutes", 20)
+            result.append({
+                "day": day,
+                "title": title,
+                "duration": f"{minutes}分钟",
+                "type": ptype,
+            })
+        return result[:6]
+
     @staticmethod
     def _validate_exercise_content(content: dict) -> tuple[bool, str]:
         """校验专项练习内容。
@@ -2005,10 +2286,17 @@ def _build_stage_progress(path: Optional[Dict], unique_completed: set[str]) -> D
             "stages": [],
         }
     current = path.get("current_stage") or 1
+    # 先定位当前阶段在 stages 列表中的索引，用于判断后续阶段是否锁定
+    # （兼容字符串 / 数字 stage_id）
+    current_index = -1
+    for idx, stage in enumerate(stages):
+        if str(stage.get("stage_id")) == str(current):
+            current_index = idx
+            break
     rows = []
     total_tasks = 0
     completed_total = 0
-    for stage in stages:
+    for idx, stage in enumerate(stages):
         tasks = stage.get("tasks") if isinstance(stage.get("tasks"), list) else []
         task_ids = {str(task.get("task_id") or task.get("id") or task.get("description")) for task in tasks if isinstance(task, dict)}
         completed = len(task_ids & unique_completed)
@@ -2019,13 +2307,21 @@ def _build_stage_progress(path: Optional[Dict], unique_completed: set[str]) -> D
         total_tasks += total
         completed_total += completed
         percent = _clamp(round((completed / total) * 100)) if total else 0
+        # 优先用阶段索引判断锁定状态；找不到时兜底用 int 比较（仅对数字 stage_id 有效）
+        if current_index >= 0:
+            locked = idx > current_index
+        else:
+            try:
+                locked = int(stage.get("stage_id") or 0) > int(current or 1)
+            except (TypeError, ValueError):
+                locked = False
         rows.append({
             "stage_id": stage.get("stage_id"),
             "title": stage.get("title") or f"阶段 {stage.get('stage_id')}",
             "completed_tasks": completed,
             "total_tasks": total,
             "percent": percent,
-            "locked": int(stage.get("stage_id") or 0) > int(current or 1),
+            "locked": locked,
             "is_current": str(stage.get("stage_id")) == str(current),
         })
     return {

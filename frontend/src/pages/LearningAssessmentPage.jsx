@@ -44,6 +44,8 @@ export default function LearningAssessmentPage() {
         scope,
         studentId: course?.student_id || studentId,
       })
+      console.log(6666666,result);
+      
       setData(result)
     } catch (err) {
       setError(err.message || '加载失败')
