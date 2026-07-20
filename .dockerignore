@@ -1,17 +1,52 @@
+# Git
 .git
+.gitignore
+
+# IDE
 .idea
 .vscode
+*.swp
+*.swo
+
+# Python
 __pycache__
 *.pyc
+*.pyo
 .pytest_cache
-pytest-cache-files-*
 venv
+.venv
+*.egg-info
+
+# 敏感文件
 .env
 *.db
-logs
+logs/
+*.log
 
+# 前端构建产物和依赖
 frontend/node_modules
 frontend/dist
-backend/__pycache__
-backend/**/__pycache__
-test/__pycache__
+frontend/.vite
+
+# 测试和文档
+test/
+tests/
+docs/
+screenshots/
+_openapi_test.json
+pyproject.toml
+pyrightconfig.json
+
+# 无关项目
+stickynotes/
+.agents/
+.claude/
+release/
+
+# 临时文件
+*.tar
+*.tar.gz
+*.zip
+*.tmp
+Thumbs.db
+.DS_Store

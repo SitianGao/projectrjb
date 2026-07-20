@@ -1,0 +1,107 @@
+# =============================================================
+# EduAgent 生产环境 Docker Compose 配置
+# 使用方式: docker compose -f docker-compose.prod.yml up -d
+# =============================================================
+
+services:
+  # ── 后端服务 ──────────────────────────────────────────────
+  backend:
+    image: eduagent-backend:latest
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    container_name: eduagent-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      # 数据库
+      DATABASE_URL: "sqlite:////app/runtime/eduagent.db"
+      SEED_DEMO_DATA: "true"
+      INIT_DEMO_COURSE: "true"
+      # LLM 配置
+      LLM_PRIMARY: "${LLM_PRIMARY:-spark}"
+      LLM_TIMEOUT: "${LLM_TIMEOUT:-120}"
+      LLM_MAX_RETRIES: "${LLM_MAX_RETRIES:-3}"
+      LLM_STRICT_MODE: "${LLM_STRICT_MODE:-false}"
+      # 讯飞星火
+      SPARK_ENABLED: "${SPARK_ENABLED:-true}"
+      SPARK_PROTOCOL: "${SPARK_PROTOCOL:-http}"
+      SPARK_API_PASSWORD: "${SPARK_API_PASSWORD:-}"
+      SPARK_MODEL: "${SPARK_MODEL:-4.0Ultra}"
+      SPARK_BASE_URL: "${SPARK_BASE_URL:-https://spark-api-open.xf-yun.com/v1/}"
+      SPARK_API_URL: "${SPARK_API_URL:-https://spark-api-open.xf-yun.com/v1/chat/completions}"
+      SPARK_APP_ID: "${SPARK_APP_ID:-}"
+      SPARK_API_SECRET: "${SPARK_API_SECRET:-}"
+      SPARK_API_KEY: "${SPARK_API_KEY:-}"
+      # DeepSeek 备用
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      DEEPSEEK_API_URL: "${DEEPSEEK_API_URL:-https://api.deepseek.com}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-chat}"
+      # OpenAI 备用
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      # RAG 配置
+      CHROMA_PERSIST_DIR: "/app/runtime/chroma_data"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-paraphrase-multilingual-MiniLM-L12-v2}"
+      RAG_AUTO_INIT: "true"
+      RAG_STRICT_MODE: "${RAG_STRICT_MODE:-true}"
+      RESOURCE_STRICT_MODE: "${RESOURCE_STRICT_MODE:-true}"
+      # 认证
+      AUTH_REQUIRED: "${AUTH_REQUIRED:-false}"
+      # 离线模式（嵌入模型）
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      # PPT 服务
+      SPARK_PPT_ENABLED: "${SPARK_PPT_ENABLED:-true}"
+      SPARK_PPT_API_KEY: "${SPARK_PPT_API_KEY:-}"
+      SPARK_PPT_API_URL: "${SPARK_PPT_API_URL:-https://zwapi.xfyun.cn/api/ppt/v2}"
+      SPARK_PPT_DOWNLOAD_DIR: "/app/runtime/ppt"
+    volumes:
+      - backend-runtime:/app/runtime
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - eduagent-net
+
+  # ── 前端服务 ──────────────────────────────────────────────
+  frontend:
+    image: eduagent-frontend:latest
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    container_name: eduagent-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - eduagent-net
+
+  # ── 判题服务（可选，通过 profile 启动）────────────────────
+  judge:
+    image: eduagent-judge-py:latest
+    container_name: eduagent-judge
+    profiles:
+      - judge
+    networks:
+      - eduagent-net
+
+volumes:
+  backend-runtime:
+    name: eduagent-runtime
+
+networks:
+  eduagent-net:
+    name: eduagent-network

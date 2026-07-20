@@ -25,3 +25,13 @@ chroma_db/
 # OS
 .DS_Store
 Thumbs.db
+
+# Release
+release/
+*.tar
+*.tar.gz
+*.zip
+
+# Deploy runtime
+deploy/.env
+deploy/images/

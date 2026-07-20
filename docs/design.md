@@ -1,6 +1,6 @@
 # 系统开发说明书
 
-> **项目**：EduAgent — 基于大模型的个性化学习资源生成与学习多智能体系统
+> **项目**：智学相伴（EduAgent）— 基于大模型的个性化学习资源生成与学习多智能体系统
 > **赛题**：第15届软件杯 A3 | 出题方：科大讯飞
 
 ---
@@ -48,7 +48,7 @@
 │               异步流式、Swagger 自动文档、CORS                │
 ├─────────────────────────────────────────────────────────────┤
 │  AI 层          LangChain + LangGraph（Agent 编排）          │
-│                + 讯飞星火 Spark 4.0 + ChromaDB + RAG        │
+│                + 讯飞星火 Spark Ultra-32K + ChromaDB + RAG  │
 ├─────────────────────────────────────────────────────────────┤
 │  数据层         SQLite（开发）/ MySQL（提交）                 │
 │                + Redis（缓存/异步任务，可选）                 │
@@ -70,7 +70,7 @@
                                                     ┌─────────────┴─────────────┐
                                                     ▼                           ▼
                                                LLMClient                   RAG Pipeline
-                                          (星火/DeepSeek)              (ChromaDB + Embedding)
+                                        (讯飞星火Spark Ultra-32K)       (ChromaDB + Embedding)
                                                     │                           │
                                                     ▼                           ▼
                                               SQLite/MySQL              知识库文档
@@ -87,7 +87,7 @@
 ```
 1. 用户在前端输入 → POST /api/profile/chat (SSE)
 2. FastAPI 路由 → ProfileAgent.run()
-3. ProfileAgent 调用 LLMClient.chat_stream() → 讯飞星火 API
+3. ProfileAgent 调用 LLMClient.chat_stream() → 讯飞星火 Spark Ultra-32K API
 4. 流式返回画像 JSON → 存入数据库
 5. PlannerAgent + ResourceAgent 并行执行
 6. 生成学习路径 + 学习资源 → 推送给前端渲染
@@ -107,8 +107,8 @@
 
 | 层面 | 技术 | 版本 | 选型理由 |
 |------|------|------|----------|
-| **大模型（主）** | 讯飞星火 Spark | 4.0 | 赛题方是讯飞，使用星火有加分 |
-| **大模型（备）** | DeepSeek | V3 | 国内好用、便宜、OpenAI 兼容接口 |
+| **大模型（主）** | 讯飞星火 Spark | Ultra-32K | 赛题方是讯飞，使用星火有加分；正式比赛唯一 LLM |
+| **大模型（备）** | DeepSeek | V3 | 默认关闭，仅作为备用降级方案 |
 | **后端框架** | FastAPI | 0.115 | 原生异步、SSE 流式、自动 Swagger 文档 |
 | **Agent 编排** | LangGraph | 0.2 | 状态图编排、条件分支、并行支持 |
 | **LLM 调用** | LangChain | 0.3 | 统一 LLM 接口、Prompt 模板 |
@@ -120,7 +120,7 @@
 | **嵌入模型** | sentence-transformers | 3.0 | paraphrase-multilingual-MiniLM-L12-v2 |
 | **思维导图** | markmap | 0.18 | Markdown 列表直接渲染为思维导图 |
 | **图表** | Mermaid.js | 11 | 文本生成流程图/时序图 |
-| **PPT 生成** | python-pptx | 1.0 | 简单 PPT 生成，LLM 输出大纲即可 |
+| **PPT 生成** | 讯飞星火 PPT API + python-pptx | - | 星火 API 生成专业课件，python-pptx 作为降级方案 |
 | **内容安全** | 关键词过滤 + Prompt 约束 | - | 双重过滤，无需额外服务 |
 | **部署** | Docker + docker-compose | - | 评委一键启动 |
 
@@ -128,9 +128,9 @@
 
 | 赛题要求 | 实现方式 |
 |----------|----------|
-| 大模型驱动 | 讯飞星火 Spark 4.0 为主力模型 |
+| 大模型驱动 | 讯飞星火 Spark Ultra-32K 为唯一主力模型 |
 | 多智能体协同 | LangGraph 状态图编排，5 个 Agent 并行协作 |
-| 多模态生成 | Markdown + 思维导图(markmap) + 图表(Mermaid) + PPT(python-pptx) |
+| 多模态生成 | Markdown + 思维导图(markmap) + 图表(Mermaid) + PPT(讯飞星火API) |
 | 流式输出 | FastAPI SSE + Vercel AI SDK |
 | 内容安全 | 双层过滤：敏感词库 + System Prompt 约束 |
 | 防幻觉 | RAG 知识增强 + 来源标注 + Prompt 约束 |
@@ -156,7 +156,7 @@ backend/
 │
 ├── agents/                   AI 层 — 核心智能逻辑
 │   ├── base_agent.py         Agent 基类（流式调用 + 重试 + 日志）
-│   ├── llm_client.py         LLM 统一封装（星火 + DeepSeek 自动切换）
+│   ├── llm_client.py         LLM 统一封装（星火 Spark 主力，DeepSeek 备用）
 │   ├── profile_agent.py      学生画像 Agent
 │   ├── planner_agent.py      学习规划 Agent
 │   ├── resource_agent.py     资源生成 Agent
@@ -250,6 +250,7 @@ students 1 ──── * student_profiles    (一个学生多个画像版本)
 students 1 ──── * learning_paths      (一个学生多个路径版本)
 students 1 ──── * resources           (一个学生多个资源)
 students 1 ──── * learning_records    (一个学生多条学习记录)
+students 1 ──── * wrong_questions     (一个学生多道错题)
 learning_paths 1 ──── * resources     (一个路径关联多个资源)
 ```
 
@@ -323,6 +324,32 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 | score | REAL | 答题得分 0-1 |
 | time_spent | INTEGER | 花费时间（秒） |
 
+#### wrong_questions — 错题本表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | VARCHAR(36) PK | UUID |
+| student_id | VARCHAR(36) FK | 关联学生 |
+| resource_id | VARCHAR(36) FK | 关联资源（可空） |
+| question_id | VARCHAR(36) | 题目标识 |
+| topic | VARCHAR(200) | 知识点主题 |
+| question | TEXT | 题目内容 |
+| question_text | TEXT | 题目文本 |
+| options | TEXT | 选项（JSON 数组） |
+| user_answer | TEXT | 学生答案 |
+| correct_answer | TEXT | 正确答案 |
+| explanation | TEXT | 解析 |
+| difficulty | VARCHAR(20) | 难度 |
+| tags | TEXT | 标签（JSON 数组） |
+| wrong_count | INTEGER | 错误次数（默认 1） |
+| correct_streak | INTEGER | 连续正确次数（默认 0） |
+| status | VARCHAR(20) | unmastered / reviewing / mastered |
+| last_wrong_at | DATETIME | 最近答错时间 |
+| next_review_at | DATETIME | 下次复习时间 |
+| created_at | DATETIME | 创建时间 |
+
+**自动收集机制**：当学生在练习题中答错时（`POST /api/evaluate/record` 且 `is_correct=false`），系统自动将题目写入错题本。同一学生同一题目再次答错时，`wrong_count` 自增而非重复插入。
+
 ---
 
 ## 6. API 接口设计
@@ -367,7 +394,7 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 | 方法 | 路径 | 用途 | 响应方式 |
 |------|------|------|----------|
 | `GET` | `/api/courses/{course_id}/profile` | 获取课程画像 | JSON |
-| `POST` | `/api/courses/{course_id}/profile/conversations/{conversation_id}/messages` | 课程画像对话消息（调用 ProfileAgent → DeepSeek） | JSON |
+| `POST` | `/api/courses/{course_id}/profile/conversations/{conversation_id}/messages` | 课程画像对话消息（调用 ProfileAgent → Spark） | JSON |
 | `PUT` | `/api/courses/{course_id}/profile` | 更新课程画像 | JSON |
 
 #### 6.1.5 学习路径
@@ -430,7 +457,7 @@ learning_paths 1 ──── * resources     (一个路径关联多个资源)
 | `GET` | `/api/evaluate/{student_id}` | 获取评估（兼容） | JSON |
 | `GET` | `/api/evaluate/{student_id}/history` | 评估历史（兼容） | JSON |
 | `GET` | `/api/evaluate/{student_id}/progress` | 进度统计（兼容） | JSON |
-| `POST` | `/api/evaluate/record` | 提交学习记录 | JSON |
+| `POST` | `/api/evaluate/record` | 提交学习记录（答错自动写入错题本） | JSON |
 | `GET` | `/api/evaluate/record` | 查询学习记录 | JSON |
 | `GET` | `/api/evaluate/wrong-book` | 错题本 | JSON |
 | `PATCH` | `/api/evaluate/wrong-book/{question_id}` | 更新错题状态 | JSON |
@@ -504,8 +531,8 @@ POST /api/courses/{course_id}/profile/conversations/{conversation_id}/messages
     "sources": ["dialogue"],
     "agent_run": {
       "agent_name": "ProfileAgent",
-      "provider": "deepseek",
-      "model": "deepseek-chat",
+      "provider": "spark",
+      "model": "4.0Ultra",
       "status": "completed",
       "fallback_used": false,
       "duration_ms": 1234
@@ -612,6 +639,8 @@ TutorAgent  EvaluateAgent  ← 用户主动触发
 | **TutorAgent** | 智能辅导问答 | question, context, explanation_style | chat_response + diagrams + references |
 | **EvaluateAgent** | 学习效果评估 | student_id, profile, records, path | overall_score + dimensions + suggestions |
 
+> 所有 Agent 统一通过 `LLMClient` 调用讯飞星火 Spark Ultra-32K，DeepSeek 作为备用降级方案（默认关闭）。
+
 ### 7.3 防幻觉机制
 
 在每个 Agent 的 System Prompt 中嵌入以下约束：
@@ -641,7 +670,26 @@ RAG 增强：生成内容附带"参考来源"，提升内容可信度。
 - 当 R 降至阈值（0.6）以下 → 自动推送复习内容
 - 存储于 `student_profiles.memory_strength` 字段
 
-### 8.2 多解释路径生成
+### 8.2 错题本自动收集与间隔复习
+
+**核心机制**：
+- 学生在练习题中答错时，系统自动将题目写入 `wrong_questions` 表
+- 同一学生同一题目再次答错时，`wrong_count` 自增而非重复插入
+- 错题本页面支持按状态筛选（待复习/复习中/已掌握）
+- 复习时连续答对 2 次，自动标记为"已掌握"
+- 页面可见时自动刷新，从练习页返回即看到新错题
+
+**数据流**：
+```
+练习答题 → POST /evaluate/record (is_correct=false)
+         → record_learning() 检测答错
+         → _upsert_wrong_question() 写入错题本
+         → 返回 { added_to_wrong_book: true }
+
+切换到错题本 → visibilitychange 触发 → 自动刷新 → 显示新错题
+```
+
+### 8.3 多解释路径生成
 
 TutorAgent 支持 4 种解释风格切换：
 - 类比法（analogy）：日常生活类比
