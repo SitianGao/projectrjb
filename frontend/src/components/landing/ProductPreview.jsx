@@ -99,7 +99,7 @@ export default function ProductPreview() {
           <span className="lp-preview-dot lp-preview-dot--red" />
           <span className="lp-preview-dot lp-preview-dot--yellow" />
           <span className="lp-preview-dot lp-preview-dot--green" />
-          <span className="lp-preview-window__title">EduAgent — 学习概览</span>
+          <span className="lp-preview-window__title">智学相伴 — 学习概览</span>
         </div>
 
         <div className="lp-preview-window__body">

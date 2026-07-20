@@ -90,7 +90,7 @@ export default function RegisterPage() {
         <div className="login-form-wrap">
           <div className="auth-header">
             <Title level={3}>📚 创建账号</Title>
-            <Text type="secondary">加入智能学习平台，开启学习之旅</Text>
+            <Text type="secondary">加入智学相伴，开启学习之旅</Text>
           </div>
 
           {error && (

@@ -19,7 +19,7 @@ const DOC_SECTIONS = [
     title: '平台简介',
     content: (
       <Paragraph style={{ fontSize: 14, lineHeight: 2 }}>
-        智能学习平台是一个 AI 驱动的个性化学习系统。它融合了<strong>智能辅导</strong>、<strong>学习资源推荐</strong>、
+        智学相伴是一个 AI 驱动的个性化学习系统。它融合了<strong>智能辅导</strong>、<strong>学习资源推荐</strong>、
         <strong>自适应路径规划</strong>与<strong>六维学习画像</strong>四大核心能力，为你打造专属的学习体验。
         无论你是想提升某个学科、备战考试，还是希望系统性地规划学习路线，平台都能根据你的学习画像
         提供精准的个性化服务。

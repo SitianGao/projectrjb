@@ -33,8 +33,8 @@ export default function LandingNavbar() {
       <div className="lp-navbar__inner">
         <div className="lp-navbar__brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <RobotOutlined className="lp-navbar__logo-icon" />
-          <span className="lp-navbar__logo-text">EduAgent</span>
-          <span className="lp-navbar__logo-sub">智能学习平台</span>
+          <span className="lp-navbar__logo-text">智学相伴</span>
+          <span className="lp-navbar__logo-sub">EduAgent</span>
         </div>
 
         <div className="lp-navbar__links">

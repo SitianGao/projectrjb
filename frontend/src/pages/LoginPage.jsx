@@ -53,7 +53,7 @@ export default function LoginPage() {
       <div className="login-right">
         <div className="login-form-wrap">
           <div className="auth-header">
-            <Title level={3}>📚 智能学习平台</Title>
+            <Title level={3}>📚 智学相伴</Title>
             <Text type="secondary">欢迎回来，请登录您的账号</Text>
           </div>
 

@@ -10,7 +10,7 @@ export default function FinalCTA() {
       <div className="lp-cta__inner">
         <h2 className="lp-cta__title">开启属于你的个性化学习路径</h2>
         <p className="lp-cta__desc">
-          从一次自然语言对话开始，让 EduAgent 理解你的目标、基础与薄弱点，并生成完整的学习计划。
+          从一次自然语言对话开始，让智学相伴理解你的目标、基础与薄弱点，并生成完整的学习计划。
         </p>
         <Space size={16}>
           <Button

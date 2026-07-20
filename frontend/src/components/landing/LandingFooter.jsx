@@ -6,7 +6,7 @@ export default function LandingFooter() {
       <div className="lp-footer__inner">
         <div className="lp-footer__brand">
           <RobotOutlined className="lp-footer__icon" />
-          <span className="lp-footer__name">EduAgent 智能学习平台</span>
+          <span className="lp-footer__name">智学相伴</span>
         </div>
         <div className="lp-footer__info">
           <span>第十五届中国软件杯 A3 赛题作品</span>

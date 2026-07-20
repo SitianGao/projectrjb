@@ -702,7 +702,7 @@ function ProfileWorkspace({ studentId, activeCourse, updateCourse }) {
           {/* 项目标题 */}
           <div style={{ textAlign: 'center', marginBottom: 12 }}>
             <Title level={2} style={{ margin: 0, fontWeight: 700, background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: 2 }}>
-              智能学习平台
+              智学相伴
             </Title>
             <Text type="secondary" style={{ fontSize: 14 }}>个性化 AI 学习助手</Text>
             {restoredPath?.stages?.length > 0 && (

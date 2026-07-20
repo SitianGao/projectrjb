@@ -11,28 +11,28 @@ const STEPS = [
     title: '构建画像',
     desc: '通过对话式交互，AI 自动构建包含知识基础、学习目标、认知风格等六维度的学生画像。',
     color: '#6256e8',
-    screenshot: '/screenshots/frontend-profile-final.png',
+    screenshot: '/screenshots/loop-1.png',
   },
   {
     icon: <CompassOutlined />,
     title: '生成路径',
     desc: 'PlannerAgent 根据画像和课程目标，生成分阶段、可解锁的个性化学习路径。',
     color: '#258cf4',
-    screenshot: '/screenshots/frontend-learning-path.png',
+    screenshot: '/screenshots/loop-2.png',
   },
   {
     icon: <ReadOutlined />,
     title: '执行任务',
     desc: '学生按照路径学习，ResourceAgent 生成讲义、练习题等资源，TutorAgent 提供实时辅导。',
     color: '#2ac99a',
-    screenshot: '/screenshots/frontend-home.png',
+    screenshot: '/screenshots/loop-3.png',
   },
   {
     icon: <BarChartOutlined />,
     title: '学习评估',
     desc: 'EvaluateAgent 对学习成果进行多维度评估，输出能力雷达图和薄弱知识点诊断。',
     color: '#fa8c16',
-    screenshot: '/screenshots/report-full.png',
+    screenshot: '/screenshots/loop-4.png',
   },
 ]
 

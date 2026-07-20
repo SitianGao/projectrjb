@@ -67,7 +67,6 @@ function AuthLayout() {
     { label: 'AI 学习助手', path: activeCourse?.id ? `/course/${activeCourse.id}/ai-workspace` : '/ai-workspace', match: (p) => p.includes('/ai-workspace') || p.includes('/chat'), icon: <RobotOutlined /> },
     { label: '学习评估', path: '/assessment/dashboard', match: (p) => p.startsWith('/assessment') || p.includes('/assessment') || p.includes('/test') || p === '/evaluate', icon: <CheckCircleOutlined /> },
     { label: '我的学习资料', path: '/resources', match: (p) => p === '/resources' || p.startsWith('/resources?') || p.startsWith('/resources/'), icon: <FileTextOutlined /> },
-    { label: '产品主页', path: '/landing', match: (p) => p === '/landing', icon: <RocketOutlined /> },
   ]
 
   // 用户下拉菜单项
@@ -116,7 +115,7 @@ function AuthLayout() {
       <div className="top-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           <Text strong style={{ color: 'var(--text-primary)', fontSize: 18, cursor: 'pointer' }} onClick={() => navigate('/home')}>
-            🤖 智能学习平台
+            🤖 智学相伴
           </Text>
           {navItems.map((item) => {
             const active = item.match(location.pathname)
@@ -294,6 +293,9 @@ export default function App() {
           <LandingPage />
         </Suspense>
       } />
+
+      {/* 首页默认跳转到产品主页 */}
+      <Route path="/" element={<Navigate to="/landing" replace />} />
 
       {/* 需要登录的页面 */}
       <Route path="/*" element={
